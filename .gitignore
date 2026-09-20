@@ -1,0 +1,66 @@
+# ============================================
+# Unity 项目通用忽略
+# ============================================
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.suo
+
+# Unity 自动生成
+*.unityproj
+*.pidb.meta
+sysinfo.txt
+
+# 打包产物
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+
+# ============================================
+# Codely 工具缓存和包（重点）
+# ============================================
+.codely-cli/
+.codely.packages/
+
+# ============================================
+# 超大文件
+# ============================================
+# 129MB 的 TMP 字体图集，本地按需重新生成
+Assets/TextMesh Pro/Resources/Fonts & Materials/lemixisu SDF.asset
+
+# ============================================
+# 系统文件
+# ============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.log
+
+# Visual Scripting auto-generated files
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db.meta
