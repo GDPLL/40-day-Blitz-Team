@@ -1,0 +1,9 @@
+﻿<Solution>
+  <Project Path="Cn.Tuanjie.Codely.Editor.csproj" />
+  <Project Path="UnityTcp.Editor.csproj" />
+  <Project Path="tjgenerators.Editor.csproj" />
+  <Project Path="UnityTcp.CustomTool.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="TJGenerators.Runtime.csproj" />
+  <Project Path="Codely.Common.csproj" />
+</Solution>

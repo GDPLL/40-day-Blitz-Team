@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class Gun_Control : MonoBehaviour
 {
+    [Header("朝向焦点")]
+    public float focusDistance = 10f;   // 按住左键时，人物朝向相机射线前方 focusDistance 处的焦点
+
     public Transform shootPoint;   // 发射点（枪口）
     public LineRenderer line;      // 射线显示
     public AudioSource audioSource;
@@ -25,11 +28,15 @@ public class Gun_Control : MonoBehaviour
     float recoilRecoverSpeed;                // 后坐力恢复速率
     float originalRecoilX, originalRecoilY;  // 原始后坐力（肩射减后坐力后恢复用）
 
+    [Header("举枪 / 收枪")]
+    public float aimSmooth = 10f;            // 举枪、收枪的插值速度
+    Quaternion originalLocalRot;             // 初始局部旋转（收枪目标）
+
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
     float lastShotTime;            // 上次射击时间
 
-    public RectTransform uiFocuspos;      // 中心UI
+    RectTransform uiFocuspos;      // 中心UI
 
     void Start()
     {
@@ -37,9 +44,14 @@ public class Gun_Control : MonoBehaviour
         if (line != null) line.enabled = false;
         originalRecoilX = recoilX;   // 记录原始后坐力（肩射减后坐力恢复用）
         originalRecoilY = recoilY;
+        originalLocalRot = transform.localRotation;   // 记录初始局部旋转（收枪目标）
     }
 
-    void FixedUpdate()
+    public void Gun_Control_Init(RectTransform rectTransform)
+    {
+        uiFocuspos =rectTransform;
+    }
+    public void Gun_Control_FixedUpdate()
     {
         fireTimer += Time.deltaTime;
         // 射线短暂显示后消失
@@ -91,7 +103,6 @@ public class Gun_Control : MonoBehaviour
         if (Physics.Raycast(origin, dir, out RaycastHit hit, range))
         {
             end = hit.point;                                        // 命中落点
-            Debug.Log($"{end},{hit.collider.gameObject.name}");
 
             // 在落点生成对象
             if (hitEffect != null)
@@ -140,5 +151,41 @@ public class Gun_Control : MonoBehaviour
     {
         recoilX = originalRecoilX * (on ? 0.3f : 1f);
         recoilY = originalRecoilY * (on ? 0.3f : 1f);
+    }
+
+    // 举枪：枪口指向世界坐标 aimPoint
+    public void AimAt()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(uiFocuspos.position);
+        Vector3 Point;
+        if (TryGetAimPoint(ray, out Vector3 hitPoint))
+            Point = hitPoint;                    // 命中对象：瞄准碰撞落点
+        else
+            Point = ray.GetPoint(focusDistance); // 未命中：回到固定焦点距离
+        Quaternion worldLook = Quaternion.LookRotation(Point - transform.position, Vector3.up);
+        Quaternion targetRot = transform.parent != null
+            ? Quaternion.Inverse(transform.parent.rotation) * worldLook
+            : worldLook;
+
+        transform.localRotation = Quaternion.Slerp(transform.localRotation, targetRot, Time.deltaTime * aimSmooth);
+    }
+
+    // 收枪：回到初始局部旋转
+    public void AimDown()
+    {
+        transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
+    }
+
+    bool TryGetAimPoint(Ray ray, out Vector3 aimPoint)
+    {
+        aimPoint = Vector3.zero;
+        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.collider.CompareTag("Player")) continue;   // 跳过玩家自身
+            aimPoint = hit.point;
+            return true;
+        }
+        return false;
     }
 }
