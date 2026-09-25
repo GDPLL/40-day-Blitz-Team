@@ -17,6 +17,9 @@ public class Player_Control : Character_Move
 
     public Gun_Control gun_Control;
 
+    [Header("精度：目标检测")]
+    public LayerMask enemyMask;      // 哪些层算敌人（给瞄准精度用）
+
     public Player_camera camShake;   // 相机震动脚本（开火时触发）
 
     public Player_Input input;  
@@ -73,7 +76,15 @@ public class Player_Control : Character_Move
 
         // 右键：切换肩射模式 + 后坐力减少 70%
         if (camShake != null) camShake.SetShoulderAim(isMouse2Down);
-        if (gun_Control != null) gun_Control.SetRecoilReduction(isMouse2Down);
+
+        // 【新增】把姿态 / 移动状态 / 目标坐标喂给枪，枪只负责存和算
+        if (gun_Control != null)
+        {
+            gun_Control.SetRecoilReduction(isMouse2Down);
+            gun_Control.SetAimState(isMouse2Down, false);          // 右键=据枪；开镜还没输入，先传 false
+            gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
+            UpdateAimTarget();
+        }
     }
 
     // 只负责读输入
@@ -130,6 +141,34 @@ public class Player_Control : Character_Move
         Player_camera = cam;
         camShake = camRig;
         if (camRig != null) camRig.Player = Head;   // 第三人称相机跟随本地玩家头部
+    }
+
+    // 【新增】找瞄准范围内"最靠近枪口方向"的目标，把它的坐标交给枪
+    // 这里是"外界"，负责去场景里找；Gun 不参与查找，只负责判定和存数据
+    void UpdateAimTarget()
+    {
+        Vector3 origin = gun_Control.MuzzlePosition;
+        Collider[] cols = Physics.OverlapSphere(origin, gun_Control.range, enemyMask);
+
+        float bestAngle = float.MaxValue;
+        Vector3 bestPos = Vector3.zero;
+        bool found = false;
+
+        foreach (Collider col in cols)
+        {
+            if (col.transform.IsChildOf(transform)) continue;   // 跳过自己身上的碰撞体
+
+            Vector3 center = col.bounds.center;                 // 用包围盒中心，比 pivot 稳
+            float angle = Vector3.Angle(gun_Control.transform.forward, center - origin);
+            if (angle < bestAngle)
+            {
+                bestAngle = angle;
+                bestPos   = center;
+                found     = true;
+            }
+        }
+
+        gun_Control.SetTarget(found, bestPos);
     }
 
     void ForwardInputToBody(float X, float Y)
