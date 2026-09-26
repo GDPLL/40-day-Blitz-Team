@@ -2,6 +2,9 @@
   "dependencies": {
     "cn.tuanjie.ai.generators": "file:../.codely-cli/extensions/TJGenerators/Packages/cn.tuanjie.ai.generators",
     "cn.tuanjie.codely.bridge": "file:../.codely.packages/cn.tuanjie.codely.bridge@1.0.85-785dea6a",
+    "cn.unity.uos.launcher": "https://cnb.cool/unity/uos/UOSLauncher.git",
+    "cn.unity.uos.sync.relay": "https://cnb.cool/unity/uos/SyncRelaySDK.git",
+    "cn.unity.uos.transport.kcp2k": "https://cnb.cool/unity/uos/Transport.git?path=/kcp2k",
     "com.unity.animation.rigging": "1.2.1",
     "com.unity.ide.visualstudio": "2.0.28",
     "com.unity.netcode.gameobjects": "1.13.1",

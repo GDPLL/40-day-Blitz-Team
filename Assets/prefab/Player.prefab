@@ -112,6 +112,14 @@ MonoBehaviour:
   maxRecoil: 0.5
   recoilRecoverFactor: 2
   aimSmooth: 10
+  nearDistance: 5
+  farDistance: 40
+  farFactor: 0.15
+  moveFactorSquatStand: 1.3
+  moveFactorStand: 1
+  moveFactorSquatWalk: 0.7
+  moveFactorWalk: 0.5
+  moveFactorRun: 0.25
 --- !u!120 &886811154986688294
 LineRenderer:
   serializedVersion: 2
@@ -639,10 +647,13 @@ MonoBehaviour:
   squatSpeed: 1
   Head: {fileID: 7295220296533284295}
   UIFocus: {fileID: 0}
+  rigidbody: {fileID: 6445952189836789830}
   Player_camera: {fileID: 0}
   groundCheckDistance: 0.2
   gun_Control: {fileID: 278098467587173686}
-  enemyMask: 256
+  enemyMask:
+    serializedVersion: 2
+    m_Bits: 0
   camShake: {fileID: 0}
   body: {fileID: -12797140595565352}
   input: {fileID: -6448023826613531737}

@@ -6,4 +6,5 @@
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="TJGenerators.Runtime.csproj" />
   <Project Path="Codely.Common.csproj" />
+  <Project Path="Unity.UOS.Encrypt.csproj" />
 </Solution>

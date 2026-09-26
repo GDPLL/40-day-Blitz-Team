@@ -4,26 +4,28 @@ using Unity.Netcode;
 
 public class GameManager : MonoBehaviour
 {
-    // 游戏状态：房间中 -> 关卡 -> 结算
+    // 游戏状态
     public enum GameState { 房间中, 关卡, 结算 }
     public static GameState State { get; private set; } = GameState.房间中;
 
     [Header("关卡设置")]
-    public string levelSceneName = "SampleScene";   // 游戏关卡场景名
-    public GameObject playerPrefab;                 // 每个玩家的角色预制体
-    public Vector3 startPos;                        // 玩家出生起点，X 依次 +2
+    public string levelSceneName = "SampleScene";   // 关卡场景名
+    public GameObject playerPrefab;                 // 角色预制体
+    public Vector3 startPos;                        // 出生起点
 
-    bool levelEntered;      // 已进入关卡（服务器已生成玩家）
-    bool localReady;        // 本地玩家已出现并完成初始化
+    bool levelEntered;      // 已进入关卡
+    bool localReady;        // 本地玩家已初始化
 
+    // 跨场景保留
     void Awake()
     {
-        DontDestroyOnLoad(gameObject);   // 跨场景不删除（保持唯一 GameManager）
+        DontDestroyOnLoad(gameObject);
     }
 
+    // 驱动状态与玩家生成
     void Update()
     {
-        // 不在关卡中 -> 回到房间中状态
+        // 不在关卡则回房间状态
         if (SceneManager.GetActiveScene().name != levelSceneName)
         {
             levelEntered = false;
@@ -32,7 +34,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 进入关卡（首次）：服务器生成所有玩家
+        // 首次进关卡生成玩家
         if (!levelEntered)
         {
             levelEntered = true;
@@ -41,7 +43,7 @@ public class GameManager : MonoBehaviour
                 SpawnPlayers();
         }
 
-        // 本地玩家出现后：统一初始化（绑定相机/UI + 初始化敌人）
+        // 本地玩家出现后初始化
         if (!localReady &&
             NetworkManager.Singleton != null &&
             NetworkManager.Singleton.LocalClient != null &&
@@ -52,7 +54,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // 服务器：为每个已连接客户端生成一个玩家对象（归属各自客户端，各自控制）
+    // 为每个客户端生成玩家
     void SpawnPlayers()
     {
         int i = 0;
@@ -65,7 +67,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // 每个客户端各自执行：本地玩家接入场景相机/UI，并初始化所有敌人
+    // 绑定本地相机与UI
     void InitLocalPlayer()
     {
         Transform local = NetworkManager.Singleton.LocalClient.PlayerObject.transform;
@@ -83,7 +85,7 @@ public class GameManager : MonoBehaviour
        
     }
 
-    // 结算（战斗结束/胜负判定后手动调用）
+    // 结束游戏
     public void EndGame()
     {
         State = GameState.结算;

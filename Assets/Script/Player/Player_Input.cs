@@ -4,26 +4,25 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
-/// <summary>
-/// 获取输入，分发事件
-/// </summary>
+// 输入层，读取输入并分发事件
 public class Player_Input : MonoBehaviour
 {
-    //游戏活动输入事件合集
-    public event Action<Vector2> Move_event;     //移动事件
-    public event Action<bool> JumpDown_event;          //跳跃按下
-    public event Action<bool> Mouse1_event;      //左键
-    public event Action<bool> Mouse2_event;      //右键
-    public event Action<bool> MouseHeld_event;   //鼠标按下
-    public event Action<bool> Run_event;         //奔跑事件
-    public event Action ReloadHeld_event;       //换弹事件
-    public event Action<bool> Squat_event;       //蹲下事件
+    // 输入事件
+    public event Action<Vector2> Move_event;     // 移动事件
+    public event Action<bool> JumpDown_event;          // 跳跃
+    public event Action<bool> Mouse1_event;      // 左键
+    public event Action<bool> Mouse2_event;      // 右键
+    public event Action<bool> MouseHeld_event;   // 鼠标按住
+    public event Action<bool> Run_event;         // 奔跑
+    public event Action ReloadHeld_event;       // 换弹
+    public event Action<bool> Squat_event;       // 蹲下
 
+    // 每帧读取并分发输入
     void Update()
     {
         Input_get();
 
-        //移动：每帧上报输入轴
+        //移动输入
         if (WASDHeld || MoveAxis != Vector2.zero)
         {
             Move(MoveAxis);
@@ -34,7 +33,7 @@ public class Player_Input : MonoBehaviour
         Mouse1(Mouse1Held);
         //右键
         Mouse2(Mouse2Held);
-        //鼠标按住（左键或右键）
+        //鼠标按住
         MouseDown(MouseHeld);
         //奔跑
         Run(RunHeld);
@@ -47,7 +46,7 @@ public class Player_Input : MonoBehaviour
         Squat(SquatHeld);
     }
 
-    //调用事件
+    // 事件分发
     public void Move(Vector2 vector2)
     {
         Move_event?.Invoke(vector2);
@@ -92,9 +91,7 @@ public class Player_Input : MonoBehaviour
     public bool ReloadHeld;         //换弹输入
     public bool SquatHeld;          //蹲下输入
 
-    /// <summary>
-    /// 获取输入状态
-    /// </summary>
+    // 读取输入状态
     void Input_get()
     {
         MoveAxis = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));

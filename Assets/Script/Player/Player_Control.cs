@@ -6,30 +6,27 @@ using Unity.Netcode;
 using Unity.VisualScripting;
 using System;
 
-/// <summary>
-/// 提供玩家对象相关组件引用，提供行为方法作为最终描述环节
-/// </summary>
+// 玩家行为控制，持有各组件引用
 public class Player_Control : Character_Move
 {
-    NetworkObject netObj;   // 联网对象（用于判断是否本地玩家）
+    NetworkObject netObj;   // 联网对象
 
-    public Transform Head;
-    public RectTransform UIFocus;
-
-    public Camera Player_camera;
+    // 外部引用
+    public Transform Head;                       // 头部
+    public RectTransform UIFocus;                // 准星UI
+    public Rigidbody rigidbody;                  // 刚体
+    public Camera Player_camera;                 // 相机
+    public Gun_Control gun_Control;              // 枪械
+    public Player_camera camShake;               // 相机震动
+    public Player_Body body;                     // 本体
+    public Player_Input input;                   // 输入
+    public Player_animation player_Animation;    // 动画
 
     [Header("落地检测")]
     public float groundCheckDistance = 0.2f;  // 落地检测距离
 
-    public Gun_Control gun_Control;
-
     [Header("精度：目标检测")]
-    public LayerMask enemyMask;      // 哪些层算敌人（给瞄准精度用）
-    
-    public Player_camera camShake;   // 相机震动脚本（开火时触发）
-    public Player_Body body;
-    public Player_Input input;
-    public Player_animation player_Animation;
+    public LayerMask enemyMask;      // 敌人层
 
     //本地状态
     public bool isOnGround;  //在地面
@@ -43,50 +40,69 @@ public class Player_Control : Character_Move
     public bool isSquat;        //蹲下输入
 
 
+    // 取缺失的组件引用
     void Awake()
     {
         if (body == null) body = GetComponent<Player_Body>();
         if (input == null) input = GetComponent<Player_Input>();
     }
 
+    // 初始化组件与输入
     void Start()
     {
         netObj = GetComponent<NetworkObject>();
 
+        UIFocus = Player_Main.UI_RectTransform;
 
-        // 非本地玩家：不做本地控制/不绑相机，物理交给网络同步
+    
+        if (Player_camera == null)
+        {
+            Debug.LogError("Player_camera==null");
+        }
+        if (UIFocus == null)
+        {
+            Debug.LogError("UIFocus==null");
+        }
+        if (rigidbody == null)
+        {
+            Debug.LogError("rigidbody==null");
+        }
+
+        // 非本地玩家不控制
 
         if (netObj != null && !netObj.IsOwner)
         {
-            //rb.isKinematic = true;
             Debug.Log("非本地玩家，已禁用本地控制");
             return;
         }
 
-        // 隐藏并锁定鼠标到屏幕中心，不让其移出屏幕
+        // 锁定并隐藏鼠标
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // 输入事件注册（只有本地玩家注册）
+        // 注册输入事件
         RegisterInputEvents();
 
-
+        body.Body_Init(Player_camera, UIFocus, rigidbody);
+        gun_Control.Gun_Control_Init(UIFocus);
     }
 
+    // 注册输入事件
     void RegisterInputEvents()
     {
         if (input == null) return;
 
         input.Move_event += OnMove;                 //移动
         input.JumpDown_event += OnJumpDown;         //跳跃
-        input.Mouse1_event += OnMouse1;             //左键（开火）
-        input.Mouse2_event += OnMouse2;             //右键（肩射）
-        input.MouseHeld_event += OnMouseHeld;       //鼠标按住（举枪/瞄准）
+        input.Mouse1_event += OnMouse1;             //左键
+        input.Mouse2_event += OnMouse2;             //右键
+        input.MouseHeld_event += OnMouseHeld;       //鼠标按住
         input.Run_event += OnRun;                   //奔跑
         input.ReloadHeld_event += OnReloadHeld;     //换弹
         input.Squat_event += OnSquat;               //蹲下
     }
 
+    // 反注册输入事件
     void UnregisterInputEvents()
     {
         if (input == null) return;
@@ -106,10 +122,7 @@ public class Player_Control : Character_Move
         UnregisterInputEvents();
     }
 
-    /// <summary>
-    /// 保持奔跑并传入移动方向
-    /// </summary>
-    /// <param name="axis"></param>
+    // 移动，axis为输入轴
     void OnMove(Vector2 axis)
     {
         try
@@ -133,9 +146,7 @@ public class Player_Control : Character_Move
         }
     }
 
-    /// <summary>
-    /// 施加向上力
-    /// </summary>
+    // 跳跃
     void OnJumpDown(bool on)
     {
         isJumpDown = on;
@@ -146,9 +157,7 @@ public class Player_Control : Character_Move
 
     }
 
-    /// <summary>
-    /// 左键：按下时每帧开火（射速由 Gun_Control 内部限流），松开立即停止开火
-    /// </summary>
+    // 左键开火
     void OnMouse1(bool on)
     {
         isMouse1Down = on;
@@ -164,15 +173,13 @@ public class Player_Control : Character_Move
         }
         else
         {
-            
+
         }
 
 
     }
 
-    /// <summary>
-    /// 右键：按下进入肩射（相机肩射 + 后坐力减少 70%），松开恢复
-    /// </summary>
+    // 右键肩射
     void OnMouse2(bool on)
     {
         isMouse2Down = on;
@@ -183,9 +190,7 @@ public class Player_Control : Character_Move
         }
     }
 
-    /// <summary>
-    /// 鼠标按住（左键或右键）：按下举枪并朝向准星，松开放下枪
-    /// </summary>
+    // 举枪瞄准
     void OnMouseHeld(bool on)
     {
         if (on)
@@ -201,68 +206,60 @@ public class Player_Control : Character_Move
 
     }
 
-    /// <summary>
-    ///  奔跑（状态每帧上报，松开即为 false）
-    /// </summary>
+    // 奔跑
     void OnRun(bool on)
     {
         isRuning = on;
     }
 
-    /// <summary>
-    ///  换弹
-    /// </summary>
+    // 换弹
     void OnReloadHeld()
     {
         if (input != null) isReload = input.ReloadHeld;
         if (isReload && gun_Control != null) gun_Control.Reload();
     }
 
-    /// <summary>
-    ///  蹲下（状态每帧上报，松开即为 false）
-    /// </summary>
+    // 蹲下
     void OnSquat(bool on)
     {
         isSquat = on;
 
     }
 
-    // 右键状态应用：相机肩射 + 枪械后坐力减免
+    // 空方法，待实现
     void ApplyAimState(bool on)
     {
-
-
     }
 
+    // 每帧更新本地控制
     void Update()
     {
         if (netObj != null && !netObj.IsOwner) return;   // 非本地对象不更新
-        if (Player_camera == null) return;               // 等关卡管理器绑定本地相机后再控制
+        if (Player_camera == null) return;               // 等相机绑定后再控制
 
-        //键盘输入状态检测
+        // 落地检测
         isOnGround = IsGrounded();
 
         if (input == null || body == null || gun_Control == null) return;
 
-        // 本地向量数据计算
+        // 计算移动数据
         body.Player_Body_Update(input.MoveAxis, isRuning, isSquat);
 
         // 动画更新
         player_Animation.Player_animation_Update(this);
 
-        //把姿态 / 移动状态 / 目标坐标喂给枪
+        // 传递枪械状态
+        gun_Control.SetRecoilReduction(isMouse2Down);
+        gun_Control.SetAimState(isMouse2Down, false);          // 开镜未接入，传 false
+        gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
+        UpdateAimTarget();
 
-            gun_Control.SetRecoilReduction(isMouse2Down);
-            gun_Control.SetAimState(isMouse2Down, false);          // 右键=据枪；开镜还没输入，先传 false
-            gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
-            UpdateAimTarget();
-        
     }
 
     // 只负责读输入
     void ReadInput(out float X, out float Y)
     {
-        X = 0f;                 
+        X = 0f;
         Y = 0f;
 
         if (input == null) return;
@@ -271,12 +268,13 @@ public class Player_Control : Character_Move
         Y = input.MoveAxis.y;
         isMouse1Down = input.Mouse1Held;
         isMouse2Down = input.Mouse2Held;
-        isJumpDown   = input.JumpDownHeld;
-        isReload     = input.ReloadHeld;
-        isWASDDowm   = input.WASDHeld;
-        isRuning     = input.RunHeld && (isMouse2Down == false);
-        isSquat      = input.SquatHeld;
+        isJumpDown = input.JumpDownHeld;
+        isReload = input.ReloadHeld;
+        isWASDDowm = input.WASDHeld;
+        isRuning = input.RunHeld && (isMouse2Down == false);
+        isSquat = input.SquatHeld;
     }
+    // 物理帧更新
     void FixedUpdate()
     {
         body.Local_FixedUpdate();
@@ -284,7 +282,7 @@ public class Player_Control : Character_Move
         gun_Control.Gun_Control_FixedUpdate();
     }
 
-    // 检测角色是否站在地面上
+    // 落地检测
     bool IsGrounded()
     {
         Collider col = GetComponent<Collider>();
@@ -297,16 +295,15 @@ public class Player_Control : Character_Move
     }
 
 
-    // 由关卡管理器统一调用：给本地玩家绑定场景相机/UI/相机跟随（替代分散的 Player_Main 初始化）
+    // 绑定本地相机
     public void SetupLocal(Camera cam, Player_camera camRig, RectTransform ui)
     {
         Player_camera = cam;
         camShake = camRig;
-        if (camRig != null) camRig.Player = Head;   // 第三人称相机跟随本地玩家头部
+        if (camRig != null) camRig.Player = Head;   // 相机跟随头部
     }
 
-    // 【新增】找瞄准范围内"最靠近枪口方向"的目标，把它的坐标交给枪
-    // 这里是"外界"，负责去场景里找；Gun 不参与查找，只负责判定和存数据
+    // 找射程内最接近枪口方向的敌人
     void UpdateAimTarget()
     {
         Vector3 origin = gun_Control.MuzzlePosition;
@@ -318,28 +315,18 @@ public class Player_Control : Character_Move
 
         foreach (Collider col in cols)
         {
-            if (col.transform.IsChildOf(transform)) continue;   // 跳过自己身上的碰撞体
+            if (col.transform.IsChildOf(transform)) continue;   // 跳过自身
 
-            Vector3 center = col.bounds.center;                 // 用包围盒中心，比 pivot 稳
+            Vector3 center = col.bounds.center;                 // 取包围盒中心
             float angle = Vector3.Angle(gun_Control.transform.forward, center - origin);
             if (angle < bestAngle)
             {
                 bestAngle = angle;
-                bestPos   = center;
-                found     = true;
+                bestPos = center;
+                found = true;
             }
         }
 
         gun_Control.SetTarget(found, bestPos);
-    }
-
-    void ForwardInputToBody(float X, float Y)
-    {
-        body.SetMoveInput(new Vector2(X, Y));
-        body.SetMoveHeld(isWASDDowm);
-        body.SetRun(isRuning);
-        body.SetSquat(isSquat);
-        body.SetJumpHeld(isJumpDown);
-        body.SetAim(isMouseDown);
     }
 }
