@@ -4,18 +4,35 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
-// 输入层，读取输入并分发事件
-public class Player_Input : MonoBehaviour
+// 全局输入管理，跨场景常驻
+public class Input_Manage : MonoBehaviour
 {
+    public static Input_Manage Instance { get; private set; }   // 全局实例
+
     // 输入事件
-    public event Action<Vector2> Move_event;     // 移动事件
-    public event Action<bool> JumpDown_event;          // 跳跃
+    public event Action<Vector2> Move_event;     // 移动
+    public event Action<bool> JumpDown_event;    // 跳跃
     public event Action<bool> Mouse1_event;      // 左键
     public event Action<bool> Mouse2_event;      // 右键
     public event Action<bool> MouseHeld_event;   // 鼠标按住
     public event Action<bool> Run_event;         // 奔跑
-    public event Action ReloadHeld_event;       // 换弹
+    public event Action ReloadHeld_event;        // 换弹
     public event Action<bool> Squat_event;       // 蹲下
+    public event Action<bool> Debug_event;       // 调试面板
+
+    // 建立全局单例
+    void Awake()
+    {
+        if (Instance != null)
+        {
+            Debug.LogError("Input_Manage|Awake|已存在实例，销毁重复对象");
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
 
     // 每帧读取并分发输入
     void Update()
@@ -44,6 +61,8 @@ public class Player_Input : MonoBehaviour
         }
         //蹲下
         Squat(SquatHeld);
+        //调试呼出
+        DebugE(DebugKey);
     }
 
     // 事件分发
@@ -79,6 +98,10 @@ public class Player_Input : MonoBehaviour
     {
         Squat_event?.Invoke(on);
     }
+    public void DebugE(bool on)
+    {
+        Debug_event?.Invoke(on);
+    }
 
     //输入检测状态
     public Vector2 MoveAxis;        //移动输入轴
@@ -90,6 +113,7 @@ public class Player_Input : MonoBehaviour
     public bool RunHeld;            //奔跑输入
     public bool ReloadHeld;         //换弹输入
     public bool SquatHeld;          //蹲下输入
+    public bool DebugKey;           // 调试输入
 
     // 读取输入状态
     void Input_get()
@@ -102,7 +126,7 @@ public class Player_Input : MonoBehaviour
         RunHeld = Input.GetKey(KeyCode.LeftShift) && !Mouse2Held;       //奔跑输入
         ReloadHeld = Input.GetKey(KeyCode.R);            //换弹输入 
         SquatHeld = Input.GetKey(KeyCode.LeftControl);       //蹲下输入
-
+        DebugKey = Input.GetKey(KeyCode.BackQuote);         //调试输入按钮
     }
 
 

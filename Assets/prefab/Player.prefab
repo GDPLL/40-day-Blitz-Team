@@ -566,7 +566,6 @@ GameObject:
   - component: {fileID: -8760748900487357536}
   - component: {fileID: 6287345104829123456}
   - component: {fileID: 7686200710200441173}
-  - component: {fileID: -6448023826613531737}
   - component: {fileID: -12797140595565352}
   m_Layer: 0
   m_HasEditorInfo: 1
@@ -649,15 +648,15 @@ MonoBehaviour:
   UIFocus: {fileID: 0}
   rigidbody: {fileID: 6445952189836789830}
   Player_camera: {fileID: 0}
-  groundCheckDistance: 0.2
   gun_Control: {fileID: 278098467587173686}
+  camShake: {fileID: 0}
+  body: {fileID: -12797140595565352}
+  input: {fileID: 0}
+  player_Animation: {fileID: 581025581722992385}
+  groundCheckDistance: 0.2
   enemyMask:
     serializedVersion: 2
     m_Bits: 0
-  camShake: {fileID: 0}
-  body: {fileID: -12797140595565352}
-  input: {fileID: -6448023826613531737}
-  player_Animation: {fileID: 581025581722992385}
   isOnGround: 0
   isJumpDown: 0
   isMouse1Down: 0
@@ -770,26 +769,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6c0be61502bb534f922ebb746851216, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &-6448023826613531737
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7709504677304415273}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 889689302daa57147a42b2da46b99beb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  MoveAxis: {x: 0, y: 0}
-  JumpDownHeld: 0
-  Mouse1Held: 0
-  Mouse2Held: 0
-  WASDHeld: 0
-  RunHeld: 0
-  ReloadHeld: 0
-  SquatHeld: 0
 --- !u!114 &-12797140595565352
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -806,11 +785,11 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
-  uiFocuspos: {fileID: 0}
   moveForce: 700
   jumpForce: 100
   groundCheckDistance: 0.2
   rb: {fileID: 0}
+  uiFocuspos: {fileID: 0}
 --- !u!1001 &3258126144818772609
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class Player_animation : MonoBehaviour
 {
-    public Animator animation;   // 动画组件
+    public new Animator animation;   // 动画组件
 
     // 同步动画参数
     public void Player_animation_Update(Player_Control player_Control)

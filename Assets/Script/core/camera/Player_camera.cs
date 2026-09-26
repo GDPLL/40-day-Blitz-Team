@@ -8,7 +8,7 @@ public class Player_camera : MonoBehaviour
     public Transform Camera_Object;
     public Transform Target_Object;
 
-    public Transform Player;
+    public Transform PlayerHeadTransform;
 
     float mouseSensitivity = 1f;
     public float radius;
@@ -46,12 +46,19 @@ public class Player_camera : MonoBehaviour
         rotationX = transform.rotation.x;
         rotationY = transform.rotation.y;
         currentLocalOffset = new Vector3(0, 0, -radius) + startOffset;   // 初始为常规姿态
-        pNet = Player != null ? Player.GetComponentInParent<NetworkObject>() : null;
+        pNet = PlayerHeadTransform != null ? PlayerHeadTransform.GetComponentInParent<NetworkObject>() : null;
     }
 
     // 每帧更新视角与相机位置
     private void Update()
     {
+        // 引用为空或已销毁
+        if (PlayerHeadTransform == null || Target_Object == null || Camera_Object == null)
+        {
+            Debug.LogError($"Player_camera|Update|引用失效 PlayerHeadTransform={PlayerHeadTransform != null} 目标={Target_Object != null} 相机={Camera_Object != null}");
+            return;
+        }
+
         if (pNet != null && !pNet.IsOwner) return;   // 非本地玩家不更新
 
         // 视角旋转
@@ -89,7 +96,7 @@ public class Player_camera : MonoBehaviour
         }
 
         // 应用位置
-        Target_Object.position = Player.position;
+        Target_Object.position = PlayerHeadTransform.position;
         Camera_Object.transform.position = Target_Object.position + worldOffset + shakeOffset;
 
     }

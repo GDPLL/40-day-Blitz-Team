@@ -11,7 +11,7 @@ public class Player_Main : MonoBehaviour
     public RectTransform oUI_RectTransform; // 准星UI
 
     // 静态引用
-    public static Camera camera;                  // 相机
+    public static new Camera camera;              // 相机
     public static Player_camera player_Camera;    // 相机脚本
     public static RectTransform UI_RectTransform; // 准星UI
 

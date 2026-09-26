@@ -14,12 +14,12 @@ public class Player_Control : Character_Move
     // 外部引用
     public Transform Head;                       // 头部
     public RectTransform UIFocus;                // 准星UI
-    public Rigidbody rigidbody;                  // 刚体
+    public new Rigidbody rigidbody;              // 刚体，需在 Inspector 赋值
     public Camera Player_camera;                 // 相机
     public Gun_Control gun_Control;              // 枪械
     public Player_camera camShake;               // 相机震动
     public Player_Body body;                     // 本体
-    public Player_Input input;                   // 输入
+    public Input_Manage input;                   // 全局输入
     public Player_animation player_Animation;    // 动画
 
     [Header("落地检测")]
@@ -44,7 +44,6 @@ public class Player_Control : Character_Move
     void Awake()
     {
         if (body == null) body = GetComponent<Player_Body>();
-        if (input == null) input = GetComponent<Player_Input>();
     }
 
     // 初始化组件与输入
@@ -52,20 +51,23 @@ public class Player_Control : Character_Move
     {
         netObj = GetComponent<NetworkObject>();
 
+        if (input == null) input = Input_Manage.Instance;   // 全局输入单例
+        if (input == null) Debug.LogError("Player_Control|Start|未找到 Input_Manage");
+
         UIFocus = Player_Main.UI_RectTransform;
 
     
         if (Player_camera == null)
         {
-            Debug.LogError("Player_camera==null");
+            Debug.LogError("Player_Control|Start|Player_camera 为空");
         }
         if (UIFocus == null)
         {
-            Debug.LogError("UIFocus==null");
+            Debug.LogError("Player_Control|Start|UIFocus 为空");
         }
         if (rigidbody == null)
         {
-            Debug.LogError("rigidbody==null");
+            Debug.LogError("Player_Control|Start|rigidbody 为空");
         }
 
         // 非本地玩家不控制
@@ -90,7 +92,11 @@ public class Player_Control : Character_Move
     // 注册输入事件
     void RegisterInputEvents()
     {
-        if (input == null) return;
+        if (input == null)
+        {
+            Debug.LogError("Player_Control|RegisterInputEvents|input 为空");
+            return;
+        }
 
         input.Move_event += OnMove;                 //移动
         input.JumpDown_event += OnJumpDown;         //跳跃
@@ -131,11 +137,11 @@ public class Player_Control : Character_Move
         }
         catch (Exception e)
         {
-            Debug.LogError(e);
+            Debug.LogError($"Player_Control|OnMove|{e}");
         }
         if (body == null)
         {
-            Debug.LogError("body == null");
+            Debug.LogError("Player_Control|OnMove|body 为空");
             return;
         }
         if (isOnGround)
@@ -161,7 +167,11 @@ public class Player_Control : Character_Move
     void OnMouse1(bool on)
     {
         isMouse1Down = on;
-        if (gun_Control == null) return;
+        if (gun_Control == null)
+        {
+            Debug.LogError("Player_Control|OnMouse1|gun_Control 为空");
+            return;
+        }
 
         if (isMouse1Down)
         {
@@ -235,12 +245,22 @@ public class Player_Control : Character_Move
     void Update()
     {
         if (netObj != null && !netObj.IsOwner) return;   // 非本地对象不更新
-        if (Player_camera == null) return;               // 等相机绑定后再控制
+
+        // 等相机绑定后再控制
+        if (Player_camera == null)
+        {
+            Debug.LogError("Player_Control|Update|Player_camera 为空");
+            return;
+        }
 
         // 落地检测
         isOnGround = IsGrounded();
 
-        if (input == null || body == null || gun_Control == null) return;
+        if (input == null || body == null || gun_Control == null || player_Animation == null)
+        {
+            Debug.LogError("Player_Control|Update|input/body/gun_Control/player_Animation 为空");
+            return;
+        }
 
         // 计算移动数据
         body.Player_Body_Update(input.MoveAxis, isRuning, isSquat);
@@ -287,7 +307,11 @@ public class Player_Control : Character_Move
     {
         Collider col = GetComponent<Collider>();
         if (col == null) col = GetComponentInChildren<Collider>();
-        if (col == null) return false;
+        if (col == null)
+        {
+            Debug.LogError("Player_Control|IsGrounded|未找到 Collider");
+            return false;
+        }
 
         Vector3 origin = col.bounds.center;
         float rayDistance = col.bounds.extents.y + groundCheckDistance;
@@ -296,11 +320,21 @@ public class Player_Control : Character_Move
 
 
     // 绑定本地相机
-    public void SetupLocal(Camera cam, Player_camera camRig, RectTransform ui)
+    public void SetupLocal(Camera cam, Player_camera camRig)
     {
         Player_camera = cam;
         camShake = camRig;
-        if (camRig != null) camRig.Player = Head;   // 相机跟随头部
+
+        if (camRig == null)
+        {
+            Debug.LogError("Player_Control|SetupLocal|camRig 为空");
+            return;
+        }
+
+        if (Head == null) Debug.LogError("Player_Control|SetupLocal|Head 为空，相机无法跟随");
+
+        camRig.PlayerHeadTransform = Head;   // 相机跟随头部
+        Debug.Log($"{camRig.PlayerHeadTransform}完成绑定");
     }
 
     // 找射程内最接近枪口方向的敌人

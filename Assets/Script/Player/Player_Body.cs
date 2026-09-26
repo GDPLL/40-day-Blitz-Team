@@ -39,7 +39,11 @@ public class Player_Body : Character_Move
     // 按输入轴计算移动方向，axis为移动输入轴
     public void Player_Body_Update(Vector2 axis, bool run, bool squat)
     {
-        if (PlayerCamera == null) return;               // 等相机绑定后再控制
+        if (PlayerCamera == null)
+        {
+            Debug.LogError("Player_Body|Player_Body_Update|PlayerCamera 为空");
+            return;
+        }
 
         // 相机水平前向与右向
         Vector3 forward = PlayerCamera.transform.forward; forward.y = 0f; forward.Normalize();
@@ -74,7 +78,11 @@ public class Player_Body : Character_Move
     // 物理帧更新，落地检测与限速
     public void Local_FixedUpdate()
     {
-        if (PlayerCamera == null) return;   // 等相机绑定后再执行
+        if (PlayerCamera == null)
+        {
+            Debug.LogError("Player_Body|Local_FixedUpdate|PlayerCamera 为空");
+            return;
+        }
 
         IsGrounded = isGrounded();
         //地面移动
@@ -109,7 +117,11 @@ public class Player_Body : Character_Move
     {
         Collider col = GetComponent<Collider>();
         if (col == null) col = GetComponentInChildren<Collider>();
-        if (col == null) return false;
+        if (col == null)
+        {
+            Debug.LogError("Player_Body|isGrounded|未找到 Collider");
+            return false;
+        }
 
         Vector3 origin = col.bounds.center;
         float rayDistance = col.bounds.extents.y + groundCheckDistance;

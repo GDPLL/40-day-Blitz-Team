@@ -72,17 +72,26 @@ public class GameManager : MonoBehaviour
     {
         Transform local = NetworkManager.Singleton.LocalClient.PlayerObject.transform;
         Player_camera camRig = FindObjectOfType<Player_camera>();
-        if (camRig == null) return;
-
-        Player_Control pc = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<Player_Control>();
-        if (pc != null)
+        if (camRig == null)
         {
-            Camera cam = camRig.GetComponent<Camera>();
-            RectTransform ui = GameObject.Find("uiPos")?.GetComponent<RectTransform>();
-            pc.SetupLocal(cam, camRig, ui);   // 相机跟随本地玩家头部、绑定准星 UI
+            Debug.LogError("GameManager|InitLocalPlayer|未找到 Player_camera");
+            return;
         }
 
-       
+        Player_Control pc = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<Player_Control>();
+        if (pc == null)
+        {
+            Debug.LogError("GameManager|InitLocalPlayer|玩家上未找到 Player_Control");
+            return;
+        }
+
+        Camera cam = camRig.GetComponent<Camera>();
+        pc.SetupLocal(cam, camRig);   // 绑定相机
+        Debug.Log("绑定完成");
+
+        // 把本机角色交给调试面板
+        UI_Debug debug = FindObjectOfType<UI_Debug>();
+        if (debug != null) debug.SetupDebug(pc);
     }
 
     // 结束游戏

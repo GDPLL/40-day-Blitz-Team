@@ -7,6 +7,7 @@ using TMPro;
 public class Start_Main : MonoBehaviour
 {
     public NetworkManager networkManager;
+    public SessionManager session;
     public Button hostButton;
     public Button clientButton;
     public Button startButton;
@@ -17,22 +18,25 @@ public class Start_Main : MonoBehaviour
     // 绑定按钮与连接事件
     void Start()
     {
+        if (session == null) session = GetComponent<SessionManager>();
+        if (session == null) Debug.LogError("Start_Main|Start|未找到 SessionManager");
+
         hostButton.onClick.AddListener(StartHost);
         clientButton.onClick.AddListener(StartClient);
         startButton.onClick.AddListener(StartGame);
         networkManager.OnConnectionEvent += OnPlayerJoin;
     }
 
-    // 开主机
+    // 开主机，创建中继房间
     public void StartHost()
     {
-        networkManager.StartHost();
+        session.StartHost();
     }
 
-    // 连主机
+    // 连主机，加入中继房间
     public void StartClient()
     {
-        networkManager.StartClient();
+        session.StartClient();
     }
 
     // 房主开始游戏，各端切场景
