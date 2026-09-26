@@ -642,6 +642,7 @@ MonoBehaviour:
   Player_camera: {fileID: 0}
   groundCheckDistance: 0.2
   gun_Control: {fileID: 278098467587173686}
+  enemyMask: 256
   camShake: {fileID: 0}
   body: {fileID: -12797140595565352}
   input: {fileID: -6448023826613531737}

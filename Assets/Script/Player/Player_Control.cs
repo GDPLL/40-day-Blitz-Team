@@ -22,6 +22,10 @@ public class Player_Control : Character_Move
     public float groundCheckDistance = 0.2f;  // 落地检测距离
 
     public Gun_Control gun_Control;
+
+    [Header("精度：目标检测")]
+    public LayerMask enemyMask;      // 哪些层算敌人（给瞄准精度用）
+    
     public Player_camera camShake;   // 相机震动脚本（开火时触发）
     public Player_Body body;
     public Player_Input input;
@@ -238,13 +242,40 @@ public class Player_Control : Character_Move
         //键盘输入状态检测
         isOnGround = IsGrounded();
 
-        if (input == null || body == null) return;
+        if (input == null || body == null || gun_Control == null) return;
 
         // 本地向量数据计算
         body.Player_Body_Update(input.MoveAxis, isRuning, isSquat);
 
         // 动画更新
         player_Animation.Player_animation_Update(this);
+
+        //把姿态 / 移动状态 / 目标坐标喂给枪
+
+            gun_Control.SetRecoilReduction(isMouse2Down);
+            gun_Control.SetAimState(isMouse2Down, false);          // 右键=据枪；开镜还没输入，先传 false
+            gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
+            UpdateAimTarget();
+        
+    }
+
+    // 只负责读输入
+    void ReadInput(out float X, out float Y)
+    {
+        X = 0f;                 
+        Y = 0f;
+
+        if (input == null) return;
+
+        X = input.MoveAxis.x;
+        Y = input.MoveAxis.y;
+        isMouse1Down = input.Mouse1Held;
+        isMouse2Down = input.Mouse2Held;
+        isJumpDown   = input.JumpDownHeld;
+        isReload     = input.ReloadHeld;
+        isWASDDowm   = input.WASDHeld;
+        isRuning     = input.RunHeld && (isMouse2Down == false);
+        isSquat      = input.SquatHeld;
     }
     void FixedUpdate()
     {
@@ -272,9 +303,43 @@ public class Player_Control : Character_Move
         Player_camera = cam;
         camShake = camRig;
         if (camRig != null) camRig.Player = Head;   // 第三人称相机跟随本地玩家头部
+    }
 
-        UIFocus = ui;
-        gun_Control.Gun_Control_Init(UIFocus);
-        body.Body_Init(cam, UIFocus, GetComponent<Rigidbody>());
+    // 【新增】找瞄准范围内"最靠近枪口方向"的目标，把它的坐标交给枪
+    // 这里是"外界"，负责去场景里找；Gun 不参与查找，只负责判定和存数据
+    void UpdateAimTarget()
+    {
+        Vector3 origin = gun_Control.MuzzlePosition;
+        Collider[] cols = Physics.OverlapSphere(origin, gun_Control.range, enemyMask);
+
+        float bestAngle = float.MaxValue;
+        Vector3 bestPos = Vector3.zero;
+        bool found = false;
+
+        foreach (Collider col in cols)
+        {
+            if (col.transform.IsChildOf(transform)) continue;   // 跳过自己身上的碰撞体
+
+            Vector3 center = col.bounds.center;                 // 用包围盒中心，比 pivot 稳
+            float angle = Vector3.Angle(gun_Control.transform.forward, center - origin);
+            if (angle < bestAngle)
+            {
+                bestAngle = angle;
+                bestPos   = center;
+                found     = true;
+            }
+        }
+
+        gun_Control.SetTarget(found, bestPos);
+    }
+
+    void ForwardInputToBody(float X, float Y)
+    {
+        body.SetMoveInput(new Vector2(X, Y));
+        body.SetMoveHeld(isWASDDowm);
+        body.SetRun(isRuning);
+        body.SetSquat(isSquat);
+        body.SetJumpHeld(isJumpDown);
+        body.SetAim(isMouseDown);
     }
 }
