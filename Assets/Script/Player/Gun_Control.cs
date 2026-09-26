@@ -2,7 +2,9 @@ using UnityEngine;
 
 public class Gun_Control : MonoBehaviour
 {
-    // ===================== 原有：基础参数 =====================
+    [Header("朝向焦点")]
+    public float focusDistance = 10f;   // 按住左键时，人物朝向相机射线前方 focusDistance 处的焦点
+
     public Transform shootPoint;   // 发射点（枪口）
     public LineRenderer line;      // 射线显示
     public AudioSource audioSource;
@@ -26,39 +28,50 @@ public class Gun_Control : MonoBehaviour
     float recoilRecoverSpeed;                // 后坐力恢复速率
     float originalRecoilX, originalRecoilY;  // 原始后坐力（肩射减后坐力后恢复用）
 
+    [Header("举枪 / 收枪")]
+    public float aimSmooth = 10f;            // 举枪、收枪的插值速度
+    Quaternion originalLocalRot;             // 初始局部旋转（收枪目标）
+
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
     float lastShotTime;            // 上次射击时间
 
-    // ===================== 新增：精度系统参数 =====================
+    RectTransform uiFocuspos;      // 中心UI
 
-    // 一种姿态对应的一组参数（Inspector 里会折叠成一组）
+    // 一种姿态对应的一组参数
     [System.Serializable]
     public class AimProfile
     {
-        public float outerAngle = 8f;   // 外圈：瞄准范围 + 起始精度（度）
-        public float innerAngle = 2f;   // 内圈：该姿态能达到的最大精度（度）
-        public float growSpeed  = 8f;   // 基础精度增长速度（度/秒）
+        public float outerAngle = 8f;   // 外圈：瞄准范围
+        public float innerAngle = 2f;   // 内圈：该姿态能达到的最大精度
+        public float growSpeed = 8f;   // 基础精度增长速度
+
+        public AimProfile(float outer, float inner, float speed)
+        {
+            outerAngle = outer;
+            innerAngle = inner;
+            growSpeed = speed;
+        }
     }
 
     [Header("精度：各姿态参数")]
-    public AimProfile hipAim      = new AimProfile();   // 腰射
-    public AimProfile shoulderAim = new AimProfile();   // 据枪
-    public AimProfile adsAim      = new AimProfile();   // 开镜
+    AimProfile hipAim = new AimProfile(8f, 4f, 4f);   // 腰射
+    AimProfile shoulderAim = new AimProfile(4f, 1f, 2f);   // 据枪
+    AimProfile adsAim = new AimProfile(2f, 0.3f, 0.3f);   // 开镜
 
     [Header("精度：距离影响")]
     public float nearDistance = 5f;      // 这个距离以内满速
-    public float farDistance  = 40f;     // 超过这个距离最低速
-    public float farFactor    = 0.15f;   // 远距离的系数
+    public float farDistance = 40f;     // 超过这个距离最低速
+    public float farFactor = 0.15f;   // 远距离的系数
 
     [Header("精度：移动姿态系数（越激进越慢）")]
     public float moveFactorSquatStand = 1.3f;   // 蹲下
-    public float moveFactorStand      = 1.0f;   // 站立
-    public float moveFactorSquatWalk  = 0.7f;   // 蹲走
-    public float moveFactorWalk       = 0.5f;   // 走路
-    public float moveFactorRun        = 0.25f;  // 奔跑
+    public float moveFactorStand = 1.0f;   // 站立
+    public float moveFactorSquatWalk = 0.7f;   // 蹲走
+    public float moveFactorWalk = 0.5f;   // 走路
+    public float moveFactorRun = 0.25f;  // 奔跑
 
-    // ===================== 新增：外界输入 =====================
+    //本地状态
     bool aimingShoulder;     // 据枪姿态
     bool aimingAds;          // 开镜姿态（输入还没做，外界先传 false）
     bool stateSquat;         // 蹲着
@@ -67,17 +80,15 @@ public class Gun_Control : MonoBehaviour
     bool hasTarget;          // 瞄准范围内是否有目标
     Vector3 targetPos;       // 目标世界坐标
 
-    // ===================== 新增：精度内部状态 + 只读出口 =====================
     float currentAngle;                             // 当前实际精度圈（度）
     public float CurrentAngle => currentAngle;      // 给 UI 圈用
     public float OuterAngle   => CurrentProfile().outerAngle;
 
-    // 开火点：没配枪口就退回枪身上方 1 米（和原来 Shoot() 里的兜底一致）
-    public Vector3 MuzzlePosition =>
-        shootPoint != null ? shootPoint.position : transform.position + Vector3.up * 1f;
+    // 按当前姿态取参数组
+    AimProfile CurrentProfile()
+        => aimingAds ? adsAim : (aimingShoulder ? shoulderAim : hipAim);
 
-    // ===================== 新增：输入接口（外界只调这三个） =====================
-    public void SetAimState(bool shoulder, bool adsOn)
+        public void SetAimState(bool shoulder, bool adsOn)
     {
         aimingShoulder = shoulder;
         aimingAds      = adsOn;
@@ -95,12 +106,6 @@ public class Gun_Control : MonoBehaviour
         hasTarget = has;
         targetPos = worldPosition;
     }
-
-    // 按当前姿态取参数组
-    AimProfile CurrentProfile()
-        => aimingAds ? adsAim : (aimingShoulder ? shoulderAim : hipAim);
-
-    // ===================== 原有：初始化 =====================
     void Start()
     {
         if (line == null) line = GetComponent<LineRenderer>();
@@ -108,14 +113,19 @@ public class Gun_Control : MonoBehaviour
         originalRecoilX = recoilX;   // 记录原始后坐力（肩射减后坐力恢复用）
         originalRecoilY = recoilY;
 
-        currentAngle = hipAim.outerAngle;   // 【新增】开局按腰射外圈起步
+        currentAngle = hipAim.outerAngle;               //开局按腰射外圈起步
+        originalLocalRot = transform.localRotation;     // 记录初始局部旋转（收枪目标）
     }
 
-    void FixedUpdate()
+    public void Gun_Control_Init(RectTransform rectTransform)
+    {
+        uiFocuspos =rectTransform;
+    }
+    public void Gun_Control_FixedUpdate()
     {
         fireTimer += Time.deltaTime;
 
-        UpdateAimAccuracy(Time.deltaTime);   // 【新增】精度每物理帧更新一次
+        UpdateAimAccuracy(Time.deltaTime);   // 精度每物理帧更新一次
 
         // 射线短暂显示后消失
         lineTimer -= Time.deltaTime;
@@ -161,7 +171,7 @@ public class Gun_Control : MonoBehaviour
     {
         if (!stateMoving) return stateSquat ? moveFactorSquatStand : moveFactorStand;   // 蹲下 / 站立
         if (stateRunning) return moveFactorRun;                                        // 奔跑
-        if (stateSquat)   return moveFactorSquatWalk;                                  // 蹲走
+        if (stateSquat) return moveFactorSquatWalk;                                  // 蹲走
         return moveFactorWalk;                                                         // 走路
     }
 
@@ -213,7 +223,6 @@ public class Gun_Control : MonoBehaviour
         if (Physics.Raycast(origin, dir, out RaycastHit hit, range))
         {
             end = hit.point;                                        // 命中落点
-            Debug.Log($"{end},{hit.collider.gameObject.name}");
 
             // 在落点生成对象
             if (hitEffect != null)
@@ -265,4 +274,39 @@ public class Gun_Control : MonoBehaviour
         recoilY = originalRecoilY * (on ? 0.3f : 1f);
     }
 
+    // 举枪：枪口指向世界坐标 aimPoint
+    public void AimAt()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(uiFocuspos.position);
+        Vector3 Point;
+        if (TryGetAimPoint(ray, out Vector3 hitPoint))
+            Point = hitPoint;                    // 命中对象：瞄准碰撞落点
+        else
+            Point = ray.GetPoint(focusDistance); // 未命中：回到固定焦点距离
+        Quaternion worldLook = Quaternion.LookRotation(Point - transform.position, Vector3.up);
+        Quaternion targetRot = transform.parent != null
+            ? Quaternion.Inverse(transform.parent.rotation) * worldLook
+            : worldLook;
+
+        transform.localRotation = Quaternion.Slerp(transform.localRotation, targetRot, Time.deltaTime * aimSmooth);
+    }
+
+    // 收枪：回到初始局部旋转
+    public void AimDown()
+    {
+        transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
+    }
+
+    bool TryGetAimPoint(Ray ray, out Vector3 aimPoint)
+    {
+        aimPoint = Vector3.zero;
+        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.collider.CompareTag("Player")) continue;   // 跳过玩家自身
+            aimPoint = hit.point;
+            return true;
+        }
+        return false;
+    }
 }

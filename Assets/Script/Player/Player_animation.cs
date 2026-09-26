@@ -4,11 +4,9 @@ using UnityEngine;
 
 public class Player_animation : MonoBehaviour
 {
-    public Player_Control player_Control;
-
     public Animator animation;
 
-    void FixedUpdate()
+    public void Player_animation_Update(Player_Control player_Control)
     {
         animation.SetBool("run",player_Control.isRuning);
         animation.SetBool("walk",player_Control.isWASDDowm);

@@ -96,6 +96,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc69861ea9fbf0046ba3133ba404a0f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  focusDistance: 10
   shootPoint: {fileID: 4564924738081001126}
   line: {fileID: 886811154986688294}
   audioSource: {fileID: 6945292661482473287}
@@ -110,7 +111,7 @@ MonoBehaviour:
   recoilY: 0.06
   maxRecoil: 0.5
   recoilRecoverFactor: 2
-  uiFocuspos: {fileID: 0}
+  aimSmooth: 10
 --- !u!120 &886811154986688294
 LineRenderer:
   serializedVersion: 2
@@ -637,12 +638,15 @@ MonoBehaviour:
   runSpeed: 6
   squatSpeed: 1
   Head: {fileID: 7295220296533284295}
+  UIFocus: {fileID: 0}
   Player_camera: {fileID: 0}
   groundCheckDistance: 0.2
   gun_Control: {fileID: 278098467587173686}
   enemyMask: 256
   camShake: {fileID: 0}
+  body: {fileID: -12797140595565352}
   input: {fileID: -6448023826613531737}
+  player_Animation: {fileID: 581025581722992385}
   isOnGround: 0
   isJumpDown: 0
   isMouse1Down: 0
@@ -651,7 +655,6 @@ MonoBehaviour:
   isRuning: 0
   isReload: 0
   isSquat: 0
-  body: {fileID: -12797140595565352}
 --- !u!114 &581025581722992385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -664,7 +667,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 850b1f2ca7e77aa47bba94cd3e03c0b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player_Control: {fileID: 612418887052715161}
   animation: {fileID: 7802526638902691494}
 --- !u!54 &6445952189836789830
 Rigidbody:
@@ -705,7 +707,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3580946079
+  GlobalObjectIdHash: 815433573
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -793,9 +795,7 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
-  focusDistance: 10
   uiFocuspos: {fileID: 0}
-  Gun: {fileID: 1187990316601534914}
   moveForce: 700
   jumpForce: 100
   groundCheckDistance: 0.2

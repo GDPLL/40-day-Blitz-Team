@@ -40,18 +40,20 @@ public class Player_camera : MonoBehaviour
     Vector3 currentLocalOffset;                  // 当前局部环绕偏移（模式间平滑过渡）
     Vector3 localVelocity;                       // 局部偏移 SmoothDamp 速度缓存
 
+    NetworkObject pNet;
     private void Start()
     {
         rotationX = transform.rotation.x;
         rotationY = transform.rotation.y;
         // 初始化当前局部环绕偏移为常规姿态
         currentLocalOffset = new Vector3(0, 0, -radius) + startOffset;
+        pNet = Player != null ? Player.GetComponentInParent<NetworkObject>() : null;
     }
 
     private void Update()
     {
         // 非本地玩家：相机只跟随本地控制的对象，不更新
-        NetworkObject pNet = Player != null ? Player.GetComponentInParent<NetworkObject>() : null;
+       
         if (pNet != null && !pNet.IsOwner) return;
 
         //角度旋转控制
