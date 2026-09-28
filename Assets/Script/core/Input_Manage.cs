@@ -32,6 +32,8 @@ public class Input_Manage : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        Debug.Log("Input_Manage|Awake|完成初始化");
     }
 
     // 每帧读取并分发输入

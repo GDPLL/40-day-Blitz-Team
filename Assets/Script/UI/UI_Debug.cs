@@ -15,22 +15,19 @@ public class UI_Debug : MonoBehaviour
     RelayTransportNetcode relayTransport;   // 中继组件
     readonly StringBuilder builder = new StringBuilder(512);   // 文本缓存
 
-    // 注入本机角色
-    public void SetupDebug(Player_Control control)
+    // 注入本机角色并订阅
+    public void UI_Debug_Start(Player_Control control,Input_Manage input_Manage)
     {
-        player = control;
-    }
-
-    // 订阅调试事件
-    void Start()
-    {
-        if (Input_Manage.Instance == null)
+        if (input_Manage == null)
         {
             Debug.LogError("UI_Debug|Start|未找到 Input_Manage");
             return;
         }
+        input_Manage.Debug_event += OnDebug;
 
-        Input_Manage.Instance.Debug_event += OnDebug;
+        player = control;
+
+        Debug.Log("UI_Debug|UI_Debug_Start|完成初始化");
     }
 
     // 反订阅调试事件
@@ -128,11 +125,11 @@ public class UI_Debug : MonoBehaviour
         builder.Append("举枪: ").Append(player.isMouseDown ? "是" : "否")
                .Append("  换弹: ").AppendLine(player.isReload ? "是" : "否");
 
-        if (player.gun_Control != null)
+        if (player.Con_gun_Control != null)
         {
-            builder.Append("弹药: ").Append(player.gun_Control.ammo).Append('/')
-                   .AppendLine(player.gun_Control.maxAmmo.ToString());
-            builder.Append("精度圈: ").AppendLine(player.gun_Control.CurrentAngle.ToString("F2"));
+            builder.Append("弹药: ").Append(player.Con_gun_Control.ammo).Append('/')
+                   .AppendLine(player.Con_gun_Control.maxAmmo.ToString());
+            builder.Append("精度圈: ").AppendLine(player.Con_gun_Control.CurrentAngle.ToString("F2"));
         }
     }
 }

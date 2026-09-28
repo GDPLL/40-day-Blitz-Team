@@ -34,6 +34,8 @@ public class Player_Body : Character_Move
         if (rb != null) rb.freezeRotation = true;    // 防碰撞翻滚
 
         currentMoveDirection = transform.forward;    // 平滑转向初值
+
+        Debug.Log("Player_Body|Body_Init|完成初始化");
     }
 
     // 按输入轴计算移动方向，axis为移动输入轴

@@ -644,15 +644,15 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
+  Con_netObj: {fileID: -8760748900487357536}
+  Con_camera: {fileID: 0}
+  Con_gun_Control: {fileID: 278098467587173686}
+  Con_player_camera: {fileID: 0}
+  Con_body: {fileID: -12797140595565352}
+  Con_input_Manage: {fileID: 0}
+  Con_player_Animation: {fileID: 581025581722992385}
   Head: {fileID: 7295220296533284295}
-  UIFocus: {fileID: 0}
   rigidbody: {fileID: 6445952189836789830}
-  Player_camera: {fileID: 0}
-  gun_Control: {fileID: 278098467587173686}
-  camShake: {fileID: 0}
-  body: {fileID: -12797140595565352}
-  input: {fileID: 0}
-  player_Animation: {fileID: 581025581722992385}
   groundCheckDistance: 0.2
   enemyMask:
     serializedVersion: 2
@@ -717,7 +717,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 815433573
+  GlobalObjectIdHash: 3580946079
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -788,7 +788,7 @@ MonoBehaviour:
   moveForce: 700
   jumpForce: 100
   groundCheckDistance: 0.2
-  rb: {fileID: 0}
+  rb: {fileID: 6445952189836789830}
   uiFocuspos: {fileID: 0}
 --- !u!1001 &3258126144818772609
 PrefabInstance:

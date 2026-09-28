@@ -5,10 +5,9 @@ using Unity.Netcode;
 
 public class Player_camera : MonoBehaviour
 {
-    public Transform Camera_Object;
-    public Transform Target_Object;
-
-    public Transform PlayerHeadTransform;
+    public Transform Camera_Object;         //角度与朝向信息
+    public Transform Target_Object;         //位置跟随信息
+    public Transform PlayerHeadTransform;   //跟随位置
 
     float mouseSensitivity = 1f;
     public float radius;
@@ -41,25 +40,37 @@ public class Player_camera : MonoBehaviour
     NetworkObject pNet;   // 联网对象
 
     // 记录初始视角与偏移
-    private void Start()
+    public void Player_camera_Start(Transform _PlayerHeadTransform)
     {
+        if (_PlayerHeadTransform == null)
+        {
+            Debug.LogError("Player_camera|Player_camera_Start|PlayerHeadTransform 为空");
+            return;
+        }
+
+        PlayerHeadTransform = _PlayerHeadTransform;
+        pNet = PlayerHeadTransform.GetComponentInParent<NetworkObject>();
+
         rotationX = transform.rotation.x;
         rotationY = transform.rotation.y;
         currentLocalOffset = new Vector3(0, 0, -radius) + startOffset;   // 初始为常规姿态
-        pNet = PlayerHeadTransform != null ? PlayerHeadTransform.GetComponentInParent<NetworkObject>() : null;
+
+        Debug.Log("Player_camera|Player_camera_Start|完成初始化");
     }
 
     // 每帧更新视角与相机位置
-    private void Update()
+    public void Player_camera_Update()
     {
+        if(!Player_Main.player_Main.isInit) return;     //等待关卡初始化
+
+        if (pNet != null && !pNet.IsOwner) return;      // 非本地玩家不更新
+
         // 引用为空或已销毁
         if (PlayerHeadTransform == null || Target_Object == null || Camera_Object == null)
         {
             Debug.LogError($"Player_camera|Update|引用失效 PlayerHeadTransform={PlayerHeadTransform != null} 目标={Target_Object != null} 相机={Camera_Object != null}");
             return;
         }
-
-        if (pNet != null && !pNet.IsOwner) return;   // 非本地玩家不更新
 
         // 视角旋转
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;

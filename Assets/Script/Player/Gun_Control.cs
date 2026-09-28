@@ -132,6 +132,8 @@ public class Gun_Control : MonoBehaviour
     public void Gun_Control_Init(RectTransform rectTransform)
     {
         uiFocuspos = rectTransform;
+
+        Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
     // 物理帧更新射速计时与精度

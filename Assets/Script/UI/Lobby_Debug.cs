@@ -24,6 +24,8 @@ public class Lobby_Debug : MonoBehaviour
         }
 
         Input_Manage.Instance.Debug_event += OnDebug;
+
+        Debug.Log("Lobby_Debug|Start|完成初始化");
     }
 
     // 反订阅调试事件

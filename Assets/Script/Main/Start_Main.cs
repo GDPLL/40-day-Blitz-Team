@@ -3,10 +3,11 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
 using TMPro;
+using Unity.VisualScripting;
 
+//负责开始界面的场景初始化与配置方法
 public class Start_Main : MonoBehaviour
 {
-    public NetworkManager networkManager;
     public SessionManager session;
     public Button hostButton;
     public Button clientButton;
@@ -16,7 +17,7 @@ public class Start_Main : MonoBehaviour
     public TextMeshProUGUI textMeshPro;
 
     // 绑定按钮与连接事件
-    void Start()
+    void Awake()
     {
         if (session == null) session = GetComponent<SessionManager>();
         if (session == null) Debug.LogError("Start_Main|Start|未找到 SessionManager");
@@ -24,7 +25,15 @@ public class Start_Main : MonoBehaviour
         hostButton.onClick.AddListener(StartHost);
         clientButton.onClick.AddListener(StartClient);
         startButton.onClick.AddListener(StartGame);
-        networkManager.OnConnectionEvent += OnPlayerJoin;
+
+        GameManager.gameManager.networkManager.OnConnectionEvent += OnPlayerJoin;
+
+        Debug.Log("Start_Main|Awake|完成初始化");
+    }
+
+    void OnDestroy()
+    {
+        GameManager.gameManager.networkManager.OnConnectionEvent -= OnPlayerJoin;
     }
 
     // 开主机，创建中继房间
@@ -42,7 +51,7 @@ public class Start_Main : MonoBehaviour
     // 房主开始游戏，各端切场景
     public void StartGame()
     {
-        networkManager.SceneManager.LoadScene("SampleScene", LoadSceneMode.Single);
+        GameManager.gameManager.Scence_SwitchClientRpc(GameManager.GameState.关卡);
     }
 
     // 有玩家连接时生成对象
@@ -55,7 +64,7 @@ public class Start_Main : MonoBehaviour
     // 生成玩家对象，位置依次右移 2
     void SpawnPlayer()
     {
-        int index = networkManager.ConnectedClients.Count - 1;
+        int index = GameManager.gameManager.networkManager.ConnectedClients.Count - 1;
 
         GameObject go = Instantiate(ObjectPrefab,
             StartVector3 + Vector3.right * 2f * index, Quaternion.identity);

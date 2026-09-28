@@ -323,6 +323,7 @@ GameObject:
   serializedVersion: 7
   m_Component:
   - component: {fileID: 60913628}
+  - component: {fileID: 60913629}
   - component: {fileID: 60913627}
   m_Layer: 0
   m_HasEditorInfo: 1
@@ -344,9 +345,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e78300e1996f47a468be823bcbc06ca9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  levelSceneName: SampleScene
-  playerPrefab: {fileID: 7709504677304415273, guid: 3bc22507b26719d44ae826d2684a42ff, type: 3}
-  startPos: {x: 40, y: 2, z: 27}
+  networkManager: {fileID: 381198040}
 --- !u!4 &60913628
 Transform:
   m_ObjectHideFlags: 0
@@ -362,6 +361,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &60913629
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 60913626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 2270908842
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!1 &126032522
 GameObject:
   m_ObjectHideFlags: 0
@@ -937,7 +957,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 17.960022, y: -67}
+  m_AnchoredPosition: {x: 17.95996, y: -67}
   m_SizeDelta: {x: 1000, y: 0}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &701996568
@@ -1262,7 +1282,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5accad5176ba20e4187b126332fd0c9f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  networkManager: {fileID: 381198040}
   session: {fileID: 381198042}
   hostButton: {fileID: 412078570}
   clientButton: {fileID: 1288334119}
