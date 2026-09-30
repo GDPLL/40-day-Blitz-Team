@@ -49,9 +49,9 @@ public class Player_Control : Character_Move
     public bool isReload;       //换弹输入
     public bool isSquat;        //蹲下输入
 
-    //本机表现状态
-    bool isLocalFireHeld;   //本机左键按住
-    float localFireTimer;   //本机震动计时
+    //同步表现状态
+    NetworkVariable<byte> netShowState = new NetworkVariable<byte>();        //表现状态位
+    NetworkVariable<Vector3> netAimPoint = new NetworkVariable<Vector3>();  //瞄准落点
 
     // 初始化组件与输入，服务器与客户端通用
     public void Player_Control_Start(Input_Manage inputManage)
@@ -139,7 +139,6 @@ public class Player_Control : Character_Move
         if (Con_localInputEvent == null) Con_localInputEvent = gameObject.AddComponent<Local_InputEvent>();
         Con_localInputEvent.Local_Input_Init(Con_input_Manage);
         Con_localInputEvent.ShoulderAim_event += OnLocalShoulderAim;
-        Con_localInputEvent.FireHeld_event += OnLocalFireHeld;
 
         Con_player_camera.Player_camera_Start(Head);    //相机跟随头部
 
@@ -150,43 +149,46 @@ public class Player_Control : Character_Move
         Debug.Log("Player_Control|Player_Control_Local_Init|完成初始化");
     }
 
-    // 本机表现层每帧更新
-    public void Player_Control_Local_Update()
+    // 客户端每帧本机表现层更新
+    public void Player_Control_LocalShow_Update()
     {
         if (!IsLocalPlayer) return;
 
         // 相机跟随
-        if (Con_player_camera != null) Con_player_camera.Player_camera_Update();
-
-        // 开火震动，按射速逐发
-        if (Con_player_camera == null || Con_gun_Control == null) return;
-
-        if (!isLocalFireHeld)
-        {
-            localFireTimer = 0f;    //松开归零
-            return;
-        }
-
-        localFireTimer -= Time.deltaTime;
-        if (localFireTimer > 0f) return;
-
-        localFireTimer = 1f / Con_gun_Control.fireRate;
-        if (Con_gun_Control.HasAmmo()) Con_player_camera.Shake();
+        if (Con_player_camera != null) Con_player_camera.Camera_Follow_Performance_Local();
     }
 
-    // 本机肩射开关
-    void OnLocalShoulderAim(bool on)
+    // 客户端每帧各端表现层更新
+    public void Player_Control_Show_Update()
     {
-        if (Con_player_camera != null) Con_player_camera.SetShoulderAim(on);
+        byte state = netShowState.Value;
+
+        // 动画
+        if (Con_player_Animation != null) Con_player_Animation.Player_animation_Show(state);
+
+        if (Con_gun_Control == null) return;
+
+        // 举枪状态
+        if ((state & Player_animation.BitGun) != 0) Con_gun_Control.Gun_Aim_Performance(netAimPoint.Value);
+        else Con_gun_Control.Gun_AimDown_Performance();
+
+        Con_gun_Control.Gun_Fixed_Performance();
     }
 
-    // 本机左键按住
-    void OnLocalFireHeld(bool on)
+    // 打包表现状态位
+    byte PackShowState()
     {
-        isLocalFireHeld = on;
+        byte state = 0;
+        if (isWASDDowm) state |= Player_animation.BitWalk;
+        if (isRuning) state |= Player_animation.BitRun;
+        if (isSquat) state |= Player_animation.BitSquat;
+        if (isMouseDown) state |= Player_animation.BitGun;
+        if (isJumpDown) state |= Player_animation.BitJump;
+        if (!isOnGround) state |= Player_animation.BitAir;
+        return state;
     }
 
-    // 每帧更新本地控制
+    // 主机每帧各端逻辑更新
     public void Player_Control_Update()
     {
         if (!IsActive) return;   // 非法不运行
@@ -203,10 +205,11 @@ public class Player_Control : Character_Move
         isOnGround = IsGrounded();
 
         // 计算移动数据
-        Con_body.Player_Body_Update(packet.move, packet.viewDir, isRuning, isSquat);
+        Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning, isSquat);
 
-        // 动画更新
-        Con_player_Animation.Player_animation_Update(this);
+        // 同步表现状态
+        netShowState.Value = PackShowState();
+        if (isMouseDown) netAimPoint.Value = packet.aimPoint;
 
         // 传递枪械状态
         Con_gun_Control.SetRecoilReduction(isMouse2Down);
@@ -215,13 +218,56 @@ public class Player_Control : Character_Move
         UpdateAimTarget();
 
     }
-    // 物理帧更新
+    // 主机每物理帧各端逻辑更新
     public void Player_Control_FixedUpdate()
     {
         if (!IsActive) return;
 
-        Con_body.Local_FixedUpdate();
-        Con_gun_Control.Gun_Control_FixedUpdate();
+        Con_body.Body_Fixed_Date();
+        Con_gun_Control.Gun_Fixed_Date();
+    }
+
+
+    // 本机肩射开关
+    void OnLocalShoulderAim(bool on)
+    {
+        if (Con_player_camera != null) Con_player_camera.Camera_Aim_Performance_Local(on);
+    }
+
+    // 开火，拼接逻辑与表现
+    void Player_Fire()
+    {
+        if (Con_gun_Control == null || Con_player_HostNetworkEvent == null)
+        {
+            Debug.LogError("Player_Control|Player_Fire|gun 为空");
+            return;
+        }
+
+        // 枪口瞄准方向由落点推算,落点-开火点
+        Vector3 aimDir = Con_player_HostNetworkEvent.Packet.aimPoint - Con_gun_Control.MuzzlePosition;
+        if (aimDir.sqrMagnitude <= 0.001f) aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
+
+        if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
+            out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)) return;
+
+        Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
+
+        // 本机开火震屏
+        if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
+
+        Gun_Shoot_ClientRpc(origin, dir, isHit, hitPoint, hitNormal);
+    }
+
+    // 客户端开火表现
+    [ClientRpc]
+    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
+    {
+        if (IsServer) return;   //主机已播放
+
+        if (Con_gun_Control != null) Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
+
+        // 本机开火震屏
+        if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
     }
 
 
@@ -266,12 +312,12 @@ public class Player_Control : Character_Move
         UnregisterInputEvents();
 
         // 反注册本机表现事件
-        if (Con_localInputEvent != null)
-        {
-            Con_localInputEvent.ShoulderAim_event -= OnLocalShoulderAim;
-            Con_localInputEvent.FireHeld_event -= OnLocalFireHeld;
-        }
+        if (Con_localInputEvent != null) Con_localInputEvent.ShoulderAim_event -= OnLocalShoulderAim;
     }
+
+
+
+    // 输入事件包装-唯一行为方法
 
     // 移动，axis为输入轴
     void OnMove(Vector2 axis)
@@ -290,14 +336,14 @@ public class Player_Control : Character_Move
 
         Con_body.Body_calculateVectorMove(axis, Con_player_HostNetworkEvent.Packet.viewDir);
         Con_body.Body_Move();
-        if (!isMouseDown) Con_body.Body_rotation();
+        if (!isMouseDown) Con_body.Body_Rotation_Performance();
     }
 
     // 跳跃
     void OnJumpDown(bool on)
     {
         isJumpDown = on;
-        if (on && Con_body != null) Con_body.Body_Jump();
+        if (on && Con_body != null) Con_body.Body_Jump_Date();
     }
 
     // 左键开火
@@ -312,7 +358,7 @@ public class Player_Control : Character_Move
         if (!on) return;
 
         Con_gun_Control.SetRecoilReduction(false);
-        Con_gun_Control.Shoot();
+        Player_Fire();
     }
 
     // 右键肩射
@@ -325,18 +371,9 @@ public class Player_Control : Character_Move
     // 举枪瞄准
     void OnMouseHeld(bool on)
     {
-        if (Con_body == null || Con_gun_Control == null || Con_player_HostNetworkEvent == null) return;
+        if (Con_body == null || Con_player_HostNetworkEvent == null) return;
 
-        if (on)
-        {
-            InputPacket packet = Con_player_HostNetworkEvent.Packet;   //纯数据来源
-            Con_body.Body_rotationWithFocus(packet.viewDir);
-            Con_gun_Control.AimAt(packet.aimPoint);
-        }
-        else
-        {
-            Con_gun_Control.AimDown();
-        }
+        if (on) Con_body.Body_Aim_Performance(Con_player_HostNetworkEvent.Packet.viewDir);
     }
 
     // 奔跑
@@ -349,7 +386,7 @@ public class Player_Control : Character_Move
     void OnReloadHeld()
     {
         isReload = true;
-        if (Con_gun_Control != null) Con_gun_Control.Reload();
+        if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Date();
     }
 
     // 蹲下

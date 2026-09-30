@@ -30,10 +30,13 @@ public class Player_Main : NetworkBehaviour
         if (!isInit) return;
 
         for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
             oplayer_Controls[i].Player_Control_Update();
+            oplayer_Controls[i].Player_Control_Show_Update();
+        }
 
         // 本机表现层驱动
-        if (oPlayer_Control != null) oPlayer_Control.Player_Control_Local_Update();
+        if (oPlayer_Control != null) oPlayer_Control.Player_Control_LocalShow_Update();
     }
 
     //游戏场景物理总驱动器
@@ -121,7 +124,7 @@ public class Player_Main : NetworkBehaviour
         InitScenceClientRpc();
     }
 
-    // 客户端寻找本地玩家
+    // 各端收集玩家并寻找本地玩家
     [ClientRpc]
     void JudgePlayerClientRpc()
     {
@@ -132,20 +135,23 @@ public class Player_Main : NetworkBehaviour
             return;
         }
 
+        oplayer_Controls.Clear();
+
         foreach (var kv in netSingle.SpawnManager.SpawnedObjects)
         {
             Player_Control control = kv.Value.GetComponent<Player_Control>();
             if (control == null) continue;
 
+            oplayer_Controls.Add(control);
+
             if (kv.Value.OwnerClientId == netSingle.LocalClientId)
             {
                 oPlayer_Control = control;
                 hasLocalPlayer = true;
-                return;
             }
         }
 
-        Debug.LogError("Player_Main|JudgePlayerClientRpc|未找到本地玩家");
+        if (!hasLocalPlayer) Debug.LogError("Player_Main|JudgePlayerClientRpc|未找到本地玩家");
     }
 
     // 客户端初始化场景

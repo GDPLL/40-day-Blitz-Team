@@ -5,7 +5,8 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
-// 全局输入管理，跨场景常驻
+// 负责全局输入系统，定时发送输入包 
+// 负责本地事件分发
 public class Input_Manage : NetworkBehaviour
 {
     public static Input_Manage Instance { get; private set; }   // 全局实例

@@ -129,13 +129,23 @@ public class Gun_Control : MonoBehaviour
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
-    // 物理帧更新射速计时与精度
-    public void Gun_Control_FixedUpdate()
+    // 物理帧逻辑，计时与后坐力恢复
+    public void Gun_Fixed_Date()
     {
         fireTimer += Time.deltaTime;
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
 
+        // 后坐力恢复
+        if (recoil.sqrMagnitude > 0.0001f)
+            recoil = Vector2.MoveTowards(recoil, Vector2.zero, recoilRecoverSpeed * Time.deltaTime);
+        else
+            recoil = Vector2.zero;
+    }
+
+    // 物理帧表现，射线与音效计时
+    public void Gun_Fixed_Performance()
+    {
         // 射线短暂显示后消失
         lineTimer -= Time.deltaTime;
         if (line != null && lineTimer <= 0f) line.enabled = false;
@@ -143,12 +153,6 @@ public class Gun_Control : MonoBehaviour
         // 长时间未射击停止音效
         if (audioSource != null && audioSource.isPlaying && Time.time - lastShotTime > 0.2f)
             audioSource.Stop();
-
-        // 后坐力恢复
-        if (recoil.sqrMagnitude > 0.0001f)
-            recoil = Vector2.MoveTowards(recoil, Vector2.zero, recoilRecoverSpeed * Time.deltaTime);
-        else
-            recoil = Vector2.zero;
     }
 
     // 按目标与移动状态更新精度
@@ -192,22 +196,21 @@ public class Gun_Control : MonoBehaviour
     Vector2 GetSpreadOffset()
         => Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
-    // 沿枪口方向射击，返回是否开火
-    public bool Shoot() => Shoot(null);
-
-    // 朝目标射击，目标为空则沿枪口方向
-    public bool Shoot(Transform target)
+    // 开火逻辑，返回是否成功
+    public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
+        out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)
     {
-        if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;
+        origin = MuzzlePosition;
+        dir = transform.forward;
+        isHit = false;
+        hitPoint = Vector3.zero;
+        hitNormal = Vector3.up;
+
+        if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
+
         ammo--;
         fireTimer = 0f;
         lastShotTime = Time.time;
-
-        // 播放射击音效
-        if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
-
-        Vector3 origin = MuzzlePosition;
-        Vector3 aim = target != null ? target.position + Vector3.up * 1f : origin + transform.forward * 10f;
 
         // 累计后坐力
         recoil += new Vector2(Random.Range(-recoilX, recoilX), Random.Range(0f, recoilY));
@@ -217,34 +220,43 @@ public class Gun_Control : MonoBehaviour
 
         // 后坐力叠加精度散布
         Vector2 offset = recoil + GetSpreadOffset();
-
-        // 计算射击方向
-        Vector3 dir = (aim - origin).normalized + transform.right * offset.x + transform.up * offset.y;
+        dir = aimDir.normalized + transform.right * offset.x + transform.up * offset.y;
         dir.Normalize();
 
-        // 在开火点生成对象
-        if (fireEffect != null)
-            Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
-
-        Vector3 end = origin + dir * range;                         // 默认终点
+        // 射线检测与伤害结算
         if (Physics.Raycast(origin, dir, out RaycastHit hit, range))
         {
-            end = hit.point;                                        // 命中落点
+            isHit = true;
+            hitPoint = hit.point;
+            hitNormal = hit.normal;
+
+            Idamage damageable = hit.collider.GetComponent<Idamage>();
+            if (damageable != null) damageable.Takedamage(damage);
+        }
+
+        return true;    // 本次已开火
+    }
+
+    // 开火表现，参数为逻辑结果
+    public void Gun_Shoot_Performance(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
+    {
+        // 播放射击音效
+        if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
+
+        // 在开火点生成对象
+        if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
+
+        Vector3 end = origin + dir * range;    // 默认终点
+        if (isHit)
+        {
+            end = hitPoint;                    // 命中落点
 
             // 在落点生成对象
             if (hitEffect != null)
             {
-                Vector3 bounceDir = Vector3.Reflect(dir, hit.normal);
-                if (bounceDir.sqrMagnitude <= 0.001f) bounceDir = -hit.normal;   // 极端角度兜底
-                Instantiate(hitEffect, hit.point, Quaternion.LookRotation(bounceDir));
-            }
-
-            // 对命中对象造成伤害
-            // TODO 联机后移到主机裁决
-            Idamage damageable = hit.collider.GetComponent<Idamage>();
-            if (damageable != null)
-            {
-                damageable.Takedamage(damage);
+                Vector3 bounceDir = Vector3.Reflect(dir, hitNormal);
+                if (bounceDir.sqrMagnitude <= 0.001f) bounceDir = -hitNormal;   // 极端角度兜底
+                Instantiate(hitEffect, hitPoint, Quaternion.LookRotation(bounceDir));
             }
         }
 
@@ -257,12 +269,10 @@ public class Gun_Control : MonoBehaviour
             line.enabled = true;
             lineTimer = 0.05f;
         }
-
-        return true;    // 本次已开火
     }
 
-    // 换弹
-    public void Reload()
+    // 换弹逻辑，弹匣补满
+    public void Gun_Reload_Date()
     {
         ammo = maxAmmo;
     }
@@ -282,8 +292,10 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 举枪朝向瞄准落点
-    public void AimAt(Vector3 aimPoint)
+    public void Gun_Aim_Performance(Vector3 aimPoint)
     {
+        if (aimPoint == Vector3.zero) return;   //无落点不转向
+
         Vector3 dir = aimPoint - transform.position;
         if (dir.sqrMagnitude <= 0.001f) return;   // 落点与枪重叠
 
@@ -296,7 +308,7 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 收枪
-    public void AimDown()
+    public void Gun_AimDown_Performance()
     {
         transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
     }

@@ -58,8 +58,8 @@ public class Player_camera : MonoBehaviour
         Debug.Log("Player_camera|Player_camera_Start|完成初始化");
     }
 
-    // 每帧更新视角与相机位置
-    public void Player_camera_Update()
+    // 视角旋转与相机跟随
+    public void Camera_Follow_Performance_Local()
     {
         if(!Player_Main.player_Main.isInit) return;     //等待关卡初始化
 
@@ -120,14 +120,14 @@ public class Player_camera : MonoBehaviour
         shakeOffset = Random.insideUnitSphere * shakeMagnitude;
     }
 
-    // 相机震动
-    public void Shake()
+    // 开火震动
+    public void Camera_Shoot_Performance_Local()
     {
         ShakeOffset();
     }
 
     // 切换肩射
-    public void SetShoulderAim(bool on)
+    public void Camera_Aim_Performance_Local(bool on)
     {
         isShoulderAim = on;
     }

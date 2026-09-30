@@ -29,8 +29,8 @@ public class Player_Body : Character_Move
         Debug.Log("Player_Body|Body_Init|完成初始化");
     }
 
-    // 按输入轴与视角计算移动，axis为输入轴
-    public void Player_Body_Update(Vector2 axis, Vector3 viewDir, bool run, bool squat)
+    // 按输入轴与视角算移动，axis为输入轴
+    public void Body_Move_Date(Vector2 axis, Vector3 viewDir, bool run, bool squat)
     {
         // 视角换算世界方向
         direction = GetMoveDir(axis, viewDir);
@@ -68,8 +68,8 @@ public class Player_Body : Character_Move
         return (axis.x * right + axis.y * forward).normalized;
     }
 
-    // 物理帧更新，落地检测与限速
-    public void Local_FixedUpdate()
+    // 物理帧逻辑，落地检测与限速
+    public void Body_Fixed_Date()
     {
         IsGrounded = isGrounded();
         //地面移动
@@ -101,8 +101,8 @@ public class Player_Body : Character_Move
         return Physics.Raycast(origin, Vector3.down, rayDistance);
     }
 
-    // 施加跳跃力
-    public void Body_Jump()
+    // 跳跃逻辑，施加跳跃力
+    public void Body_Jump_Date()
     {
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
@@ -113,14 +113,14 @@ public class Player_Body : Character_Move
         rb.AddForce(currentMoveDirection * currentForce, ForceMode.Force);
     }
 
-    // 转向移动方向
-    public void Body_rotation()
+    // 表现，转向移动方向
+    public void Body_Rotation_Performance()
     {
         SmoothRotate(currentMoveDirection);
     }
 
-    // 转向视角方向
-    public void Body_rotationWithFocus(Vector3 viewDir)
+    // 表现，转向视角方向
+    public void Body_Aim_Performance(Vector3 viewDir)
     {
         SmoothRotate(viewDir);
     }
