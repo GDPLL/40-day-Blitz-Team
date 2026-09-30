@@ -649,15 +649,15 @@ MonoBehaviour:
   UIFocus: {fileID: 0}
   rigidbody: {fileID: 6445952189836789830}
   Player_camera: {fileID: 0}
-  groundCheckDistance: 0.2
   gun_Control: {fileID: 278098467587173686}
-  enemyMask:
-    serializedVersion: 2
-    m_Bits: 0
   camShake: {fileID: 0}
   body: {fileID: -12797140595565352}
   input: {fileID: -6448023826613531737}
   player_Animation: {fileID: 581025581722992385}
+  groundCheckDistance: 0.2
+  enemyMask:
+    serializedVersion: 2
+    m_Bits: 256
   isOnGround: 0
   isJumpDown: 0
   isMouse1Down: 0
@@ -806,11 +806,11 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
-  uiFocuspos: {fileID: 0}
   moveForce: 700
   jumpForce: 100
   groundCheckDistance: 0.2
   rb: {fileID: 0}
+  uiFocuspos: {fileID: 0}
 --- !u!1001 &3258126144818772609
 PrefabInstance:
   m_ObjectHideFlags: 0

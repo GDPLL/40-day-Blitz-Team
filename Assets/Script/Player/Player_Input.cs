@@ -16,6 +16,8 @@ public class Player_Input : MonoBehaviour
     public event Action<bool> Run_event;         // 奔跑
     public event Action ReloadHeld_event;       // 换弹
     public event Action<bool> Squat_event;       // 蹲下
+    public event Action<bool> Shoulder_event;    // 肩射
+    public event Action<bool> Ads_event;         // 开镜
 
     // 每帧读取并分发输入
     void Update()
@@ -33,8 +35,8 @@ public class Player_Input : MonoBehaviour
         Mouse1(Mouse1Held);
         //右键
         Mouse2(Mouse2Held);
-        //鼠标按住
-        MouseDown(MouseHeld);
+        //举枪朝向
+        MouseDown(AimHeld);
         //奔跑
         Run(RunHeld);
         //换弹
@@ -44,6 +46,10 @@ public class Player_Input : MonoBehaviour
         }
         //蹲下
         Squat(SquatHeld);
+        //肩射
+        Shoulder(ShoulderHeld);
+        //开镜
+        Ads(AdsHeld);
     }
 
     // 事件分发
@@ -79,6 +85,14 @@ public class Player_Input : MonoBehaviour
     {
         Squat_event?.Invoke(on);
     }
+    public void Shoulder(bool on)
+    {
+        Shoulder_event?.Invoke(on);
+    }
+    public void Ads(bool on)
+    {
+        Ads_event?.Invoke(on);
+    }
 
     //输入检测状态
     public Vector2 MoveAxis;        //移动输入轴
@@ -86,10 +100,13 @@ public class Player_Input : MonoBehaviour
     public bool Mouse1Held;         //左键输入
     public bool Mouse2Held;         //右键输入
     public bool MouseHeld => Mouse1Held || Mouse2Held;
+    public bool AimHeld => Mouse1Held || Mouse2Held || ShoulderHeld || AdsHeld;    //举枪朝向
     public bool WASDHeld;           //移动输入
     public bool RunHeld;            //奔跑输入
     public bool ReloadHeld;         //换弹输入
     public bool SquatHeld;          //蹲下输入
+    public bool ShoulderHeld;       //肩射输入
+    public bool AdsHeld;            //开镜输入
 
     // 读取输入状态
     void Input_get()
@@ -98,8 +115,10 @@ public class Player_Input : MonoBehaviour
         JumpDownHeld = Input.GetKey(KeyCode.Space);     //跳跃空格
         Mouse1Held = Input.GetMouseButton(0);        //左键输入
         Mouse2Held = Input.GetMouseButton(1);        //右键输入
+        ShoulderHeld = Input.GetKey(KeyCode.Z);          //肩射输入
+        AdsHeld = Input.GetKey(KeyCode.X);               //开镜输入
         WASDHeld = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D);        //移动输入
-        RunHeld = Input.GetKey(KeyCode.LeftShift) && !Mouse2Held;       //奔跑输入
+        RunHeld = Input.GetKey(KeyCode.LeftShift) && !ShoulderHeld && !AdsHeld;       //奔跑输入
         ReloadHeld = Input.GetKey(KeyCode.R);            //换弹输入 
         SquatHeld = Input.GetKey(KeyCode.LeftControl);       //蹲下输入
 
