@@ -2,8 +2,8 @@
   <Project Path="Cn.Tuanjie.Codely.Editor.csproj" />
   <Project Path="UnityTcp.Editor.csproj" />
   <Project Path="tjgenerators.Editor.csproj" />
-  <Project Path="UnityTcp.CustomTool.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="UnityTcp.CustomTool.csproj" />
   <Project Path="TJGenerators.Runtime.csproj" />
   <Project Path="Codely.Common.csproj" />
   <Project Path="Unity.UOS.Encrypt.csproj" />

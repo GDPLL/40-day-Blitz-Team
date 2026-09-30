@@ -1,24 +1,26 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
 // 全局输入管理，跨场景常驻
-public class Input_Manage : MonoBehaviour
+public class Input_Manage : NetworkBehaviour
 {
     public static Input_Manage Instance { get; private set; }   // 全局实例
 
+    [Header("网络输入")]
+    public float sendRate = 60f;    // 发送频率
+    float sendTimer;                // 发送计时
+
+    [Header("举枪瞄准")]
+    public float focusDistance = 10f;   // 未命中时的瞄点距离
+    public Vector3 AimPoint;            // 当前瞄准落点
+
     // 输入事件
-    public event Action<Vector2> Move_event;     // 移动
-    public event Action<bool> JumpDown_event;    // 跳跃
-    public event Action<bool> Mouse1_event;      // 左键
-    public event Action<bool> Mouse2_event;      // 右键
-    public event Action<bool> MouseHeld_event;   // 鼠标按住
-    public event Action<bool> Run_event;         // 奔跑
-    public event Action ReloadHeld_event;        // 换弹
-    public event Action<bool> Squat_event;       // 蹲下
-    public event Action<bool> Debug_event;       // 调试面板
+    public event Action<InputPacket> Input_event;   // 收到输入包
+    public event Action<bool> Debug_event;          // 调试面板
 
     // 建立全局单例
     void Awake()
@@ -36,70 +38,86 @@ public class Input_Manage : MonoBehaviour
         Debug.Log("Input_Manage|Awake|完成初始化");
     }
 
-    // 每帧读取并分发输入
+    // 每帧读取输入并上传
     void Update()
     {
+        if (Player_Main.player_Main == null || !Player_Main.player_Main.isInit) return;  // 等待关卡初始化完成
         Input_get();
 
-        //移动输入
-        if (WASDHeld || MoveAxis != Vector2.zero)
-        {
-            Move(MoveAxis);
-        }
-        //跳跃
-        Jump(JumpDownHeld);
-        //左键
-        Mouse1(Mouse1Held);
-        //右键
-        Mouse2(Mouse2Held);
-        //鼠标按住
-        MouseDown(MouseHeld);
-        //奔跑
-        Run(RunHeld);
-        //换弹
-        if (ReloadHeld)
-        {
-            Reload();
-        }
-        //蹲下
-        Squat(SquatHeld);
-        //调试呼出
         DebugE(DebugKey);
+        SendPacket();
     }
 
-    // 事件分发
-    public void Move(Vector2 vector2)
+    // 固定时段上传输入
+    void SendPacket()
     {
-        Move_event?.Invoke(vector2);
+        if (!IsSpawned) return;                     // 未接入网络不发
+        
+
+        sendTimer += Time.deltaTime;
+        if (sendTimer < 1f / sendRate) return;
+
+        sendTimer = 0f;
+        SubmitInputServerRpc(GetPacket());
     }
-    public void Jump(bool on)
+
+    // 服务器接收输入包，跳过所有权校验
+    [ServerRpc(RequireOwnership = false)]
+    void SubmitInputServerRpc(InputPacket packet)
     {
-        JumpDown_event?.Invoke(on);
+        Input_event?.Invoke(packet);
     }
-    public void Mouse1(bool on)
+
+    // 打包当前输入
+    public InputPacket GetPacket()
     {
-        Mouse1_event?.Invoke(on);
+        InputPacket packet = new InputPacket();
+        packet.clientId = NetworkManager.Singleton.LocalClientId;
+
+        Camera cam = Player_Main.player_Main != null ? Player_Main.player_Main.oCamera : null;
+        if (cam != null) packet.viewDir = cam.transform.forward;    //本机视角朝向
+
+        packet.aimPoint = GetAimPoint(cam);     //举枪瞄准落点
+
+        packet.move = MoveAxis;
+        packet.jump = JumpDownHeld;
+        packet.mouse1 = Mouse1Held;
+        packet.mouse2 = Mouse2Held;
+        packet.mouseHeld = MouseHeld;
+        packet.run = RunHeld;
+        packet.reload = ReloadHeld;
+        packet.squat = SquatHeld;
+        return packet;
     }
-    public void Mouse2(bool on)
+
+    // 准星射线取举枪瞄准落点
+    Vector3 GetAimPoint(Camera cam)
     {
-        Mouse2_event?.Invoke(on);
+        RectTransform focus = Player_Main.player_Main != null ? Player_Main.player_Main.oUI_RectTransform : null;
+        if (cam == null || focus == null) return AimPoint;      // 引用缺失沿用上次
+
+        Ray ray = cam.ScreenPointToRay(focus.position);
+        if (TryGetAimPoint(ray, out Vector3 hit)) AimPoint = hit;      // 命中碰撞落点
+        else AimPoint = ray.GetPoint(focusDistance);                   // 未命中取固定焦点距离
+
+        return AimPoint;
     }
-    public void MouseDown(bool on)
+
+    // 取射线命中点，跳过玩家
+    bool TryGetAimPoint(Ray ray, out Vector3 point)
     {
-        MouseHeld_event?.Invoke(on);
+        point = Vector3.zero;
+        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+        foreach (RaycastHit hit in hits)
+        {
+            if (hit.collider.CompareTag("Player")) continue;   // 跳过玩家
+            point = hit.point;
+            return true;
+        }
+        return false;
     }
-    public void Run(bool on)
-    {
-        Run_event?.Invoke(on);
-    }
-    public void Reload()
-    {
-        ReloadHeld_event?.Invoke();
-    }
-    public void Squat(bool on)
-    {
-        Squat_event?.Invoke(on);
-    }
+
+    // 调试分发
     public void DebugE(bool on)
     {
         Debug_event?.Invoke(on);

@@ -2,9 +2,6 @@ using UnityEngine;
 
 public class Gun_Control : MonoBehaviour
 {
-    [Header("朝向焦点")]
-    public float focusDistance = 10f;   // 按住左键时，人物朝向相机射线前方 focusDistance 处的焦点
-
     public Transform shootPoint;   // 枪口
     public LineRenderer line;      // 射线显示
     public AudioSource audioSource;   // 音源
@@ -37,8 +34,6 @@ public class Gun_Control : MonoBehaviour
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
     float lastShotTime;            // 上次射击时间
-
-    RectTransform uiFocuspos;      // 中心UI
 
     // 一种姿态对应的一组参数
     // 外圈、内圈与增长速度
@@ -128,11 +123,9 @@ public class Gun_Control : MonoBehaviour
         originalLocalRot = transform.localRotation;     // 记录初始旋转
     }
 
-    // 注入准星UI
-    public void Gun_Control_Init(RectTransform rectTransform)
+    // 注入完成
+    public void Gun_Control_Init()
     {
-        uiFocuspos = rectTransform;
-
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
@@ -288,16 +281,13 @@ public class Gun_Control : MonoBehaviour
         recoilY = originalRecoilY * (on ? 0.3f : 1f);
     }
 
-    // 举枪瞄向准星
-    public void AimAt()
+    // 举枪朝向瞄准落点
+    public void AimAt(Vector3 aimPoint)
     {
-        Ray ray = Camera.main.ScreenPointToRay(uiFocuspos.position);
-        Vector3 Point;
-        if (TryGetAimPoint(ray, out Vector3 hitPoint))
-            Point = hitPoint;                    // 瞄准碰撞落点
-        else
-            Point = ray.GetPoint(focusDistance); // 回到固定焦点距离
-        Quaternion worldLook = Quaternion.LookRotation(Point - transform.position, Vector3.up);
+        Vector3 dir = aimPoint - transform.position;
+        if (dir.sqrMagnitude <= 0.001f) return;   // 落点与枪重叠
+
+        Quaternion worldLook = Quaternion.LookRotation(dir, Vector3.up);
         Quaternion targetRot = transform.parent != null
             ? Quaternion.Inverse(transform.parent.rotation) * worldLook
             : worldLook;
@@ -309,19 +299,5 @@ public class Gun_Control : MonoBehaviour
     public void AimDown()
     {
         transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
-    }
-
-    // 取射线命中点，跳过自身
-    bool TryGetAimPoint(Ray ray, out Vector3 aimPoint)
-    {
-        aimPoint = Vector3.zero;
-        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.collider.CompareTag("Player")) continue;   // 跳过自身
-            aimPoint = hit.point;
-            return true;
-        }
-        return false;
     }
 }

@@ -96,7 +96,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc69861ea9fbf0046ba3133ba404a0f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  focusDistance: 10
   shootPoint: {fileID: 4564924738081001126}
   line: {fileID: 886811154986688294}
   audioSource: {fileID: 6945292661482473287}
@@ -560,13 +559,15 @@ GameObject:
   - component: {fileID: 4678201328113845342}
   - component: {fileID: 6542558866760458668}
   - component: {fileID: 3882853619959400029}
+  - component: {fileID: -8760748900487357536}
   - component: {fileID: 612418887052715161}
   - component: {fileID: 581025581722992385}
   - component: {fileID: 6445952189836789830}
-  - component: {fileID: -8760748900487357536}
   - component: {fileID: 6287345104829123456}
   - component: {fileID: 7686200710200441173}
   - component: {fileID: -12797140595565352}
+  - component: {fileID: 2084833044355557849}
+  - component: {fileID: 954743277171575806}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: Player
@@ -628,6 +629,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HP: 100
   MaxHp: 100
+--- !u!114 &-8760748900487357536
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 815433573
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &612418887052715161
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -645,13 +667,15 @@ MonoBehaviour:
   runSpeed: 6
   squatSpeed: 1
   Con_netObj: {fileID: -8760748900487357536}
-  Con_camera: {fileID: 0}
   Con_gun_Control: {fileID: 278098467587173686}
-  Con_player_camera: {fileID: 0}
   Con_body: {fileID: -12797140595565352}
   Con_input_Manage: {fileID: 0}
   Con_player_Animation: {fileID: 581025581722992385}
+  Con_player_HostNetworkEvent: {fileID: 2084833044355557849}
+  Con_localInputEvent: {fileID: 954743277171575806}
   Head: {fileID: 7295220296533284295}
+  Con_camera: {fileID: 0}
+  Con_player_camera: {fileID: 0}
   rigidbody: {fileID: 6445952189836789830}
   groundCheckDistance: 0.2
   enemyMask:
@@ -705,27 +729,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
---- !u!114 &-8760748900487357536
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7709504677304415273}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3580946079
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
 --- !u!114 &6287345104829123456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -789,7 +792,30 @@ MonoBehaviour:
   jumpForce: 100
   groundCheckDistance: 0.2
   rb: {fileID: 6445952189836789830}
-  uiFocuspos: {fileID: 0}
+--- !u!114 &2084833044355557849
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c82cdcf86b5d71347aeb275ffce0efe0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &954743277171575806
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c82564e2eb20b364ca0639968e8261d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &3258126144818772609
 PrefabInstance:
   m_ObjectHideFlags: 0

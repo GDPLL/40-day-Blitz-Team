@@ -27,20 +27,22 @@ public class Player_Main : NetworkBehaviour
     //游戏场景总驱动器
     void Update()
     {
-        if (isInit)
-        {
-            oPlayer_Camera.Player_camera_Update();
-            oPlayer_Control.Player_Control_Update();
-        }
+        if (!isInit) return;
 
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+            oplayer_Controls[i].Player_Control_Update();
+
+        // 本机表现层驱动
+        if (oPlayer_Control != null) oPlayer_Control.Player_Control_Local_Update();
     }
+
     //游戏场景物理总驱动器
     void FixedUpdate()
     {
-        if (isInit)
-        {
-            oPlayer_Control.Player_Control_FixedUpdate();
-        }
+        if (!isInit) return;
+
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+            oplayer_Controls[i].Player_Control_FixedUpdate();
     }
 
     //订阅场景初始化
@@ -109,6 +111,10 @@ public class Player_Main : NetworkBehaviour
                 continue;
             }
             go_netObj.SpawnAsPlayerObject(clientId);
+
+            // 主机初始化该玩家
+            go_control.Player_Control_Start(Input_Manage.Instance);
+            go_control.Player_Control_Local_Init(oCamera, Input_Manage.Instance, oPlayer_Camera);   //只有本机玩家生效
         }
 
         JudgePlayerClientRpc();
@@ -157,8 +163,8 @@ public class Player_Main : NetworkBehaviour
             return;
         }
 
-        oPlayer_Camera.Player_camera_Start(oPlayer_Control.Head);
-        oPlayer_Control.Player_Control_Start(oCamera, Input_Manage.Instance, oUI_RectTransform, oPlayer_Camera);
+        oPlayer_Control.Player_Control_Start(Input_Manage.Instance);
+        oPlayer_Control.Player_Control_Local_Init(oCamera, Input_Manage.Instance, oPlayer_Camera);
         uI_Debug.UI_Debug_Start(oPlayer_Control, oPlayer_Control.Con_input_Manage);
 
         isInit = true;

@@ -1,7 +1,8 @@
+using Unity.Netcode;
 using UnityEngine;
 
 // 角色公共逻辑，转向与速度
-public class Character_Move : MonoBehaviour
+public class Character_Move : NetworkBehaviour
 {
     // 速度参数
     public float turnSpeed = 360f;   // 转向速度

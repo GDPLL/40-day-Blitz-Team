@@ -85,7 +85,8 @@ public class UI_Debug : MonoBehaviour
             manager.IsConnectedClient ? "已连接" : "连接中");
 
         builder.Append("LocalClientId: ").AppendLine(manager.LocalClientId.ToString());
-        builder.Append("已连接人数: ").AppendLine(manager.ConnectedClients.Count.ToString());
+        builder.Append("已连接人数: ").AppendLine(
+            manager.IsServer ? manager.ConnectedClients.Count.ToString() : "-");   //仅服务端可读
 
         if (relayTransport != null)
         {
