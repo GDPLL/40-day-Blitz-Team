@@ -892,7 +892,7 @@ MonoBehaviour:
   runSpeed: 6
   squatSpeed: 1
   moveForce: 700
-  jumpForce: 100
+  jumpForce: 30
   groundCheckDistance: 0.2
   rb: {fileID: 6445952189836789830}
 --- !u!114 &2084833044355557849

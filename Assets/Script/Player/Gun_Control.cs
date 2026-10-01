@@ -53,9 +53,9 @@ public class Gun_Control : MonoBehaviour
     }
 
     [Header("精度：各姿态参数")]
-    AimProfile hipAim = new AimProfile(15f, 5f, 4f);   // 腰射
-    AimProfile shoulderAim = new AimProfile(20f, 5f, 2f);   // 据枪
-    AimProfile adsAim = new AimProfile(20f, 5f, 0.3f);   // 开镜
+    AimProfile hipAim = new AimProfile(15f, 5f, 3f);   // 腰射
+    AimProfile shoulderAim = new AimProfile(15f, 4f, 4f);   // 据枪
+    AimProfile adsAim = new AimProfile(15f, 3f, 5f);   // 开镜
 
     [Header("瞄准")]
     public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
@@ -104,9 +104,17 @@ public class Gun_Control : MonoBehaviour
         aimDirection = dir.normalized;
     }
 
-    // 朝向是否对准准星
+     // 朝向是否对准准星
     bool AimAligned()
-        => Vector3.Angle(aimDirection, transform.root.forward) <= aimAlignAngle;
+    {
+        Vector3 aim = aimDirection;
+        aim.y = 0f;
+
+        Vector3 body = transform.root.forward;
+        body.y = 0f;
+
+        return Vector3.Angle(aim, body) <= aimAlignAngle;
+    }
 
     // 设置姿态，shoulder为据枪，adsOn为开镜
     public void SetAimState(bool shoulder, bool adsOn)
@@ -210,7 +218,7 @@ public class Gun_Control : MonoBehaviour
 
     // 距离系数
     float DistanceFactor(float d)
-        => Mathf.Lerp(1f, farFactor, Mathf.InverseLerp(nearDistance, farDistance, d));
+        => Mathf.Lerp(6f, farFactor, Mathf.InverseLerp(nearDistance, farDistance, d));
 
     // 精度圈内随机偏移
     Vector2 GetSpreadOffset()
