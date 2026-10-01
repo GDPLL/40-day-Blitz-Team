@@ -2,9 +2,6 @@ using UnityEngine;
 
 public class Gun_Control : MonoBehaviour
 {
-    [Header("朝向焦点")]
-    public float focusDistance = 10f;   // 按住左键时，人物朝向相机射线前方 focusDistance 处的焦点
-
     public Transform shootPoint;   // 枪口
     public LineRenderer line;      // 射线显示
     public AudioSource audioSource;   // 音源
@@ -38,15 +35,13 @@ public class Gun_Control : MonoBehaviour
     float lineTimer;               // 射线显示计时
     float lastShotTime;            // 上次射击时间
 
-    RectTransform uiFocuspos;      // 中心UI
-
     // 一种姿态对应的一组参数
     // 外圈、内圈与增长速度
     [System.Serializable]
     public class AimProfile
     {
-        public float outerAngle = 8f;   // 外圈
-        public float innerAngle = 2f;   // 内圈
+        public float outerAngle = 20f;   // 外圈
+        public float innerAngle = 5f;   // 内圈
         public float growSpeed = 8f;   // 精度增长速度
 
         public AimProfile(float outer, float inner, float speed)
@@ -58,9 +53,12 @@ public class Gun_Control : MonoBehaviour
     }
 
     [Header("精度：各姿态参数")]
-    AimProfile hipAim = new AimProfile(8f, 4f, 4f);   // 腰射
-    AimProfile shoulderAim = new AimProfile(4f, 1f, 2f);   // 据枪
-    AimProfile adsAim = new AimProfile(2f, 0.3f, 0.3f);   // 开镜
+    AimProfile hipAim = new AimProfile(15f, 5f, 4f);   // 腰射
+    AimProfile shoulderAim = new AimProfile(20f, 5f, 2f);   // 据枪
+    AimProfile adsAim = new AimProfile(20f, 5f, 0.3f);   // 开镜
+
+    [Header("瞄准")]
+    public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
 
     [Header("精度：距离影响")]
     public float nearDistance = 5f;      // 满速距离
@@ -81,11 +79,16 @@ public class Gun_Control : MonoBehaviour
     bool stateMoving;        // 有移动输入
     bool stateRunning;       // 奔跑
     bool hasTarget;          // 是否有目标
+    bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
+    Vector3 aimDirection;    // 准星方向
 
-    float currentAngle;                             // 当前精度圈
-    public float CurrentAngle => currentAngle;      // 对外读取
+    float currentAngle;                                       // 当前精度圈
+    public float CurrentAngle => currentAngle;                // 对外读取
     public float OuterAngle => CurrentProfile().outerAngle;   // 当前姿态外圈
+    public float InnerAngle => CurrentProfile().innerAngle;   // 当前姿态内圈
+    public bool HasTarget => hasTarget;                       // 是否锁定
+    public Vector3 TargetPos => targetPos;                    // 锁定点
 
     // 枪口位置
     public Vector3 MuzzlePosition =>
@@ -94,6 +97,16 @@ public class Gun_Control : MonoBehaviour
     // 按当前姿态取参数组
     AimProfile CurrentProfile()
         => aimingAds ? adsAim : (aimingShoulder ? shoulderAim : hipAim);
+
+    // 注入准星方向
+    public void SetAimDirection(Vector3 dir)
+    {
+        aimDirection = dir.normalized;
+    }
+
+    // 朝向是否对准准星
+    bool AimAligned()
+        => Vector3.Angle(aimDirection, transform.root.forward) <= aimAlignAngle;
 
     // 设置姿态，shoulder为据枪，adsOn为开镜
     public void SetAimState(bool shoulder, bool adsOn)
@@ -116,8 +129,17 @@ public class Gun_Control : MonoBehaviour
         hasTarget = has;
         targetPos = worldPosition;
     }
-    // 记录初始参数
-    void Start()
+
+    // 注入锁定与精度圈，客户端显示用
+    public void SetAimShow(bool has, Vector3 worldPosition, float angle)
+    {
+        hasTarget = has;
+        targetPos = worldPosition;
+        currentAngle = angle;
+    }
+
+    // 注入完成
+    public void Gun_Control_Init()
     {
         if (line == null) line = GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
@@ -126,28 +148,16 @@ public class Gun_Control : MonoBehaviour
 
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
+
+        Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
-    // 注入准星UI
-    public void Gun_Control_Init(RectTransform rectTransform)
-    {
-        uiFocuspos = rectTransform;
-    }
-
-    // 物理帧更新射速计时与精度
-    public void Gun_Control_FixedUpdate()
+    // 物理帧逻辑，计时与后坐力恢复
+    public void Gun_Fixed_Date()
     {
         fireTimer += Time.deltaTime;
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
-
-        // 射线短暂显示后消失
-        lineTimer -= Time.deltaTime;
-        if (line != null && lineTimer <= 0f) line.enabled = false;
-
-        // 长时间未射击停止音效
-        if (audioSource != null && audioSource.isPlaying && Time.time - lastShotTime > 0.2f)
-            audioSource.Stop();
 
         // 后坐力恢复
         if (recoil.sqrMagnitude > 0.0001f)
@@ -156,22 +166,31 @@ public class Gun_Control : MonoBehaviour
             recoil = Vector2.zero;
     }
 
+    // 物理帧表现，射线与音效计时
+    public void Gun_Fixed_Performance()
+    {
+        // 射线短暂显示后消失
+        lineTimer -= Time.deltaTime;
+        if (line != null && lineTimer <= 0f) line.enabled = false;
+
+        // 长时间未射击停止音效
+        if (audioSource != null && audioSource.isPlaying && Time.time - lastShotTime > 0.2f)
+            audioSource.Stop();
+    }
+
     // 按目标与移动状态更新精度
     void UpdateAimAccuracy(float dt)
     {
         AimProfile p = CurrentProfile();
 
         // 判定目标是否还在当前外圈
-        bool inRange = false;
-        if (hasTarget)
-        {
-            Vector3 to = targetPos - MuzzlePosition;
-            inRange = Vector3.Angle(transform.forward, to) <= p.outerAngle;
-        }
+        targetInRing = hasTarget &&
+            Vector3.Angle(aimDirection, targetPos - MuzzlePosition) <= p.outerAngle * 0.5f;   //外圈按直径算
 
-        if (!inRange)
+        // 离开范围或朝向没对准准星都不收圈
+        if (!targetInRing || !AimAligned())
         {
-            currentAngle = p.outerAngle;   // 离开范围丢失精度
+            currentAngle = p.outerAngle;
             return;
         }
 
@@ -197,22 +216,23 @@ public class Gun_Control : MonoBehaviour
     Vector2 GetSpreadOffset()
         => Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
-    // 沿枪口方向射击，返回是否开火
-    public bool Shoot() => Shoot(null);
-
-    // 朝目标射击，目标为空则沿枪口方向
-    public bool Shoot(Transform target)
+    // 开火逻辑，返回是否成功
+    public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
+        out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)
     {
-        if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;
+        origin = MuzzlePosition;
+        dir = transform.forward;
+        isHit = false;
+        hitPoint = Vector3.zero;
+        hitNormal = Vector3.up;
+
+        SetAimDirection(aimDir);      // 更新准星方向
+
+        if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
+        if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
+
         ammo--;
         fireTimer = 0f;
-        lastShotTime = Time.time;
-
-        // 播放射击音效
-        if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
-
-        Vector3 origin = MuzzlePosition;
-        Vector3 aim = target != null ? target.position + Vector3.up * 1f : origin + transform.forward * 10f;
 
         // 累计后坐力
         recoil += new Vector2(Random.Range(-recoilX, recoilX), Random.Range(0f, recoilY));
@@ -223,33 +243,58 @@ public class Gun_Control : MonoBehaviour
         // 后坐力叠加精度散布
         Vector2 offset = recoil + GetSpreadOffset();
 
-        // 计算射击方向
-        Vector3 dir = (aim - origin).normalized + transform.right * offset.x + transform.up * offset.y;
+        // 锁定圈内时子弹直指目标
+        dir = targetInRing ? (targetPos - origin).normalized : aimDir.normalized;
+        dir += transform.right * offset.x + transform.up * offset.y;
         dir.Normalize();
 
-        // 在开火点生成对象
-        if (fireEffect != null)
-            Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
-
-        Vector3 end = origin + dir * range;                         // 默认终点
+        // 射线检测与伤害结算
         if (Physics.Raycast(origin, dir, out RaycastHit hit, range))
         {
-            end = hit.point;                                        // 命中落点
+            isHit = true;
+            hitPoint = hit.point;
+            hitNormal = hit.normal;
+
+            Idamage damageable = hit.collider.GetComponent<Idamage>();
+            if (damageable != null) damageable.Takedamage(damage);
+        }
+
+        return true;    // 本次已开火
+    }
+
+    // 开火表现，参数为逻辑结果
+    public void Gun_Shoot_Performance(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
+    {
+        Gun_Shoot_Local_Performance(origin, dir);
+        Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
+    }
+
+    // 本机开火表现，枪口特效与音效
+    public void Gun_Shoot_Local_Performance(Vector3 origin, Vector3 dir)
+    {
+        lastShotTime = Time.time;   //记录本次开火时刻
+
+        // 播放射击音效
+        if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
+
+        // 在开火点生成对象
+        if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
+    }
+
+    // 弹道与命中表现
+    public void Gun_Shoot_Line_Performance(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
+    {
+        Vector3 end = origin + dir * range;    // 默认终点
+        if (isHit)
+        {
+            end = hitPoint;                    // 命中落点
 
             // 在落点生成对象
             if (hitEffect != null)
             {
-                Vector3 bounceDir = Vector3.Reflect(dir, hit.normal);
-                if (bounceDir.sqrMagnitude <= 0.001f) bounceDir = -hit.normal;   // 极端角度兜底
-                Instantiate(hitEffect, hit.point, Quaternion.LookRotation(bounceDir));
-            }
-
-            // 对命中对象造成伤害
-            // TODO 联机后移到主机裁决
-            Idamage damageable = hit.collider.GetComponent<Idamage>();
-            if (damageable != null)
-            {
-                damageable.Takedamage(damage);
+                Vector3 bounceDir = Vector3.Reflect(dir, hitNormal);
+                if (bounceDir.sqrMagnitude <= 0.001f) bounceDir = -hitNormal;   // 极端角度兜底
+                Instantiate(hitEffect, hitPoint, Quaternion.LookRotation(bounceDir));
             }
         }
 
@@ -262,12 +307,10 @@ public class Gun_Control : MonoBehaviour
             line.enabled = true;
             lineTimer = 0.05f;
         }
-
-        return true;    // 本次已开火
     }
 
-    // 换弹
-    public void Reload()
+    // 换弹逻辑，弹匣补满
+    public void Gun_Reload_Date()
     {
         ammo = maxAmmo;
     }
@@ -286,16 +329,15 @@ public class Gun_Control : MonoBehaviour
         recoilY = originalRecoilY * (on ? 0.3f : 1f);
     }
 
-    // 举枪瞄向准星
-    public void AimAt()
+    // 举枪朝向瞄准落点
+    public void Gun_Aim_Performance(Vector3 aimPoint)
     {
-        Ray ray = Camera.main.ScreenPointToRay(uiFocuspos.position);
-        Vector3 Point;
-        if (TryGetAimPoint(ray, out Vector3 hitPoint))
-            Point = hitPoint;                    // 瞄准碰撞落点
-        else
-            Point = ray.GetPoint(focusDistance); // 回到固定焦点距离
-        Quaternion worldLook = Quaternion.LookRotation(Point - transform.position, Vector3.up);
+        if (aimPoint == Vector3.zero) return;   //无落点不转向
+
+        Vector3 dir = aimPoint - transform.position;
+        if (dir.sqrMagnitude <= 0.001f) return;   // 落点与枪重叠
+
+        Quaternion worldLook = Quaternion.LookRotation(dir, Vector3.up);
         Quaternion targetRot = transform.parent != null
             ? Quaternion.Inverse(transform.parent.rotation) * worldLook
             : worldLook;
@@ -304,22 +346,8 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 收枪
-    public void AimDown()
+    public void Gun_AimDown_Performance()
     {
         transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
-    }
-
-    // 取射线命中点，跳过自身
-    bool TryGetAimPoint(Ray ray, out Vector3 aimPoint)
-    {
-        aimPoint = Vector3.zero;
-        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.collider.CompareTag("Player")) continue;   // 跳过自身
-            aimPoint = hit.point;
-            return true;
-        }
-        return false;
     }
 }

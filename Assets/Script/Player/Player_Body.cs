@@ -16,37 +16,24 @@ public class Player_Body : Character_Move
     public float groundCheckDistance = 0.2f;        // 落地检测距离
     public Rigidbody rb;                            // 刚体
 
-    bool mouseHeld;                                 // 是否举枪
-
-    // 外部引用
-    Camera PlayerCamera;                            // 相机
-    public RectTransform uiFocuspos;                // 准星UI
-    Vector3 focusPoint;                             // 相机聚焦方向
     public bool IsGrounded { get; private set; }    // 是否在地面
 
-    // 初始化，相机、准星UI、刚体由外部注入
-    public void Body_Init(Camera camera, RectTransform uiFocus, Rigidbody rigidbody)
+    // 初始化，刚体由外部注入
+    public void Body_Init(Rigidbody rigidbody)
     {
-        PlayerCamera = camera;
-        uiFocuspos = uiFocus;
-
         rb = rigidbody;
         if (rb != null) rb.freezeRotation = true;    // 防碰撞翻滚
 
         currentMoveDirection = transform.forward;    // 平滑转向初值
+
+        Debug.Log("Player_Body|Body_Init|完成初始化");
     }
 
-    // 按输入轴计算移动方向，axis为移动输入轴
-    public void Player_Body_Update(Vector2 axis, bool run, bool squat)
+    // 按输入轴与视角算移动，axis为输入轴
+    public void Body_Move_Date(Vector2 axis, Vector3 viewDir, bool run, bool squat)
     {
-        if (PlayerCamera == null) return;               // 等相机绑定后再控制
-
-        // 相机水平前向与右向
-        Vector3 forward = PlayerCamera.transform.forward; forward.y = 0f; forward.Normalize();
-        Vector3 right = PlayerCamera.transform.right; right.y = 0f; right.Normalize();
-
-        // 输入轴换算世界方向
-        direction = (axis.x * right + axis.y * forward).normalized;
+        // 视角换算世界方向
+        direction = GetMoveDir(axis, viewDir);
 
         // 平滑转向
         if (direction.sqrMagnitude > 0.001f)
@@ -71,11 +58,19 @@ public class Player_Body : Character_Move
         }
     }
 
-    // 物理帧更新，落地检测与限速
-    public void Local_FixedUpdate()
+    // 视角水平方向换算移动方向
+    Vector3 GetMoveDir(Vector2 axis, Vector3 viewDir)
     {
-        if (PlayerCamera == null) return;   // 等相机绑定后再执行
+        Vector3 forward = viewDir; forward.y = 0f; forward.Normalize();
+        if (forward.sqrMagnitude <= 0.001f) forward = transform.forward;
+        Vector3 right = Vector3.Cross(Vector3.up, forward);
 
+        return (axis.x * right + axis.y * forward).normalized;
+    }
+
+    // 物理帧逻辑，落地检测与限速
+    public void Body_Fixed_Date()
+    {
         IsGrounded = isGrounded();
         //地面移动
         if (IsGrounded)
@@ -90,35 +85,27 @@ public class Player_Body : Character_Move
         }
     }
 
-    // 取射线命中点，跳过自身
-    bool TryGetAimPoint(Ray ray, out Vector3 aimPoint)
-    {
-        aimPoint = Vector3.zero;
-        RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.collider.CompareTag("Player")) continue;   // 跳过自身
-            aimPoint = hit.point;
-            return true;
-        }
-        return false;
-    }
-
     // 落地检测
     bool isGrounded()
     {
         Collider col = GetComponent<Collider>();
         if (col == null) col = GetComponentInChildren<Collider>();
-        if (col == null) return false;
+        if (col == null)
+        {
+            Debug.LogError("Player_Body|isGrounded|未找到 Collider");
+            return false;
+        }
 
         Vector3 origin = col.bounds.center;
         float rayDistance = col.bounds.extents.y + groundCheckDistance;
         return Physics.Raycast(origin, Vector3.down, rayDistance);
     }
 
-    // 施加跳跃力
-    public void Body_Jump()
+    // 跳跃逻辑，只在地面起跳
+    public void Body_Jump_Date()
     {
+        if (!IsGrounded) return;    //非地面不能起跳
+
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
 
@@ -128,40 +115,15 @@ public class Player_Body : Character_Move
         rb.AddForce(currentMoveDirection * currentForce, ForceMode.Force);
     }
 
-    // 转向移动方向
-    public void Body_rotation()
+    // 表现，转向移动方向
+    public void Body_Rotation_Performance()
     {
         SmoothRotate(currentMoveDirection);
     }
 
-    // 转向相机聚焦方向
-    public void Body_rotationWithFocus()
+    // 表现，转向视角方向
+    public void Body_Aim_Performance(Vector3 viewDir)
     {
-        SmoothRotate(focusPoint);
-    }
-
-    // 按输入轴计算移动方向
-    public void Body_calculateVectorMove(Vector2 axis)
-    {
-        // 相机水平前向与右向
-        Vector3 forward = PlayerCamera.transform.forward; forward.y = 0f; forward.Normalize();
-        Vector3 right = PlayerCamera.transform.right; right.y = 0f; right.Normalize();
-
-        // 输入轴换算世界方向
-        direction = (axis.x * right + axis.y * forward).normalized;
-
-        // 平滑转向
-        if (direction.sqrMagnitude > 0.001f)
-        {
-            currentMoveDirection = Vector3.RotateTowards(
-                currentMoveDirection, direction,
-                turnSpeed * Mathf.Deg2Rad * Time.deltaTime, 1f);
-        }
-    }
-
-    // 计算相机聚焦方向
-    public void Body_calculateVectorCamera()
-    {
-        focusPoint = Camera.main.ScreenPointToRay(uiFocuspos.position).direction;
+        SmoothRotate(viewDir);
     }
 }
