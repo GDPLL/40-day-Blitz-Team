@@ -11,6 +11,8 @@ public class HostNetWorkInputEvent : NetworkBehaviour
     public event Action<bool> Mouse1_event;      // 左键
     public event Action<bool> Mouse2_event;      // 右键
     public event Action<bool> MouseHeld_event;   // 鼠标按住
+    public event Action<bool> Shoulder_event;    // 肩射
+    public event Action<bool> Ads_event;         // 开镜
     public event Action<bool> Run_event;         // 奔跑
     public event Action ReloadHeld_event;        // 换弹
     public event Action<bool> Squat_event;       // 蹲下
@@ -61,6 +63,8 @@ public class HostNetWorkInputEvent : NetworkBehaviour
         Mouse1_event?.Invoke(packet.mouse1);
         Mouse2_event?.Invoke(packet.mouse2);
         MouseHeld_event?.Invoke(packet.mouseHeld);
+        Shoulder_event?.Invoke(packet.shoulder);
+        Ads_event?.Invoke(packet.ads);
         Run_event?.Invoke(packet.run);
         if (packet.reload) ReloadHeld_event?.Invoke();
         Squat_event?.Invoke(packet.squat);

@@ -29,7 +29,7 @@ public class Local_InputEvent : MonoBehaviour
     {
         if (input_Manage == null) return;
 
-        ShoulderAim_event?.Invoke(input_Manage.Mouse2Held);     //肩射跟随右键
+        ShoulderAim_event?.Invoke(input_Manage.ShoulderHeld);   //肩射跟随Z键
 
         if (input_Manage.Mouse1Held) Fire_event?.Invoke();      //左键按住
     }

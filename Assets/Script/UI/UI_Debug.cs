@@ -123,7 +123,7 @@ public class UI_Debug : MonoBehaviour
         builder.Append("移动: ").Append(player.isWASDDowm ? "是" : "否")
                .Append("  奔跑: ").Append(player.isRuning ? "是" : "否")
                .Append("  蹲下: ").AppendLine(player.isSquat ? "是" : "否");
-        builder.Append("举枪: ").Append(player.isMouseDown ? "是" : "否")
+        builder.Append("举枪: ").Append(player.isAimDown ? "是" : "否")
                .Append("  换弹: ").AppendLine(player.isReload ? "是" : "否");
 
         if (player.Con_ObjectSystem != null)

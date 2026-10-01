@@ -40,8 +40,8 @@ public class Gun_Control : MonoBehaviour
     [System.Serializable]
     public class AimProfile
     {
-        public float outerAngle = 8f;   // 外圈
-        public float innerAngle = 2f;   // 内圈
+        public float outerAngle = 20f;   // 外圈
+        public float innerAngle = 5f;   // 内圈
         public float growSpeed = 8f;   // 精度增长速度
 
         public AimProfile(float outer, float inner, float speed)
@@ -53,9 +53,12 @@ public class Gun_Control : MonoBehaviour
     }
 
     [Header("精度：各姿态参数")]
-    AimProfile hipAim = new AimProfile(8f, 4f, 4f);   // 腰射
-    AimProfile shoulderAim = new AimProfile(4f, 1f, 2f);   // 据枪
-    AimProfile adsAim = new AimProfile(2f, 0.3f, 0.3f);   // 开镜
+    AimProfile hipAim = new AimProfile(15f, 5f, 4f);   // 腰射
+    AimProfile shoulderAim = new AimProfile(20f, 5f, 2f);   // 据枪
+    AimProfile adsAim = new AimProfile(20f, 5f, 0.3f);   // 开镜
+
+    [Header("瞄准")]
+    public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
 
     [Header("精度：距离影响")]
     public float nearDistance = 5f;      // 满速距离
@@ -76,11 +79,16 @@ public class Gun_Control : MonoBehaviour
     bool stateMoving;        // 有移动输入
     bool stateRunning;       // 奔跑
     bool hasTarget;          // 是否有目标
+    bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
+    Vector3 aimDirection;    // 准星方向
 
-    float currentAngle;                             // 当前精度圈
-    public float CurrentAngle => currentAngle;      // 对外读取
+    float currentAngle;                                       // 当前精度圈
+    public float CurrentAngle => currentAngle;                // 对外读取
     public float OuterAngle => CurrentProfile().outerAngle;   // 当前姿态外圈
+    public float InnerAngle => CurrentProfile().innerAngle;   // 当前姿态内圈
+    public bool HasTarget => hasTarget;                       // 是否锁定
+    public Vector3 TargetPos => targetPos;                    // 锁定点
 
     // 枪口位置
     public Vector3 MuzzlePosition =>
@@ -89,6 +97,16 @@ public class Gun_Control : MonoBehaviour
     // 按当前姿态取参数组
     AimProfile CurrentProfile()
         => aimingAds ? adsAim : (aimingShoulder ? shoulderAim : hipAim);
+
+    // 注入准星方向
+    public void SetAimDirection(Vector3 dir)
+    {
+        aimDirection = dir.normalized;
+    }
+
+    // 朝向是否对准准星
+    bool AimAligned()
+        => Vector3.Angle(aimDirection, transform.root.forward) <= aimAlignAngle;
 
     // 设置姿态，shoulder为据枪，adsOn为开镜
     public void SetAimState(bool shoulder, bool adsOn)
@@ -110,6 +128,14 @@ public class Gun_Control : MonoBehaviour
     {
         hasTarget = has;
         targetPos = worldPosition;
+    }
+
+    // 注入锁定与精度圈，客户端显示用
+    public void SetAimShow(bool has, Vector3 worldPosition, float angle)
+    {
+        hasTarget = has;
+        targetPos = worldPosition;
+        currentAngle = angle;
     }
 
     // 注入完成
@@ -158,16 +184,13 @@ public class Gun_Control : MonoBehaviour
         AimProfile p = CurrentProfile();
 
         // 判定目标是否还在当前外圈
-        bool inRange = false;
-        if (hasTarget)
-        {
-            Vector3 to = targetPos - MuzzlePosition;
-            inRange = Vector3.Angle(transform.forward, to) <= p.outerAngle;
-        }
+        targetInRing = hasTarget &&
+            Vector3.Angle(aimDirection, targetPos - MuzzlePosition) <= p.outerAngle * 0.5f;   //外圈按直径算
 
-        if (!inRange)
+        // 离开范围或朝向没对准准星都不收圈
+        if (!targetInRing || !AimAligned())
         {
-            currentAngle = p.outerAngle;   // 离开范围丢失精度
+            currentAngle = p.outerAngle;
             return;
         }
 
@@ -203,11 +226,13 @@ public class Gun_Control : MonoBehaviour
         hitPoint = Vector3.zero;
         hitNormal = Vector3.up;
 
+        SetAimDirection(aimDir);      // 更新准星方向
+
+        if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
         if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
 
         ammo--;
         fireTimer = 0f;
-        lastShotTime = Time.time;
 
         // 累计后坐力
         recoil += new Vector2(Random.Range(-recoilX, recoilX), Random.Range(0f, recoilY));
@@ -217,7 +242,10 @@ public class Gun_Control : MonoBehaviour
 
         // 后坐力叠加精度散布
         Vector2 offset = recoil + GetSpreadOffset();
-        dir = aimDir.normalized + transform.right * offset.x + transform.up * offset.y;
+
+        // 锁定圈内时子弹直指目标
+        dir = targetInRing ? (targetPos - origin).normalized : aimDir.normalized;
+        dir += transform.right * offset.x + transform.up * offset.y;
         dir.Normalize();
 
         // 射线检测与伤害结算
@@ -244,6 +272,8 @@ public class Gun_Control : MonoBehaviour
     // 本机开火表现，枪口特效与音效
     public void Gun_Shoot_Local_Performance(Vector3 origin, Vector3 dir)
     {
+        lastShotTime = Time.time;   //记录本次开火时刻
+
         // 播放射击音效
         if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
 

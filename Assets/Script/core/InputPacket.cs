@@ -15,6 +15,8 @@ public struct InputPacket : INetworkSerializable
     public bool mouse1;             // 左键
     public bool mouse2;             // 右键
     public bool mouseHeld;          // 鼠标按住
+    public bool shoulder;           // 肩射
+    public bool ads;                // 开镜
     public bool run;                // 奔跑
     public bool reload;             // 换弹
     public bool squat;              // 蹲下
@@ -30,6 +32,8 @@ public struct InputPacket : INetworkSerializable
         serializer.SerializeValue(ref mouse1);
         serializer.SerializeValue(ref mouse2);
         serializer.SerializeValue(ref mouseHeld);
+        serializer.SerializeValue(ref shoulder);
+        serializer.SerializeValue(ref ads);
         serializer.SerializeValue(ref run);
         serializer.SerializeValue(ref reload);
         serializer.SerializeValue(ref squat);

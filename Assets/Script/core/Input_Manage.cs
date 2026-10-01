@@ -85,6 +85,8 @@ public class Input_Manage : NetworkBehaviour
         packet.mouse1 = Mouse1Held;
         packet.mouse2 = Mouse2Held;
         packet.mouseHeld = MouseHeld;
+        packet.shoulder = ShoulderHeld;
+        packet.ads = AdsHeld;
         packet.run = RunHeld;
         packet.reload = ReloadHeld;
         packet.squat = SquatHeld;
@@ -133,6 +135,8 @@ public class Input_Manage : NetworkBehaviour
     public bool RunHeld;            //奔跑输入
     public bool ReloadHeld;         //换弹输入
     public bool SquatHeld;          //蹲下输入
+    public bool ShoulderHeld;       //肩射输入
+    public bool AdsHeld;            //开镜输入
     public bool DebugKey;           // 调试输入
 
     // 读取输入状态
@@ -142,8 +146,10 @@ public class Input_Manage : NetworkBehaviour
         JumpDownHeld = Input.GetKey(KeyCode.Space);     //跳跃空格
         Mouse1Held = Input.GetMouseButton(0);        //左键输入
         Mouse2Held = Input.GetMouseButton(1);        //右键输入
+        ShoulderHeld = Input.GetKey(KeyCode.Z);      //肩射输入
+        AdsHeld = Input.GetKey(KeyCode.X);           //开镜输入
         WASDHeld = Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D);        //移动输入
-        RunHeld = Input.GetKey(KeyCode.LeftShift) && !Mouse2Held;       //奔跑输入
+        RunHeld = Input.GetKey(KeyCode.LeftShift) && !ShoulderHeld && !AdsHeld;       //奔跑输入
         ReloadHeld = Input.GetKey(KeyCode.R);            //换弹输入 
         SquatHeld = Input.GetKey(KeyCode.LeftControl);       //蹲下输入
         DebugKey = Input.GetKey(KeyCode.BackQuote);         //调试输入按钮

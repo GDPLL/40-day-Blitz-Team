@@ -19,6 +19,7 @@ public class Player_Control : Character_Move
     public HostNetWorkInputEvent Con_player_HostNetworkEvent;   // 网络同步事件触发器
     public Local_InputEvent Con_localInputEvent;        // 本机表现层输入事件
     public Object_System Con_ObjectSystem;          // 生命系统
+    public Aim_Ring_UI Con_aimRing_UI;              // 本机瞄准圈显示
 
     // 本地对外变量
     [Header("头部位置")]
@@ -45,6 +46,9 @@ public class Player_Control : Character_Move
     public bool isMouse1Down;   //左键输入
     public bool isMouse2Down;   //右键输入
     public bool isMouseDown => isMouse1Down || isMouse2Down;
+    public bool isShoulderDown;   //肩射输入
+    public bool isAdsDown;        //开镜输入
+    public bool isAimDown => isMouse1Down || isMouse2Down || isShoulderDown || isAdsDown;   //举枪中
     public bool isWASDDowm;    //移动输入
     public bool isRuning;      //奔跑输入
     public bool isReload;       //换弹输入
@@ -53,6 +57,9 @@ public class Player_Control : Character_Move
     //同步表现状态
     NetworkVariable<byte> netShowState = new NetworkVariable<byte>();        //表现状态位
     NetworkVariable<Vector3> netAimPoint = new NetworkVariable<Vector3>();  //瞄准落点
+    NetworkVariable<Vector3> netTargetPos = new NetworkVariable<Vector3>(); //锁定点
+    NetworkVariable<bool> netHasTarget = new NetworkVariable<bool>();       //是否锁定
+    NetworkVariable<float> netAimAngle = new NetworkVariable<float>();     //精度圈角度
     NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
     NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
 
@@ -162,6 +169,17 @@ public class Player_Control : Character_Move
 
         Con_player_camera.Player_camera_Start(Head);    //相机跟随头部
 
+        // 本机瞄准圈
+        if (Player_Main.player_Main == null || Player_Main.player_Main.oUI_RectTransform == null)
+        {
+            Debug.LogError("Player_Control|Player_Control_Local_Init|准星UI 为空");
+        }
+        else
+        {
+            if (Con_aimRing_UI == null) Con_aimRing_UI = gameObject.AddComponent<Aim_Ring_UI>();
+            Con_aimRing_UI.Aim_Ring_UI_Init(Con_gun_Control, Player_Main.player_Main.oUI_RectTransform, Con_camera);
+        }
+
         // 锁定并隐藏鼠标
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -176,6 +194,13 @@ public class Player_Control : Character_Move
 
         // 相机跟随
         if (Con_player_camera != null) Con_player_camera.Camera_Follow_Performance_Local();
+
+        // 姿态本地预测，避免按键延迟
+        if (Con_gun_Control != null && Con_input_Manage != null)
+            Con_gun_Control.SetAimState(Con_input_Manage.ShoulderHeld, Con_input_Manage.AdsHeld);
+
+        // 瞄准圈
+        if (Con_aimRing_UI != null) Con_aimRing_UI.Aim_Ring_UI_Show();
     }
 
     // 客户端每帧各端表现层更新
@@ -191,8 +216,12 @@ public class Player_Control : Character_Move
 
         if (Con_gun_Control == null) return;
 
-        // 弹药同步到本地
-        if (!IsServer) Con_gun_Control.ammo = netAmmo.Value;
+        // 弹药与瞄准数据同步到本地
+        if (!IsServer)
+        {
+            Con_gun_Control.ammo = netAmmo.Value;
+            Con_gun_Control.SetAimShow(netHasTarget.Value, netTargetPos.Value, netAimAngle.Value);
+        }
 
         // 举枪状态
         if ((state & Player_animation.BitGun) != 0)
@@ -209,7 +238,7 @@ public class Player_Control : Character_Move
         if (isWASDDowm) state |= Player_animation.BitWalk;
         if (isRuning) state |= Player_animation.BitRun;
         if (isSquat) state |= Player_animation.BitSquat;
-        if (isMouseDown) state |= Player_animation.BitGun;
+        if (isAimDown) state |= Player_animation.BitGun;
         if (isJumpDown) state |= Player_animation.BitJump;
         if (!isOnGround) state |= Player_animation.BitAir;
         return state;
@@ -224,7 +253,7 @@ public class Player_Control : Character_Move
         if (Con_input_Manage.WASDHeld) state |= Player_animation.BitWalk;
         if (Con_input_Manage.RunHeld) state |= Player_animation.BitRun;
         if (Con_input_Manage.SquatHeld) state |= Player_animation.BitSquat;
-        if (Con_input_Manage.MouseHeld) state |= Player_animation.BitGun;
+        if (Con_input_Manage.MouseHeld || Con_input_Manage.ShoulderHeld || Con_input_Manage.AdsHeld) state |= Player_animation.BitGun;
         if (Con_input_Manage.JumpDownHeld) state |= Player_animation.BitJump;
 
         // 离地本机无权威检测，沿用同步值
@@ -276,19 +305,32 @@ public class Player_Control : Character_Move
 
         // 同步表现状态
         netShowState.Value = PackShowState();
-        if (isMouseDown) netAimPoint.Value = packet.aimPoint;
 
         // 传递枪械状态
-        Con_gun_Control.SetRecoilReduction(isMouse2Down);
-        Con_gun_Control.SetAimState(isMouse2Down, false);           // 开镜未接入，传 false
+        Con_gun_Control.SetRecoilReduction(isShoulderDown);
+        Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
+
+        // 注入准星方向
+        Vector3 aimDir = packet.aimPoint - Con_gun_Control.MuzzlePosition;
+        Con_gun_Control.SetAimDirection(aimDir.sqrMagnitude > 0.001f ? aimDir : packet.viewDir);
 
         // 生命系统状态
         netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
         netAmmo.Value = Con_gun_Control.ammo;       //获取主机上各端玩家弹药
         Con_ObjectSystem.Object_System_Update();
 
-        UpdateAimTarget();
+        // 锁敌
+        UpdateAimTarget(aimDir);
+
+        // 同步瞄准表现数据
+        netHasTarget.Value = isAimDown && Con_gun_Control.HasTarget;   //举枪才显示锁圈
+        netAimAngle.Value = Con_gun_Control.CurrentAngle;
+        if (isAimDown)
+        {
+            netAimPoint.Value = packet.aimPoint;
+            netTargetPos.Value = Con_gun_Control.TargetPos;
+        }
     }
     // 主机每物理帧各端逻辑更新
     public void Player_Control_FixedUpdate()
@@ -301,6 +343,9 @@ public class Player_Control : Character_Move
 
         Con_body.Body_Fixed_Date();
         Con_gun_Control.Gun_Fixed_Date();
+
+        // 地面有输入才施推力
+        if (isWASDDowm && Con_body.IsGrounded) Con_body.Body_Move();
     }
 
 
@@ -382,6 +427,8 @@ public class Player_Control : Character_Move
         Con_player_HostNetworkEvent.Mouse1_event += OnMouse1;             //左键
         Con_player_HostNetworkEvent.Mouse2_event += OnMouse2;             //右键
         Con_player_HostNetworkEvent.MouseHeld_event += OnMouseHeld;       //鼠标按住
+        Con_player_HostNetworkEvent.Shoulder_event += OnShoulder;         //肩射
+        Con_player_HostNetworkEvent.Ads_event += OnAds;                   //开镜
         Con_player_HostNetworkEvent.Run_event += OnRun;                   //奔跑
         Con_player_HostNetworkEvent.ReloadHeld_event += OnReloadHeld;     //换弹
         Con_player_HostNetworkEvent.Squat_event += OnSquat;               //蹲下
@@ -397,6 +444,8 @@ public class Player_Control : Character_Move
         Con_player_HostNetworkEvent.Mouse1_event -= OnMouse1;
         Con_player_HostNetworkEvent.Mouse2_event -= OnMouse2;
         Con_player_HostNetworkEvent.MouseHeld_event -= OnMouseHeld;
+        Con_player_HostNetworkEvent.Shoulder_event -= OnShoulder;
+        Con_player_HostNetworkEvent.Ads_event -= OnAds;
         Con_player_HostNetworkEvent.Run_event -= OnRun;
         Con_player_HostNetworkEvent.ReloadHeld_event -= OnReloadHeld;
         Con_player_HostNetworkEvent.Squat_event -= OnSquat;
@@ -428,19 +477,17 @@ public class Player_Control : Character_Move
     {
         isWASDDowm = axis.sqrMagnitude >= 0.01f;
 
-        if (Con_body == null || Con_player_HostNetworkEvent == null)
+        if (Con_body == null)
         {
             Debug.LogError("Player_Control|OnMove|body 为空");
             return;
         }
         if (!isOnGround) return;
 
-        // 无输入不施推力
+        // 无输入不转向
         if (!isWASDDowm) return;
 
-        Con_body.Body_calculateVectorMove(axis, Con_player_HostNetworkEvent.Packet.viewDir);
-        Con_body.Body_Move();
-        if (!isMouseDown) Con_body.Body_Rotation_Performance();
+        if (!isAimDown) Con_body.Body_Rotation_Performance();
     }
 
     // 跳跃
@@ -461,15 +508,25 @@ public class Player_Control : Character_Move
         }
         if (!on) return;
 
-        Con_gun_Control.SetRecoilReduction(false);
         Player_Fire();
     }
 
-    // 右键肩射
+    // 右键只朝向
     void OnMouse2(bool on)
     {
         isMouse2Down = on;
-        if (Con_gun_Control != null) Con_gun_Control.SetRecoilReduction(isMouse2Down);
+    }
+
+    // 肩射
+    void OnShoulder(bool on)
+    {
+        isShoulderDown = on;
+    }
+
+    // 开镜
+    void OnAds(bool on)
+    {
+        isAdsDown = on;
     }
 
     // 举枪瞄准
@@ -515,30 +572,66 @@ public class Player_Control : Character_Move
         return Physics.Raycast(origin, Vector3.down, rayDistance);
     }
 
-    // 找射程内最接近枪口方向的敌人
-    void UpdateAimTarget()
+    // 找可瞄准的敌人，fwd为准星方向
+    void UpdateAimTarget(Vector3 fwd)
     {
         Vector3 origin = Con_gun_Control.MuzzlePosition;
+        Ray ray = new Ray(origin, fwd);
+
+        // 准星射线上最近的命中
+        RaycastHit[] hits = Physics.RaycastAll(ray, Con_gun_Control.range);
+
+        float nearest = float.MaxValue;
+        RaycastHit closest = default;
+
+        foreach (RaycastHit h in hits)
+        {
+            if (h.collider.transform.IsChildOf(transform)) continue;   // 跳过自己
+            if (h.distance >= nearest) continue;
+
+            nearest = h.distance;
+            closest = h;
+        }
+
+        // 最近命中的是敌人则锁定命中点
+        if (nearest < float.MaxValue &&
+            (enemyMask.value & (1 << closest.collider.gameObject.layer)) != 0)
+        {
+            Con_gun_Control.SetTarget(true, closest.point);
+            return;
+        }
+
+        // 其次取外圈内可见敌人的最近点
+        float outer = Con_gun_Control.OuterAngle * 0.5f;   //外圈按直径算
+
         Collider[] cols = Physics.OverlapSphere(origin, Con_gun_Control.range, enemyMask);
 
         float bestAngle = float.MaxValue;
-        Vector3 bestPos = Vector3.zero;
-        bool found = false;
+        Vector3 bestPoint = Vector3.zero;
 
         foreach (Collider col in cols)
         {
-            if (col.transform.IsChildOf(transform)) continue;   // 跳过自身
+            if (col.transform.IsChildOf(transform)) continue;
 
-            Vector3 center = col.bounds.center;                 // 取包围盒中心
-            float angle = Vector3.Angle(Con_gun_Control.transform.forward, center - origin);
-            if (angle < bestAngle)
-            {
-                bestAngle = angle;
-                bestPos = center;
-                found = true;
-            }
+            // 准星射线上敌人所在深度处的点
+            float depth = Vector3.Dot(col.bounds.center - origin, fwd);
+            if (depth <= 0f) continue;
+
+            // 敌人表面离准星最近的点
+            Vector3 point = col.ClosestPoint(origin + fwd * depth);
+
+            float angle = Vector3.Angle(fwd, point - origin);
+            if (angle > outer || angle >= bestAngle) continue;
+            if (!Visible(origin, point, col)) continue;
+
+            bestAngle = angle;
+            bestPoint = point;
         }
 
-        Con_gun_Control.SetTarget(found, bestPos);
+        Con_gun_Control.SetTarget(bestAngle < float.MaxValue, bestPoint);
     }
+
+    // 判断目标点是否被挡
+    bool Visible(Vector3 origin, Vector3 point, Collider target)
+        => !Physics.Linecast(origin, point, out RaycastHit h) || h.collider == target;
 }

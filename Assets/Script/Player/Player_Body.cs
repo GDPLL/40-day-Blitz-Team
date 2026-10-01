@@ -126,18 +126,4 @@ public class Player_Body : Character_Move
     {
         SmoothRotate(viewDir);
     }
-
-    // 按输入轴与视角换算移动方向
-    public void Body_calculateVectorMove(Vector2 axis, Vector3 viewDir)
-    {
-        direction = GetMoveDir(axis, viewDir);
-
-        // 平滑转向
-        if (direction.sqrMagnitude > 0.001f)
-        {
-            currentMoveDirection = Vector3.RotateTowards(
-                currentMoveDirection, direction,
-                turnSpeed * Mathf.Deg2Rad * Time.deltaTime, 1f);
-        }
-    }
 }
