@@ -101,9 +101,11 @@ public class Player_Body : Character_Move
         return Physics.Raycast(origin, Vector3.down, rayDistance);
     }
 
-    // 跳跃逻辑，施加跳跃力
+    // 跳跃逻辑，只在地面起跳
     public void Body_Jump_Date()
     {
+        if (!IsGrounded) return;    //非地面不能起跳
+
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
 

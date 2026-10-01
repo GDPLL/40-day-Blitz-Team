@@ -18,6 +18,7 @@ public class Player_Control : Character_Move
     public Player_animation Con_player_Animation;       // 本地动画引用
     public HostNetWorkInputEvent Con_player_HostNetworkEvent;   // 网络同步事件触发器
     public Local_InputEvent Con_localInputEvent;        // 本机表现层输入事件
+    public Object_System Con_ObjectSystem;          // 生命系统
 
     // 本地对外变量
     [Header("头部位置")]
@@ -52,6 +53,11 @@ public class Player_Control : Character_Move
     //同步表现状态
     NetworkVariable<byte> netShowState = new NetworkVariable<byte>();        //表现状态位
     NetworkVariable<Vector3> netAimPoint = new NetworkVariable<Vector3>();  //瞄准落点
+    NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
+    NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
+
+    //本机表现状态
+    float localFireTime;    //本机开火计时
 
     // 初始化组件与输入，服务器与客户端通用
     public void Player_Control_Start(Input_Manage inputManage)
@@ -94,6 +100,12 @@ public class Player_Control : Character_Move
             Debug.LogError("Player_Control|Start|Con_player_HostNetworkEvent 为空");
             IsComplete = false;
         }
+        if (Con_ObjectSystem == null) Con_ObjectSystem = GetComponent<Object_System>();
+        if (Con_ObjectSystem == null)
+        {
+            Debug.LogError("Player_Control|Start|未找到 Object_System");
+            IsComplete = false;
+        }
         if (rigidbody == null)
         {
             Debug.LogError("Player_Control|Start|rigidbody 为空");
@@ -105,6 +117,13 @@ public class Player_Control : Character_Move
 
         // 注册输入事件
         RegisterInputEvents();
+
+        // 注册生命事件
+        if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd += OnHealthEnd;
+
+        // 初始化同步
+        if (IsServer && Con_ObjectSystem != null) netHealth.Value = Con_ObjectSystem.HP;
+        if (IsServer && Con_gun_Control != null) netAmmo.Value = Con_gun_Control.ammo;
 
         if (Con_body != null) Con_body.Body_Init(rigidbody);
         if (Con_gun_Control != null) Con_gun_Control.Gun_Control_Init();
@@ -139,6 +158,7 @@ public class Player_Control : Character_Move
         if (Con_localInputEvent == null) Con_localInputEvent = gameObject.AddComponent<Local_InputEvent>();
         Con_localInputEvent.Local_Input_Init(Con_input_Manage);
         Con_localInputEvent.ShoulderAim_event += OnLocalShoulderAim;
+        Con_localInputEvent.Fire_event += OnLocalFire;
 
         Con_player_camera.Player_camera_Start(Head);    //相机跟随头部
 
@@ -161,15 +181,22 @@ public class Player_Control : Character_Move
     // 客户端每帧各端表现层更新
     public void Player_Control_Show_Update()
     {
-        byte state = netShowState.Value;
+        byte state = IsOwner ? PackLocalShowState() : netShowState.Value;   //本机用本地输入预测
 
         // 动画
         if (Con_player_Animation != null) Con_player_Animation.Player_animation_Show(state);
 
+        // 血量同步到本地
+        if (!IsServer && Con_ObjectSystem != null) Con_ObjectSystem.HP = netHealth.Value;
+
         if (Con_gun_Control == null) return;
 
+        // 弹药同步到本地
+        if (!IsServer) Con_gun_Control.ammo = netAmmo.Value;
+
         // 举枪状态
-        if ((state & Player_animation.BitGun) != 0) Con_gun_Control.Gun_Aim_Performance(netAimPoint.Value);
+        if ((state & Player_animation.BitGun) != 0)
+            Con_gun_Control.Gun_Aim_Performance(IsOwner ? Con_input_Manage.AimPoint : netAimPoint.Value);
         else Con_gun_Control.Gun_AimDown_Performance();
 
         Con_gun_Control.Gun_Fixed_Performance();
@@ -188,6 +215,47 @@ public class Player_Control : Character_Move
         return state;
     }
 
+    // 打包本机表现状态位
+    byte PackLocalShowState()
+    {
+        if (Con_input_Manage == null) return netShowState.Value;
+
+        byte state = 0;
+        if (Con_input_Manage.WASDHeld) state |= Player_animation.BitWalk;
+        if (Con_input_Manage.RunHeld) state |= Player_animation.BitRun;
+        if (Con_input_Manage.SquatHeld) state |= Player_animation.BitSquat;
+        if (Con_input_Manage.MouseHeld) state |= Player_animation.BitGun;
+        if (Con_input_Manage.JumpDownHeld) state |= Player_animation.BitJump;
+
+        // 离地本机无权威检测，沿用同步值
+        state |= (byte)(netShowState.Value & Player_animation.BitAir);
+        return state;
+    }
+
+    // 重置位置与速度
+    public void Player_Respawn_Date(Vector3 position, Quaternion rotation)
+    {
+        transform.position = position;
+        transform.rotation = rotation;
+
+        if (rigidbody != null) rigidbody.velocity = Vector3.zero;
+    }
+
+    // 死亡事件，主机重置到复活点
+    void OnHealthEnd()
+    {
+        if (!IsServer) return;      //主机处理
+
+        if (Player_Main.player_Main == null)
+        {
+            Debug.LogError("Player_Control|OnHealthEnd|Player_Main 为空");
+            return;
+        }
+
+        Player_Main.player_Main.Player_Respawn(this);
+        Con_ObjectSystem.ResetHealth();
+    }
+
     // 主机每帧各端逻辑更新
     public void Player_Control_Update()
     {
@@ -204,8 +272,7 @@ public class Player_Control : Character_Move
         // 落地检测
         isOnGround = IsGrounded();
 
-        // 计算移动数据
-        Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning, isSquat);
+
 
         // 同步表现状态
         netShowState.Value = PackShowState();
@@ -213,15 +280,24 @@ public class Player_Control : Character_Move
 
         // 传递枪械状态
         Con_gun_Control.SetRecoilReduction(isMouse2Down);
-        Con_gun_Control.SetAimState(isMouse2Down, false);          // 开镜未接入，传 false
+        Con_gun_Control.SetAimState(isMouse2Down, false);           // 开镜未接入，传 false
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
-        UpdateAimTarget();
 
+        // 生命系统状态
+        netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
+        netAmmo.Value = Con_gun_Control.ammo;       //获取主机上各端玩家弹药
+        Con_ObjectSystem.Object_System_Update();
+
+        UpdateAimTarget();
     }
     // 主机每物理帧各端逻辑更新
     public void Player_Control_FixedUpdate()
     {
         if (!IsActive) return;
+
+        InputPacket packet = Con_player_HostNetworkEvent.Packet;   //纯数据来源
+        // 计算移动数据
+        Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning, isSquat);
 
         Con_body.Body_Fixed_Date();
         Con_gun_Control.Gun_Fixed_Date();
@@ -232,6 +308,21 @@ public class Player_Control : Character_Move
     void OnLocalShoulderAim(bool on)
     {
         if (Con_player_camera != null) Con_player_camera.Camera_Aim_Performance_Local(on);
+    }
+
+    // 本机开火预测，按射速节流
+    void OnLocalFire()
+    {
+        if (IsServer) return;               //主机已播放
+        if (Con_gun_Control == null || Con_input_Manage == null) return;
+        if (!Con_gun_Control.HasAmmo()) return;
+        if (Time.time - localFireTime < 1f / Con_gun_Control.fireRate) return;   //未到射速
+
+        localFireTime = Time.time;
+
+        Con_gun_Control.Gun_Shoot_Local_Performance(Con_gun_Control.MuzzlePosition, Con_gun_Control.transform.forward);
+
+        if (Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
     }
 
     // 开火，拼接逻辑与表现
@@ -264,10 +355,16 @@ public class Player_Control : Character_Move
     {
         if (IsServer) return;   //主机已播放
 
-        if (Con_gun_Control != null) Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
+        if (Con_gun_Control == null) return;
 
-        // 本机开火震屏
-        if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
+        // 本机已预测枪口与震屏，只补弹道
+        if (IsOwner)
+        {
+            Con_gun_Control.Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
+            return;
+        }
+
+        Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
     }
 
 
@@ -312,7 +409,14 @@ public class Player_Control : Character_Move
         UnregisterInputEvents();
 
         // 反注册本机表现事件
-        if (Con_localInputEvent != null) Con_localInputEvent.ShoulderAim_event -= OnLocalShoulderAim;
+        if (Con_localInputEvent != null)
+        {
+            Con_localInputEvent.ShoulderAim_event -= OnLocalShoulderAim;
+            Con_localInputEvent.Fire_event -= OnLocalFire;
+        }
+
+        // 反注册生命事件
+        if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd -= OnHealthEnd;
     }
 
 

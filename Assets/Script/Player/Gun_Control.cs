@@ -111,8 +111,9 @@ public class Gun_Control : MonoBehaviour
         hasTarget = has;
         targetPos = worldPosition;
     }
-    // 记录初始参数
-    void Start()
+
+    // 注入完成
+    public void Gun_Control_Init()
     {
         if (line == null) line = GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
@@ -121,11 +122,7 @@ public class Gun_Control : MonoBehaviour
 
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
-    }
 
-    // 注入完成
-    public void Gun_Control_Init()
-    {
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
@@ -240,12 +237,23 @@ public class Gun_Control : MonoBehaviour
     // 开火表现，参数为逻辑结果
     public void Gun_Shoot_Performance(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
     {
+        Gun_Shoot_Local_Performance(origin, dir);
+        Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
+    }
+
+    // 本机开火表现，枪口特效与音效
+    public void Gun_Shoot_Local_Performance(Vector3 origin, Vector3 dir)
+    {
         // 播放射击音效
         if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
 
         // 在开火点生成对象
         if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
+    }
 
+    // 弹道与命中表现
+    public void Gun_Shoot_Line_Performance(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
+    {
         Vector3 end = origin + dir * range;    // 默认终点
         if (isHit)
         {

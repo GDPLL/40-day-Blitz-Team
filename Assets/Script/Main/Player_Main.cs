@@ -21,6 +21,7 @@ public class Player_Main : NetworkBehaviour
     bool hasLocalPlayer;                // 是否找到本地玩家
     public GameObject playerPrefab;     // 角色预制体    
     public Vector3 startPos;            // 出生起点
+    public Transform[] respawnPoints;   // 复活点，按玩家编号
     public bool isInit { get; private set; }                //初始化准备完成
 
 
@@ -118,10 +119,39 @@ public class Player_Main : NetworkBehaviour
             // 主机初始化该玩家
             go_control.Player_Control_Start(Input_Manage.Instance);
             go_control.Player_Control_Local_Init(oCamera, Input_Manage.Instance, oPlayer_Camera);   //只有本机玩家生效
+
+            //重置位置
+            Player_Respawn(go_control);
         }
 
         JudgePlayerClientRpc();
         InitScenceClientRpc();
+    }
+
+    // 按玩家编号重置到复活点
+    public void Player_Respawn(Player_Control control)
+    {
+        if (control == null)
+        {
+            Debug.LogError("Player_Main|Player_Respawn|Player_Control 为空");
+            return;
+        }
+
+        int index = (int)control.OwnerClientId;     //玩家编号取客户端编号
+        if (respawnPoints == null || index < 0 || index >= respawnPoints.Length)
+        {
+            Debug.LogError("Player_Main|Player_Respawn|复活点数量不足");
+            return;
+        }
+
+        Transform point = respawnPoints[index];
+        if (point == null)
+        {
+            Debug.LogError("Player_Main|Player_Respawn|复活点未绑定");
+            return;
+        }
+
+        control.Player_Respawn_Date(point.position, point.rotation);
     }
 
     // 各端收集玩家并寻找本地玩家

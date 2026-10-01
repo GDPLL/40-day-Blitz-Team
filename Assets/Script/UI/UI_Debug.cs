@@ -126,6 +126,12 @@ public class UI_Debug : MonoBehaviour
         builder.Append("举枪: ").Append(player.isMouseDown ? "是" : "否")
                .Append("  换弹: ").AppendLine(player.isReload ? "是" : "否");
 
+        if (player.Con_ObjectSystem != null)
+        {
+            builder.Append("血量: ").Append(player.Con_ObjectSystem.HP).Append('/')
+                   .AppendLine(player.Con_ObjectSystem.MaxHp.ToString());
+        }
+
         if (player.Con_gun_Control != null)
         {
             builder.Append("弹药: ").Append(player.Con_gun_Control.ammo).Append('/')

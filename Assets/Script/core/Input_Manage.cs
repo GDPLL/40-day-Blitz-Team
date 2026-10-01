@@ -78,7 +78,7 @@ public class Input_Manage : NetworkBehaviour
         Camera cam = Player_Main.player_Main != null ? Player_Main.player_Main.oCamera : null;
         if (cam != null) packet.viewDir = cam.transform.forward;    //本机视角朝向
 
-        packet.aimPoint = GetAimPoint(cam);     //举枪瞄准落点
+        packet.aimPoint = AimPoint;     //举枪瞄准落点
 
         packet.move = MoveAxis;
         packet.jump = JumpDownHeld;
@@ -92,16 +92,15 @@ public class Input_Manage : NetworkBehaviour
     }
 
     // 准星射线取举枪瞄准落点
-    Vector3 GetAimPoint(Camera cam)
+    void GetAimPoint()
     {
+        Camera cam = Player_Main.player_Main != null ? Player_Main.player_Main.oCamera : null;
         RectTransform focus = Player_Main.player_Main != null ? Player_Main.player_Main.oUI_RectTransform : null;
-        if (cam == null || focus == null) return AimPoint;      // 引用缺失沿用上次
+        if (cam == null || focus == null) return;      // 引用缺失沿用上次
 
         Ray ray = cam.ScreenPointToRay(focus.position);
         if (TryGetAimPoint(ray, out Vector3 hit)) AimPoint = hit;      // 命中碰撞落点
         else AimPoint = ray.GetPoint(focusDistance);                   // 未命中取固定焦点距离
-
-        return AimPoint;
     }
 
     // 取射线命中点，跳过玩家
@@ -148,6 +147,8 @@ public class Input_Manage : NetworkBehaviour
         ReloadHeld = Input.GetKey(KeyCode.R);            //换弹输入 
         SquatHeld = Input.GetKey(KeyCode.LeftControl);       //蹲下输入
         DebugKey = Input.GetKey(KeyCode.BackQuote);         //调试输入按钮
+
+        GetAimPoint();      // 瞄准落点
     }
 
 

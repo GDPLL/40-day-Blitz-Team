@@ -30,6 +30,13 @@ public class SessionManager : MonoBehaviour
     // 创建房间并启动主机
     public async void StartHost()
     {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("SessionManager|StartHost|NetworkManager 为空");
+            return;
+        }
+        NetworkManager.Singleton.NetworkConfig.TickRate = 60;   //降低同步延迟
+
         try
         {
             string joinCode = await StartHostWithRelay(3);
@@ -47,6 +54,13 @@ public class SessionManager : MonoBehaviour
     // 按房间名加入房间
     public void StartClient()
     {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("SessionManager|StartClient|NetworkManager 为空");
+            return;
+        }
+        NetworkManager.Singleton.NetworkConfig.TickRate = 60;   //降低同步延迟
+
         try
         {
             StartClientWithRelay();
