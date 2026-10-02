@@ -60,17 +60,12 @@ public class Gun_Control : MonoBehaviour
     }
 
     [Header("精度：各姿态参数")]
-    AimProfile hipAim = new AimProfile(15f, 5f, 4f);   // 腰射
-    AimProfile shoulderAim = new AimProfile(15f, 4f, 5f);   // 据枪
-    AimProfile adsAim = new AimProfile(15f, 3f, 6f);   // 开镜
+    AimProfile hipAim = new AimProfile(15f, 5f, 25f, 8f, 20f, 0.05f);       // 腰射
+    AimProfile shoulderAim = new AimProfile(15f, 4f, 15f, 8f, 35f, 0.35f);   // 据枪
+    AimProfile adsAim = new AimProfile(15f, 3f, 21f, 10f, 60f, 0.6f);       // 开镜
 
     [Header("瞄准")]
     public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
-
-    [Header("精度：距离影响")]
-    public float nearDistance = 5f;      // 满速距离
-    public float farDistance = 40f;     // 最低速距离
-    public float farFactor = 0.6f;   // 远距离系数
 
     [Header("精度：移动姿态系数")]
     public float moveFactorSquatStand = 1.3f;   // 蹲下
@@ -225,7 +220,7 @@ public class Gun_Control : MonoBehaviour
 
     // 距离系数
     float DistanceFactor(float d, AimProfile p)
-        => Mathf.Lerp(2f, p.farFactor, Mathf.InverseLerp(p.nearDistance, p.farDistance, d));
+        => Mathf.Lerp(1f, p.farFactor, Mathf.InverseLerp(p.nearDistance, p.farDistance, d));
 
     // 精度圈内随机偏移
     Vector2 GetSpreadOffset()
