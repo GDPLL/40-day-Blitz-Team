@@ -36,19 +36,26 @@ public class Gun_Control : MonoBehaviour
     float lastShotTime;            // 上次射击时间
 
     // 一种姿态对应的一组参数
-    // 外圈、内圈与增长速度
+    // 外圈、内圈、增长速度与距离衰减
     [System.Serializable]
     public class AimProfile
     {
-        public float outerAngle = 20f;   // 外圈
-        public float innerAngle = 5f;   // 内圈
-        public float growSpeed = 8f;   // 精度增长速度
+        public float outerAngle = 20f;    // 外圈
+        public float innerAngle = 5f;     // 内圈
+        public float growSpeed = 8f;      // 精度增长速度
+        public float nearDistance = 5f;   // 满速距离
+        public float farDistance = 40f;   // 最低速距离
+        public float farFactor = 0.15f;   // 远距离系数
 
-        public AimProfile(float outer, float inner, float speed)
+        public AimProfile(float outer, float inner, float speed,
+            float near, float far, float factor)
         {
             outerAngle = outer;
             innerAngle = inner;
             growSpeed = speed;
+            nearDistance = near;
+            farDistance = far;
+            farFactor = factor;
         }
     }
 
@@ -203,7 +210,7 @@ public class Gun_Control : MonoBehaviour
         }
 
         float distance = (targetPos - MuzzlePosition).magnitude;
-        float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance);
+        float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance, p);
         currentAngle = Mathf.MoveTowards(currentAngle, p.innerAngle, speed * dt);   // 收缩到内圈
     }
 
@@ -217,8 +224,8 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 距离系数
-    float DistanceFactor(float d)
-        => Mathf.Lerp(2f, farFactor, Mathf.InverseLerp(nearDistance, farDistance, d));
+    float DistanceFactor(float d, AimProfile p)
+        => Mathf.Lerp(2f, p.farFactor, Mathf.InverseLerp(p.nearDistance, p.farDistance, d));
 
     // 精度圈内随机偏移
     Vector2 GetSpreadOffset()
