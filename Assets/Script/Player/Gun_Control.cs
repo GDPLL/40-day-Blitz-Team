@@ -15,17 +15,6 @@ public class Gun_Control : MonoBehaviour
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
 
-    [Header("后坐力")]
-    public float recoilX = 0.03f;            // 随机后坐力横向幅度
-    public float recoilY = 0.06f;            // 随机后坐力上抬幅度
-    public float maxRecoil = 0.5f;           // 后坐力上限
-    public float recoilRecoverFactor = 2f;   // 后坐力恢复系数
-
-    // 后坐力状态
-    Vector2 recoil;                          // 当前累计后坐力
-    float recoilRecoverSpeed;                // 恢复速率
-    float originalRecoilX, originalRecoilY;  // 原始后坐力
-
     [Header("举枪 / 收枪")]
     public float aimSmooth = 10f;            // 插值速度
     Quaternion originalLocalRot;             // 初始局部旋转
@@ -43,8 +32,8 @@ public class Gun_Control : MonoBehaviour
         public float outerAngle = 20f;    // 外圈
         public float innerAngle = 5f;     // 内圈
         public float growSpeed = 8f;      // 精度增长速度
-        public float nearDistance = 5f;   // 满速距离
-        public float farDistance = 40f;   // 最低速距离
+        public float nearDistance = 5f;   // 最近参考距离
+        public float farDistance = 40f;   // 最远参考距离
         public float farFactor = 0.15f;   // 远距离系数
 
         public AimProfile(float outer, float inner, float speed,
@@ -60,9 +49,9 @@ public class Gun_Control : MonoBehaviour
     }
 
     [Header("精度：各姿态参数")]
-    AimProfile hipAim = new AimProfile(15f, 5f, 25f, 8f, 20f, 0.05f);       // 腰射
-    AimProfile shoulderAim = new AimProfile(15f, 4f, 15f, 8f, 35f, 0.35f);   // 据枪
-    AimProfile adsAim = new AimProfile(15f, 3f, 21f, 10f, 60f, 0.6f);       // 开镜
+    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f);       // 腰射
+    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f);   // 据枪
+    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f);       // 开镜
 
     [Header("瞄准")]
     public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
@@ -121,8 +110,11 @@ public class Gun_Control : MonoBehaviour
     // 设置姿态，shoulder为据枪，adsOn为开镜
     public void SetAimState(bool shoulder, bool adsOn)
     {
+        if (aimingShoulder == shoulder && aimingAds == adsOn) return;   //姿态没变
+
         aimingShoulder = shoulder;
         aimingAds = adsOn;
+        currentAngle = CurrentProfile().outerAngle;   //立刻重置到新外圈
     }
 
     // 设置移动状态
@@ -153,8 +145,6 @@ public class Gun_Control : MonoBehaviour
     {
         if (line == null) line = GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
-        originalRecoilX = recoilX;   // 记录原始后坐力
-        originalRecoilY = recoilY;
 
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
@@ -162,18 +152,12 @@ public class Gun_Control : MonoBehaviour
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
-    // 物理帧逻辑，计时与后坐力恢复
+    // 物理帧逻辑，射速计时与精度更新
     public void Gun_Fixed_Date()
     {
         fireTimer += Time.deltaTime;
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
-
-        // 后坐力恢复
-        if (recoil.sqrMagnitude > 0.0001f)
-            recoil = Vector2.MoveTowards(recoil, Vector2.zero, recoilRecoverSpeed * Time.deltaTime);
-        else
-            recoil = Vector2.zero;
     }
 
     // 物理帧表现，射线与音效计时
@@ -244,14 +228,8 @@ public class Gun_Control : MonoBehaviour
         ammo--;
         fireTimer = 0f;
 
-        // 累计后坐力
-        recoil += new Vector2(Random.Range(-recoilX, recoilX), Random.Range(0f, recoilY));
-        recoil = Vector2.ClampMagnitude(recoil, maxRecoil);   // 限制后坐力上限
-        // 计算恢复速率
-        recoilRecoverSpeed = recoil.magnitude / (recoilRecoverFactor / fireRate);
-
-        // 后坐力叠加精度散布
-        Vector2 offset = recoil + GetSpreadOffset();
+        // 精度圈散布
+        Vector2 offset = GetSpreadOffset();
 
         // 锁定圈内时子弹直指目标
         dir = targetInRing ? (targetPos - origin).normalized : aimDir.normalized;
@@ -331,13 +309,6 @@ public class Gun_Control : MonoBehaviour
     // 目标是否在射程内
     public bool InRange(Transform target) =>
         target != null && Vector3.Distance(transform.position, target.position) <= range;
-
-    // 切换后坐力减免，on为真时减少 70%
-    public void SetRecoilReduction(bool on)
-    {
-        recoilX = originalRecoilX * (on ? 0.3f : 1f);
-        recoilY = originalRecoilY * (on ? 0.3f : 1f);
-    }
 
     // 举枪朝向瞄准落点
     public void Gun_Aim_Performance(Vector3 aimPoint)

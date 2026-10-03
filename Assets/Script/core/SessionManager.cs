@@ -39,7 +39,7 @@ public class SessionManager : MonoBehaviour
 
         try
         {
-            string joinCode = await StartHostWithRelay(3);
+            string joinCode = await StartHostWithRelay(4);
             if (!string.IsNullOrEmpty(joinCode))
             {
                 Debug.Log($"中继分配完成，加入代码: {joinCode}");
@@ -102,7 +102,7 @@ public class SessionManager : MonoBehaviour
     }
 
     // 创建中继房间并启动主机
-    public Task<string> StartHostWithRelay(int maxConnections = 3)
+    public Task<string> StartHostWithRelay(int maxConnections = 4)
     {
         var tcs = new TaskCompletionSource<string>();
         StartCoroutine(CreateRoomAndStartHost(maxConnections, tcs));

@@ -12,7 +12,7 @@ public class Player_Body : Character_Move
     public float moveForce = 700f;                  // 移动推力
 
     // 跳跃与落地
-    public float jumpForce = 30f;                  // 跳跃力
+    public float jumpForce = 235f;                  // 跳跃力
     public float groundCheckDistance = 0.2f;        // 落地检测距离
     public Rigidbody rb;                            // 刚体
 

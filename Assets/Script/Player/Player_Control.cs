@@ -33,6 +33,8 @@ public class Player_Control : Character_Move
     public float groundCheckDistance = 0.2f;  // 落地检测距离
     [Header("目标检测")]
     public LayerMask enemyMask;      // 敌人层
+    [Header("复活点")]
+    public int respawnIndex;         // 复活点编号
 
     //本地变量
     private bool IsComplete;            //组件层完善判断
@@ -43,6 +45,7 @@ public class Player_Control : Character_Move
     //本地状态中转
     public bool isOnGround;  //在地面
     public bool isJumpDown;    //跳跃空格
+    bool jumpRequest;          //本物理帧请求起跳
     public bool isMouse1Down;   //左键输入
     public bool isMouse2Down;   //右键输入
     public bool isMouseDown => isMouse1Down || isMouse2Down;
@@ -164,7 +167,7 @@ public class Player_Control : Character_Move
         // 本机表现层事件分发
         if (Con_localInputEvent == null) Con_localInputEvent = gameObject.AddComponent<Local_InputEvent>();
         Con_localInputEvent.Local_Input_Init(Con_input_Manage);
-        Con_localInputEvent.ShoulderAim_event += OnLocalShoulderAim;
+        Con_localInputEvent.AimPose_event += OnLocalAimPose;
         Con_localInputEvent.Fire_event += OnLocalFire;
 
         Con_player_camera.Player_camera_Start(Head);    //相机跟随头部
@@ -307,7 +310,6 @@ public class Player_Control : Character_Move
         netShowState.Value = PackShowState();
 
         // 传递枪械状态
-        Con_gun_Control.SetRecoilReduction(isShoulderDown);
         Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
 
@@ -344,15 +346,22 @@ public class Player_Control : Character_Move
         Con_body.Body_Fixed_Date();
         Con_gun_Control.Gun_Fixed_Date();
 
+        // 起跳，每物理帧最多一次
+        if (jumpRequest)
+        {
+            jumpRequest = false;
+            Con_body.Body_Jump_Date();
+        }
+
         // 地面有输入才施推力
         if (isWASDDowm && Con_body.IsGrounded) Con_body.Body_Move();
     }
 
 
-    // 本机肩射开关
-    void OnLocalShoulderAim(bool on)
+    // 本机肩射与开镜开关
+    void OnLocalAimPose(bool shoulder, bool ads)
     {
-        if (Con_player_camera != null) Con_player_camera.Camera_Aim_Performance_Local(on);
+        if (Con_player_camera != null) Con_player_camera.Camera_Aim_Performance_Local(shoulder, ads);
     }
 
     // 本机开火预测，按射速节流
@@ -460,7 +469,7 @@ public class Player_Control : Character_Move
         // 反注册本机表现事件
         if (Con_localInputEvent != null)
         {
-            Con_localInputEvent.ShoulderAim_event -= OnLocalShoulderAim;
+            Con_localInputEvent.AimPose_event -= OnLocalAimPose;
             Con_localInputEvent.Fire_event -= OnLocalFire;
         }
 
@@ -490,11 +499,11 @@ public class Player_Control : Character_Move
         if (!isAimDown) Con_body.Body_Rotation_Performance();
     }
 
-    // 跳跃
+    // 跳跃，只记按下边沿
     void OnJumpDown(bool on)
     {
+        if (on && !isJumpDown) jumpRequest = true;   //按下那一帧
         isJumpDown = on;
-        if (on && Con_body != null) Con_body.Body_Jump_Date();
     }
 
     // 左键开火

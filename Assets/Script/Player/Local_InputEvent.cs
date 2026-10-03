@@ -7,7 +7,7 @@ public class Local_InputEvent : MonoBehaviour
     Input_Manage input_Manage;      // 全局输入引用
 
     // 表现层事件
-    public event Action<bool> ShoulderAim_event;    // 肩射开关
+    public event Action<bool, bool> AimPose_event;  // 肩射与开镜开关
     public event Action Fire_event;                 // 开火
 
     // 注入全局输入
@@ -29,7 +29,7 @@ public class Local_InputEvent : MonoBehaviour
     {
         if (input_Manage == null) return;
 
-        ShoulderAim_event?.Invoke(input_Manage.ShoulderHeld);   //肩射跟随Z键
+        AimPose_event?.Invoke(input_Manage.ShoulderHeld, input_Manage.AdsHeld);   //Z肩射 X开镜
 
         if (input_Manage.Mouse1Held) Fire_event?.Invoke();      //左键按住
     }

@@ -2542,6 +2542,10 @@ MonoBehaviour:
   shoulderStartOffset: {x: 0.41, y: 0.16, z: 2.51}
   shoulderRadius: 3.44
   isShoulderAim: 0
+  adsStartOffset: {x: 0, y: 0.27, z: 0}
+  adsRadius: 0.2
+  adsFov: 15
+  isAds: 0
   shakeOffset: {x: 0, y: 0, z: 0}
   shakeDuration: 0.1
   shakeMagnitude: 0.05
