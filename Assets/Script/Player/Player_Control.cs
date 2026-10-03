@@ -311,9 +311,12 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
 
-        // 注入准星方向
+        // 注入准星方向，贴脸时落点跑到枪口后方，退回相机朝向
         Vector3 aimDir = packet.aimPoint - Con_gun_Control.MuzzlePosition;
-        Con_gun_Control.SetAimDirection(aimDir.sqrMagnitude > 0.001f ? aimDir : packet.viewDir);
+        if (aimDir.sqrMagnitude <= 0.001f || Vector3.Dot(aimDir, packet.viewDir) <= 0f)
+            aimDir = packet.viewDir;
+
+        Con_gun_Control.SetAimDirection(aimDir);
 
         // 生命系统状态
         netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
@@ -381,7 +384,9 @@ public class Player_Control : Character_Move
 
         // 枪口瞄准方向由落点推算,落点-开火点
         Vector3 aimDir = Con_player_HostNetworkEvent.Packet.aimPoint - Con_gun_Control.MuzzlePosition;
-        if (aimDir.sqrMagnitude <= 0.001f) aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
+        if (aimDir.sqrMagnitude <= 0.001f ||
+            Vector3.Dot(aimDir, Con_player_HostNetworkEvent.Packet.viewDir) <= 0f)
+            aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
 
         if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
             out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)) return;
@@ -576,6 +581,22 @@ public class Player_Control : Character_Move
     void UpdateAimTarget(Vector3 fwd)
     {
         Vector3 origin = Con_gun_Control.MuzzlePosition;
+
+        // 贴脸时枪口已在敌人内部，射线打不到，取身前 60 度内的敌人
+        Collider[] near = Physics.OverlapSphere(origin, 0.8f, enemyMask);
+
+        foreach (Collider col in near)
+        {
+            if (col.transform.IsChildOf(transform)) continue;
+            if (Vector3.Angle(fwd, col.bounds.center - origin) > 60f) continue;   // 只锁身前
+
+            Vector3 nearPoint = col.ClosestPoint(origin + fwd * 1f);
+            if (!Visible(origin, nearPoint, col)) continue;
+
+            Con_gun_Control.SetTarget(true, nearPoint);
+            return;
+        }
+
         Ray ray = new Ray(origin, fwd);
 
         // 准星射线上最近的命中
