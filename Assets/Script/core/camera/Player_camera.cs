@@ -23,6 +23,12 @@ public class Player_camera : MonoBehaviour
     public float shoulderRadius;          // 肩射半径
     public bool isShoulderAim;            // 是否肩射
 
+    [Header("开镜模式")]
+    public Vector3 adsStartOffset;        // 开镜偏移
+    public float adsRadius;               // 开镜半径
+    public float adsFov = 45f;            // 开镜视角
+    public bool isAds;                    // 是否开镜
+
     public Vector3 shakeOffset;           // 震动偏移
 
     [Header("相机震动")]
@@ -38,6 +44,11 @@ public class Player_camera : MonoBehaviour
     Vector3 localVelocity;                       // 平滑速度缓存
 
     NetworkObject pNet;   // 联网对象
+    Camera cam;           // 相机组件
+
+    float startFov;       // 常规视角
+    float currentFov;     // 当前视角
+    float fovVelocity;    // 视角平滑缓存
 
     // 记录初始视角与偏移
     public void Player_camera_Start(Transform _PlayerHeadTransform)
@@ -47,15 +58,39 @@ public class Player_camera : MonoBehaviour
             Debug.LogError("Player_camera|Player_camera_Start|PlayerHeadTransform 为空");
             return;
         }
+        if (Camera_Object == null)
+        {
+            Debug.LogError("Player_camera|Player_camera_Start|Camera_Object 为空");
+            return;
+        }
+
+        cam = Camera_Object.GetComponent<Camera>();
+        if (cam == null)
+        {
+            Debug.LogError("Player_camera|Player_camera_Start|Camera_Object 上无相机组件");
+            return;
+        }
 
         PlayerHeadTransform = _PlayerHeadTransform;
         pNet = PlayerHeadTransform.GetComponentInParent<NetworkObject>();
 
+        startFov = cam.fieldOfView;                                      // 记录常规视角
+        currentFov = startFov;
         rotationX = transform.rotation.x;
         rotationY = transform.rotation.y;
         currentLocalOffset = new Vector3(0, 0, -radius) + startOffset;   // 初始为常规姿态
 
         Debug.Log("Player_camera|Player_camera_Start|完成初始化");
+    }
+
+    // 按当前姿态取相机偏移
+    Vector3 PoseOffset()
+    {
+        if (isAds) return new Vector3(0, 0, -adsRadius) + adsStartOffset;   // 开镜优先
+
+        return isShoulderAim
+            ? new Vector3(0, 0, -shoulderRadius) + shoulderStartOffset
+            : new Vector3(0, 0, -radius) + startOffset;
     }
 
     // 视角旋转与相机跟随
@@ -88,12 +123,14 @@ public class Player_camera : MonoBehaviour
         Quaternion position_quat = transform.rotation;
 
         // 目标局部偏移
-        Vector3 targetLocalOffset = isShoulderAim
-            ? new Vector3(0, 0, -shoulderRadius) + shoulderStartOffset
-            : new Vector3(0, 0, -radius) + startOffset;
+        Vector3 targetLocalOffset = PoseOffset();
 
         currentLocalOffset = Vector3.SmoothDamp(currentLocalOffset, targetLocalOffset, ref localVelocity, modeSwitchSmoothTime);
         worldOffset = position_quat * currentLocalOffset;
+
+        // 开镜视角插值
+        currentFov = Mathf.SmoothDamp(currentFov, isAds ? adsFov : startFov, ref fovVelocity, modeSwitchSmoothTime);
+        cam.fieldOfView = currentFov;
 
         // 震动计时
         if (isShaking)
@@ -126,9 +163,10 @@ public class Player_camera : MonoBehaviour
         ShakeOffset();
     }
 
-    // 切换肩射
-    public void Camera_Aim_Performance_Local(bool on)
+    // 切换肩射与开镜
+    public void Camera_Aim_Performance_Local(bool shoulder, bool ads)
     {
-        isShoulderAim = on;
+        isShoulderAim = shoulder;
+        isAds = ads;
     }
 }

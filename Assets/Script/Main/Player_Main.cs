@@ -93,12 +93,17 @@ public class Player_Main : NetworkBehaviour
     // 服务器为每个客户端生成玩家
     void SpawnPlayers()
     {
+        // 按客户端编号排序，保证复活点分配稳定
+        List<ulong> clientIds = new List<ulong>(NetworkManager.Singleton.ConnectedClients.Keys);
+        clientIds.Sort();
+
         int i = 0;
-        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClients.Keys)
+        foreach (ulong clientId in clientIds)
         {
+            int index = i++;    //玩家编号
+
             GameObject go = Instantiate(playerPrefab,
-                startPos + Vector3.right * 2f * i, Quaternion.identity);
-            i++;
+                startPos + Vector3.right * 2f * index, Quaternion.identity);
 
             Player_Control go_control = go.GetComponent<Player_Control>();
             if (go_control == null)
@@ -106,6 +111,8 @@ public class Player_Main : NetworkBehaviour
                 Debug.LogError("Player_Main|SpawnPlayers|未找到 Player_Control");
                 continue;
             }
+
+            go_control.respawnIndex = index;    //分配复活点
             oplayer_Controls.Add(go_control);
 
             NetworkObject go_netObj = go.GetComponent<NetworkObject>();
@@ -137,7 +144,7 @@ public class Player_Main : NetworkBehaviour
             return;
         }
 
-        int index = (int)control.OwnerClientId;     //玩家编号取客户端编号
+        int index = control.respawnIndex;   //玩家编号
         if (respawnPoints == null || index < 0 || index >= respawnPoints.Length)
         {
             Debug.LogError("Player_Main|Player_Respawn|复活点数量不足");
