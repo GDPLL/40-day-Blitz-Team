@@ -62,7 +62,10 @@ public class Aim_Ring_UI : MonoBehaviour
 
         // 内圈与当前圈画在锁定点上
         Vector3 p = gun.HasTarget ? cam.WorldToScreenPoint(gun.TargetPos) : Vector3.zero;
-        bool show = gun.HasTarget && p.z > 0f;
+        bool show = gun.HasTarget;
+
+        if (p.z <= 0f) p = focus.position;   //锁定点在相机后方时画准星上
+        else p = ClampToRing(p);             //锁定点超出外圈时收到圈边上
 
         innerRing.gameObject.SetActive(show);
         currentRing.gameObject.SetActive(show);
@@ -74,6 +77,18 @@ public class Aim_Ring_UI : MonoBehaviour
 
         SetDiameter(innerRing, gun.InnerAngle);
         SetDiameter(currentRing, gun.CurrentAngle);
+    }
+
+    // 把锁定点收在外圈以内
+    Vector3 ClampToRing(Vector3 p)
+    {
+        float radius = Mathf.Tan(gun.OuterAngle * Mathf.Deg2Rad * 0.5f)
+                     / Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * Screen.height * 0.5f;
+
+        Vector2 offset = p - focus.position;
+        if (offset.magnitude <= radius) return p;
+
+        return focus.position + (Vector3)(offset.normalized * radius);
     }
 
     // 按角度设置圈的直径

@@ -138,5 +138,6 @@ public class UI_Debug : MonoBehaviour
                    .AppendLine(player.Con_gun_Control.maxAmmo.ToString());
             builder.Append("精度圈: ").AppendLine(player.Con_gun_Control.CurrentAngle.ToString("F2"));
         }
+
     }
 }

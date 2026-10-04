@@ -313,16 +313,15 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
 
-        // 注入准星方向，水平分量反向时退回相机朝向
-        Vector3 aimDir = packet.aimPoint - Con_gun_Control.MuzzlePosition;
+        // 锁定基准取相机，缺省用枪口
+        Vector3 origin = packet.viewPos != Vector3.zero ? packet.viewPos : Con_gun_Control.MuzzlePosition;
 
-        Vector3 flatAim = new Vector3(aimDir.x, 0f, aimDir.z);
-        Vector3 flatView = new Vector3(packet.viewDir.x, 0f, packet.viewDir.z);
-
-        if (flatAim.sqrMagnitude <= 0.001f || Vector3.Dot(flatAim, flatView) <= 0f)
-            aimDir = packet.viewDir;
+        // 准星方向取相机到落点
+        Vector3 aimDir = packet.aimPoint - origin;
+        if (aimDir.sqrMagnitude <= 0.001f) aimDir = packet.viewDir;
 
         Con_gun_Control.SetAimDirection(aimDir);
+        Con_gun_Control.SetAimOrigin(origin);
 
         // 生命系统状态
         netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
@@ -330,7 +329,7 @@ public class Player_Control : Character_Move
         Con_ObjectSystem.Object_System_Update();
 
         // 锁敌
-        UpdateAimTarget(aimDir);
+        UpdateAimTarget(origin, aimDir);
 
         // 同步瞄准表现数据
         netHasTarget.Value = isAimDown && Con_gun_Control.HasTarget;   //举枪才显示锁圈
@@ -557,7 +556,8 @@ public class Player_Control : Character_Move
     {
         if (Con_body == null || Con_player_HostNetworkEvent == null) return;
 
-        if (on) Con_body.Body_Aim_Performance(Con_player_HostNetworkEvent.Packet.viewDir);
+        // 举枪就朝准星转
+        if (isAimDown) Con_body.Body_Aim_Performance(Con_player_HostNetworkEvent.Packet.viewDir);
     }
 
     // 奔跑
@@ -596,28 +596,19 @@ public class Player_Control : Character_Move
     }
 
     // 找可瞄准的敌人，fwd为准星方向
-    void UpdateAimTarget(Vector3 fwd)
+    void UpdateAimTarget(Vector3 origin, Vector3 fwd)
     {
-        Vector3 origin = Con_gun_Control.MuzzlePosition;
+        fwd = fwd.normalized;   //方向归一化
 
-        // 贴脸时枪口已在敌人内部，射线打不到，取身前的敌人
-        Collider[] near = Physics.OverlapSphere(origin, 0.8f, enemyMask);
+        // 准星落点在敌人身上时直接锁落点
+        Vector3 aimPoint = Con_player_HostNetworkEvent.Packet.aimPoint;
+        Collider[] atAim = Physics.OverlapSphere(aimPoint, 0.2f, enemyMask);
 
-        Vector3 flat = fwd;   // 水平准星方向
-        flat.y = 0f;
-
-        foreach (Collider col in near)
+        foreach (Collider col in atAim)
         {
             if (col.transform.IsChildOf(transform)) continue;
 
-            Vector3 to = col.bounds.center - origin;
-            to.y = 0f;
-            if (Vector3.Angle(flat, to) > 90f) continue;   // 只排除身后
-
-            Vector3 nearPoint = col.ClosestPoint(origin + fwd * 1f);
-            if (!Visible(origin, nearPoint, col)) continue;
-
-            Con_gun_Control.SetTarget(true, nearPoint);
+            Con_gun_Control.SetTarget(true, col.ClosestPoint(aimPoint));
             return;
         }
 
@@ -676,7 +667,24 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetTarget(bestAngle < float.MaxValue, bestPoint);
     }
 
-    // 判断目标点是否被挡
+    readonly RaycastHit[] hitBuffer = new RaycastHit[16];   //遮挡检测缓存
+
+    // 判断目标点是否被挡，忽略自身
     bool Visible(Vector3 origin, Vector3 point, Collider target)
-        => !Physics.Linecast(origin, point, out RaycastHit h) || h.collider == target;
+    {
+        Vector3 dir = point - origin;
+        if (dir.sqrMagnitude <= 0.001f) return true;
+
+        int count = Physics.RaycastNonAlloc(origin, dir.normalized, hitBuffer, dir.magnitude);
+
+        for (int i = 0; i < count; i++)
+        {
+            if (hitBuffer[i].collider == target) continue;
+            if (hitBuffer[i].collider.transform.IsChildOf(transform)) continue;   // 忽略自身
+
+            return false;
+        }
+
+        return true;
+    }
 }
