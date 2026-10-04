@@ -109,7 +109,7 @@ public class Input_Manage : NetworkBehaviour
         else AimPoint = ray.GetPoint(focusDistance);                   // 未命中取固定焦点距离
     }
 
-    // 取射线命中点，跳过自己与玩家
+    // 取射线命中点
     bool TryGetAimPoint(Ray ray, out Vector3 point)
     {
         point = Vector3.zero;

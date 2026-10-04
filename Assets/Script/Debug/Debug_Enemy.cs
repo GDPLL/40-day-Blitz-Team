@@ -16,7 +16,7 @@ public class Debug_Enemy : MonoBehaviour
         go.AddComponent<Debug_Enemy>();
     }
 
-    // 关卡就绪后生成，P 重新生成，L 移除
+    // 关卡就绪后生成
     void Update()
     {
         Player_Main main = Player_Main.player_Main;
@@ -89,7 +89,7 @@ public class Debug_Enemy : MonoBehaviour
 
         enemy.AddComponent<Object_System>();     // 受击掉血
 
-        // 敌人身上挂光，暗处也能看清
+        // 敌人身上挂光源
         GameObject lamp = new GameObject("Debug_Enemy_Lamp");
         lamp.transform.SetParent(enemy.transform, false);
         lamp.transform.localPosition = new Vector3(0f, 1.8f, 0f);
@@ -117,7 +117,7 @@ public class Debug_Enemy : MonoBehaviour
         CapsuleCollider col = enemy.GetComponent<CapsuleCollider>();
         col.center = enemy.transform.InverseTransformPoint(bounds.center);
         col.height = bounds.size.y;
-        col.radius = Mathf.Clamp(Mathf.Max(bounds.size.x, bounds.size.z) * 0.5f, 0.25f, 0.5f);   // 限幅，别变成隐形墙
+        col.radius = Mathf.Clamp(Mathf.Max(bounds.size.x, bounds.size.z) * 0.5f, 0.25f, 0.5f);   // 半径限幅
 
         Debug.Log($"Debug_Enemy|FitCollider|高{col.height:F2} 半径{col.radius:F2} 中心{col.center.y:F2}");
     }

@@ -226,9 +226,19 @@ public class Player_Control : Character_Move
             Con_gun_Control.SetAimShow(netHasTarget.Value, netTargetPos.Value, netAimAngle.Value);
         }
 
-        // 举枪状态
+        // 举枪，锁定时指锁定点
         if ((state & Player_animation.BitGun) != 0)
-            Con_gun_Control.Gun_Aim_Performance(IsOwner ? Con_input_Manage.AimPoint : netAimPoint.Value);
+        {
+            Vector3 aimPoint = IsOwner ? Con_input_Manage.AimPoint : netAimPoint.Value;
+
+            // 锁定点须在枪前方
+            Vector3 muzzle = Con_gun_Control.MuzzlePosition;
+            if (Con_gun_Control.HasTarget &&
+                Vector3.Dot(Con_gun_Control.TargetPos - muzzle, aimPoint - muzzle) > 0f)
+                aimPoint = Con_gun_Control.TargetPos;
+
+            Con_gun_Control.Gun_Aim_Performance(aimPoint);
+        }
         else Con_gun_Control.Gun_AimDown_Performance();
 
         Con_gun_Control.Gun_Fixed_Performance();
@@ -313,7 +323,7 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
 
-        // 锁定基准取相机，缺省用枪口
+        // 锁定基准取相机
         Vector3 origin = packet.viewPos != Vector3.zero ? packet.viewPos : Con_gun_Control.MuzzlePosition;
 
         // 准星方向取相机到落点
@@ -595,12 +605,12 @@ public class Player_Control : Character_Move
         return Physics.Raycast(origin, Vector3.down, rayDistance);
     }
 
-    // 找可瞄准的敌人，fwd为准星方向
+    // 找可瞄准的敌人
     void UpdateAimTarget(Vector3 origin, Vector3 fwd)
     {
-        fwd = fwd.normalized;   //方向归一化
+        fwd = fwd.normalized;
 
-        // 准星落点在敌人身上时直接锁落点
+        // 准星落点在敌人身上锁落点
         Vector3 aimPoint = Con_player_HostNetworkEvent.Packet.aimPoint;
         Collider[] atAim = Physics.OverlapSphere(aimPoint, 0.2f, enemyMask);
 
@@ -622,7 +632,7 @@ public class Player_Control : Character_Move
 
         foreach (RaycastHit h in hits)
         {
-            if (h.collider.transform.IsChildOf(transform)) continue;   // 跳过自己
+            if (h.collider.transform.IsChildOf(transform)) continue;
             if (h.distance >= nearest) continue;
 
             nearest = h.distance;
@@ -637,7 +647,7 @@ public class Player_Control : Character_Move
             return;
         }
 
-        // 其次取外圈内可见敌人的最近点
+        // 取外圈内可见敌人的最近点
         float outer = Con_gun_Control.OuterAngle * 0.5f;   //外圈按直径算
 
         Collider[] cols = Physics.OverlapSphere(origin, Con_gun_Control.range, enemyMask);
@@ -669,7 +679,7 @@ public class Player_Control : Character_Move
 
     readonly RaycastHit[] hitBuffer = new RaycastHit[16];   //遮挡检测缓存
 
-    // 判断目标点是否被挡，忽略自身
+    // 判断目标点是否被挡
     bool Visible(Vector3 origin, Vector3 point, Collider target)
     {
         Vector3 dir = point - origin;

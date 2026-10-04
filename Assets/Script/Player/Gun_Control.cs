@@ -237,7 +237,7 @@ public class Gun_Control : MonoBehaviour
         // 精度圈散布
         Vector2 offset = GetSpreadOffset();
 
-        // 锁定圈内时子弹直指目标，目标在枪口后方时用准星方向
+        // 锁定直指目标，反向用准星
         Vector3 toTarget = targetPos - origin;
         dir = (targetInRing && Vector3.Dot(toTarget, aimDir) > 0f) ? toTarget.normalized : aimDir.normalized;
         dir += transform.right * offset.x + transform.up * offset.y;
