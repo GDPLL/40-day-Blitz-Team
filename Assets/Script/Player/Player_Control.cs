@@ -313,9 +313,13 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
         Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning);
 
-        // 注入准星方向，贴脸时落点跑到枪口后方，退回相机朝向
+        // 注入准星方向，水平分量反向时退回相机朝向
         Vector3 aimDir = packet.aimPoint - Con_gun_Control.MuzzlePosition;
-        if (aimDir.sqrMagnitude <= 0.001f || Vector3.Dot(aimDir, packet.viewDir) <= 0f)
+
+        Vector3 flatAim = new Vector3(aimDir.x, 0f, aimDir.z);
+        Vector3 flatView = new Vector3(packet.viewDir.x, 0f, packet.viewDir.z);
+
+        if (flatAim.sqrMagnitude <= 0.001f || Vector3.Dot(flatAim, flatView) <= 0f)
             aimDir = packet.viewDir;
 
         Con_gun_Control.SetAimDirection(aimDir);
@@ -393,8 +397,13 @@ public class Player_Control : Character_Move
 
         // 枪口瞄准方向由落点推算,落点-开火点
         Vector3 aimDir = Con_player_HostNetworkEvent.Packet.aimPoint - Con_gun_Control.MuzzlePosition;
-        if (aimDir.sqrMagnitude <= 0.001f ||
-            Vector3.Dot(aimDir, Con_player_HostNetworkEvent.Packet.viewDir) <= 0f)
+
+        Vector3 flatAim = new Vector3(aimDir.x, 0f, aimDir.z);
+        Vector3 flatView = new Vector3(
+            Con_player_HostNetworkEvent.Packet.viewDir.x, 0f,
+            Con_player_HostNetworkEvent.Packet.viewDir.z);
+
+        if (flatAim.sqrMagnitude <= 0.001f || Vector3.Dot(flatAim, flatView) <= 0f)
             aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
 
         if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
@@ -591,13 +600,19 @@ public class Player_Control : Character_Move
     {
         Vector3 origin = Con_gun_Control.MuzzlePosition;
 
-        // 贴脸时枪口已在敌人内部，射线打不到，取身前 60 度内的敌人
+        // 贴脸时枪口已在敌人内部，射线打不到，取身前的敌人
         Collider[] near = Physics.OverlapSphere(origin, 0.8f, enemyMask);
+
+        Vector3 flat = fwd;   // 水平准星方向
+        flat.y = 0f;
 
         foreach (Collider col in near)
         {
             if (col.transform.IsChildOf(transform)) continue;
-            if (Vector3.Angle(fwd, col.bounds.center - origin) > 60f) continue;   // 只锁身前
+
+            Vector3 to = col.bounds.center - origin;
+            to.y = 0f;
+            if (Vector3.Angle(flat, to) > 90f) continue;   // 只排除身后
 
             Vector3 nearPoint = col.ClosestPoint(origin + fwd * 1f);
             if (!Visible(origin, nearPoint, col)) continue;

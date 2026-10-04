@@ -82,12 +82,23 @@ public class Debug_Enemy : MonoBehaviour
         }
 
         CapsuleCollider col = enemy.AddComponent<CapsuleCollider>();
-        col.isTrigger = true;                    // 不挡路
+        col.isTrigger = false;                   // 实体碰撞
         col.center = new Vector3(0f, 0.9f, 0f);
         col.height = 1.8f;
         col.radius = 0.4f;
 
         enemy.AddComponent<Object_System>();     // 受击掉血
+
+        // 敌人身上挂光，暗处也能看清
+        GameObject lamp = new GameObject("Debug_Enemy_Lamp");
+        lamp.transform.SetParent(enemy.transform, false);
+        lamp.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+
+        Light glow = lamp.AddComponent<Light>();
+        glow.type = LightType.Point;
+        glow.color = new Color(1f, 0.85f, 0.6f);
+        glow.range = 8f;
+        glow.intensity = 3f;
 
         needFit = true;
 
@@ -106,7 +117,7 @@ public class Debug_Enemy : MonoBehaviour
         CapsuleCollider col = enemy.GetComponent<CapsuleCollider>();
         col.center = enemy.transform.InverseTransformPoint(bounds.center);
         col.height = bounds.size.y;
-        col.radius = Mathf.Max(bounds.size.x, bounds.size.z) * 0.5f;
+        col.radius = Mathf.Clamp(Mathf.Max(bounds.size.x, bounds.size.z) * 0.5f, 0.25f, 0.5f);   // 限幅，别变成隐形墙
 
         Debug.Log($"Debug_Enemy|FitCollider|高{col.height:F2} 半径{col.radius:F2} 中心{col.center.y:F2}");
     }
