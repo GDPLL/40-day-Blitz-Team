@@ -16,6 +16,7 @@ public class Player_Main : NetworkBehaviour
     public List<Player_Control> oplayer_Controls;   // 当前玩家列表
     public RectTransform oUI_RectTransform;         // 准星UI
     public UI_Debug uI_Debug;                       //UI测试代码
+    public UI_Player uI_Player;                     //本机弹药血量UI
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
@@ -32,12 +33,25 @@ public class Player_Main : NetworkBehaviour
 
         for (int i = 0; i < oplayer_Controls.Count; i++)
         {
+            if (oplayer_Controls[i] == null)      //退出的玩家
+            {
+                oplayer_Controls.RemoveAt(i);
+                continue;
+            }
             oplayer_Controls[i].Player_Control_Update();
             oplayer_Controls[i].Player_Control_Show_Update();
         }
 
         // 本机表现层驱动
-        if (oPlayer_Control != null) oPlayer_Control.Player_Control_LocalShow_Update();
+        if (oPlayer_Control != null)
+        {
+            oPlayer_Control.Player_Control_LocalShow_Update();
+
+            // 本机弹药血量
+            if (uI_Player != null)
+                uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
+                    oPlayer_Control.HP, oPlayer_Control.MaxHp);
+        }
     }
 
     //游戏场景物理总驱动器
@@ -45,8 +59,15 @@ public class Player_Main : NetworkBehaviour
     {
         if (!isInit) return;
 
-        for (int i = 0; i < oplayer_Controls.Count; i++)
+        for (int i = oplayer_Controls.Count - 1; i >= 0; i--)
+        {
+            if (oplayer_Controls[i] == null)      //退出的玩家
+            {
+                oplayer_Controls.RemoveAt(i);
+                continue;
+            }
             oplayer_Controls[i].Player_Control_FixedUpdate();
+        }
     }
 
     //订阅场景初始化
@@ -67,6 +88,14 @@ public class Player_Main : NetworkBehaviour
 
         if (GameManager.gameManager != null) GameManager.gameManager.GameAction += GameScence_Init;
         else Debug.LogError("Player_Main|Awake|GameManager 为空");
+
+        // 订阅玩家断开
+        if (GameManager.gameManager == null || GameManager.gameManager.networkManager == null)
+        {
+            Debug.LogError("Player_Main|Awake|NetworkManager 为空");
+            return;
+        }
+        GameManager.gameManager.networkManager.OnClientDisconnectCallback += OnClientDisconnect;
     }
 
     // 取消订阅
@@ -74,8 +103,28 @@ public class Player_Main : NetworkBehaviour
     {
         base.OnDestroy();
 
-        if (GameManager.gameManager != null) GameManager.gameManager.GameAction -= GameScence_Init;
+        if (GameManager.gameManager != null)
+        {
+            GameManager.gameManager.GameAction -= GameScence_Init;
+
+            if (GameManager.gameManager.networkManager != null)
+                GameManager.gameManager.networkManager.OnClientDisconnectCallback -= OnClientDisconnect;
+        }
+
         if (player_Main == this) player_Main = null;
+    }
+
+    // 玩家断开，移出玩家列表
+    void OnClientDisconnect(ulong clientId)
+    {
+        for (int i = oplayer_Controls.Count - 1; i >= 0; i--)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null || control.OwnerClientId == clientId)
+                oplayer_Controls.RemoveAt(i);
+        }
+
+        Debug.Log($"Player_Main|OnClientDisconnect|玩家 {clientId} 已离开");
     }
 
     //初始化游戏场景
@@ -209,6 +258,13 @@ public class Player_Main : NetworkBehaviour
         oPlayer_Control.Player_Control_Start(Input_Manage.Instance);
         oPlayer_Control.Player_Control_Local_Init(oCamera, Input_Manage.Instance, oPlayer_Camera);
         uI_Debug.UI_Debug_Start(oPlayer_Control, oPlayer_Control.Con_input_Manage);
+
+        // 本机弹药血量
+        if (uI_Player == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Player 为空");
+        }
+        else uI_Player.UI_Player_Init();
 
         isInit = true;
 
