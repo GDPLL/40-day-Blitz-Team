@@ -4,6 +4,6 @@ using UnityEngine;
 
 public interface Idamage
 {
-    void Takedamage(int hit);
+    void Takedamage(int hit, Vector3 fromPos);
 }
 

@@ -218,11 +218,12 @@ public class Gun_Control : MonoBehaviour
 
     // 开火逻辑，返回是否成功
     public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
-        out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)
+        out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)
     {
         origin = MuzzlePosition;
         dir = transform.forward;
         isHit = false;
+        hitTarget = false;
         hitPoint = Vector3.zero;
         hitNormal = Vector3.up;
 
@@ -254,7 +255,11 @@ public class Gun_Control : MonoBehaviour
             if (!hit.collider.transform.IsChildOf(transform.root))
             {
                 Idamage damageable = hit.collider.GetComponent<Idamage>();
-                if (damageable != null) damageable.Takedamage(damage);
+                if (damageable != null)
+                {
+                    hitTarget = true;
+                    damageable.Takedamage(damage, transform.root.position);
+                }
             }
         }
 

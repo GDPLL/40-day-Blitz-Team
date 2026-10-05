@@ -1,11 +1,20 @@
 using UnityEngine;
+using Unity.Netcode;
 
 // 临时调试敌人，测完删除
 public class Debug_Enemy : MonoBehaviour
 {
     GameObject enemy;     // 调试敌人
+    Transform modelRoot;  // 外观模型
     Player_Main owner;    // 已生成过的关卡
     bool needFit;         // 待修正碰撞体
+    static Material lineMaterial;   // 弹道材质
+
+    // 开火参数
+    public float fireRange = 30f;     // 开火距离
+    public int fireDamage = 10;       // 单发伤害
+    LineRenderer fireLine;            // 弹道显示
+    float lineTimer;                  // 弹道计时
 
     // 进场景自动挂载
     [RuntimeInitializeOnLoadMethod]
@@ -40,6 +49,16 @@ public class Debug_Enemy : MonoBehaviour
             needFit = false;
             FitCollider();
         }
+
+        // 弹道计时隐藏
+        if (fireLine != null && fireLine.enabled)
+        {
+            lineTimer -= Time.deltaTime;
+            if (lineTimer <= 0f) fireLine.enabled = false;
+        }
+
+        // V键向前开枪
+        if (Input.GetKeyDown(KeyCode.V)) Fire();
     }
 
     // 在出生点前方生成敌人
@@ -70,6 +89,7 @@ public class Debug_Enemy : MonoBehaviour
         {
             Transform clone = Instantiate(model.transform, enemy.transform);
             foreach (Collider c in clone.GetComponentsInChildren<Collider>(true)) Destroy(c);
+            modelRoot = clone;
         }
         else
         {
@@ -79,6 +99,7 @@ public class Debug_Enemy : MonoBehaviour
             body.transform.SetParent(enemy.transform, false);
             body.transform.localPosition = new Vector3(0f, 1f, 0f);
             Destroy(body.GetComponent<Collider>());
+            modelRoot = body.transform;
         }
 
         CapsuleCollider col = enemy.AddComponent<CapsuleCollider>();
@@ -100,15 +121,37 @@ public class Debug_Enemy : MonoBehaviour
         glow.range = 8f;
         glow.intensity = 3f;
 
+        // 弹道显示
+        fireLine = enemy.AddComponent<LineRenderer>();
+        fireLine.startWidth = 0.03f;
+        fireLine.endWidth = 0.03f;
+        fireLine.startColor = new Color(1f, 0.85f, 0.4f, 0.9f);
+        fireLine.endColor = fireLine.startColor;
+        fireLine.enabled = false;
+
+        if (lineMaterial == null)
+        {
+            Shader lineShader = Shader.Find("Sprites/Default");
+            if (lineShader == null) Debug.LogError("Debug_Enemy|Spawn|未找到弹道着色器");
+            else lineMaterial = new Material(lineShader);
+        }
+        if (lineMaterial != null) fireLine.material = lineMaterial;
+
         needFit = true;
 
-        Debug.Log("Debug_Enemy|Spawn|敌人已生成，P 重新生成，L 移除");
+        Debug.Log("Debug_Enemy|Spawn|敌人已生成，V 开枪，P 重新生成，L 移除");
     }
 
     // 按模型尺寸修正碰撞体
     void FitCollider()
     {
-        Renderer[] renderers = enemy.GetComponentsInChildren<Renderer>();
+        if (modelRoot == null)
+        {
+            Debug.LogError("Debug_Enemy|FitCollider|外观模型为空");
+            return;
+        }
+
+        Renderer[] renderers = modelRoot.GetComponentsInChildren<Renderer>();
         if (renderers.Length == 0) return;
 
         Bounds bounds = renderers[0].bounds;
@@ -122,12 +165,60 @@ public class Debug_Enemy : MonoBehaviour
         Debug.Log($"Debug_Enemy|FitCollider|高{col.height:F2} 半径{col.radius:F2} 中心{col.center.y:F2}");
     }
 
+    // 向前开一枪
+    void Fire()
+    {
+        if (enemy == null) return;
+
+        CapsuleCollider col = enemy.GetComponent<CapsuleCollider>();
+        Vector3 muzzle = col != null
+            ? enemy.transform.TransformPoint(col.center)
+            : enemy.transform.position + Vector3.up * 1f;
+
+        Vector3 dir = enemy.transform.forward;
+        Vector3 origin = muzzle + dir * 0.6f;
+        Vector3 end = origin + dir * fireRange;
+
+        bool isHit = Physics.Raycast(origin, dir, out RaycastHit hit, fireRange);
+        if (isHit) end = hit.point;
+
+        ShowLine(origin, end);
+
+        if (!isHit) return;
+        if (hit.collider.transform.IsChildOf(enemy.transform)) return;
+
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("Debug_Enemy|Fire|NetworkManager 为空");
+            return;
+        }
+        if (!NetworkManager.Singleton.IsServer) return;   //主机结算伤害
+
+        // 命中可伤害目标才结算
+        Idamage damageable = hit.collider.GetComponent<Idamage>();
+        if (damageable != null) damageable.Takedamage(fireDamage, enemy.transform.position);
+    }
+
+    // 显示弹道
+    void ShowLine(Vector3 from, Vector3 to)
+    {
+        if (fireLine == null) return;
+
+        fireLine.positionCount = 2;
+        fireLine.SetPosition(0, from);
+        fireLine.SetPosition(1, to);
+        fireLine.enabled = true;
+        lineTimer = 0.05f;
+    }
+
     // 移除敌人
     void Remove()
     {
         if (enemy != null) Destroy(enemy);
 
         enemy = null;
+        modelRoot = null;
+        fireLine = null;
         needFit = false;
     }
 }
