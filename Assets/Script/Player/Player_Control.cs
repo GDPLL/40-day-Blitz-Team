@@ -42,6 +42,12 @@ public class Player_Control : Character_Move
     private bool isLocalStarted;        //本机表现层是否已初始化
     public bool IsActive => IsServer && IsComplete; //主机合法运行判断
 
+    //对外读取弹药与血量
+    public int Ammo => Con_gun_Control != null ? Con_gun_Control.ammo : 0;       //剩余弹药
+    public int MaxAmmo => Con_gun_Control != null ? Con_gun_Control.maxAmmo : 0; //弹匣容量
+    public int HP => Con_ObjectSystem != null ? Con_ObjectSystem.HP : 0;         //当前血量
+    public int MaxHp => Con_ObjectSystem != null ? Con_ObjectSystem.MaxHp : 0;   //血量上限
+
     //本地状态中转
     public bool isOnGround;  //在地面
     public bool isJumpDown;    //跳跃空格

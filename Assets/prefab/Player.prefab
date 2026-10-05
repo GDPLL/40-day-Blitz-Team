@@ -123,9 +123,9 @@ MonoBehaviour:
     farFactor: 1
   adsAim:
     outerAngle: 15
-    innerAngle: 2
+    innerAngle: 1
     growSpeed: 10
-    nearDistance: 100
+    nearDistance: 30
     farDistance: 500
     farFactor: 1
   aimAlignAngle: 8
@@ -712,7 +712,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7709504677304415273}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: 8110d59cc05bd3941b32851bd2993e2a, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -754,7 +754,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 815433573
+  GlobalObjectIdHash: 3580946079
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -829,7 +829,7 @@ Rigidbody:
   m_GameObject: {fileID: 7709504677304415273}
   serializedVersion: 4
   m_Mass: 75
-  m_Drag: 0.5
+  m_Drag: 2
   m_AngularDrag: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
@@ -906,8 +906,8 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
-  moveForce: 700
-  jumpForce: 100
+  moveForce: 3000
+  jumpForce: 500
   groundCheckDistance: 0.2
   rb: {fileID: 6445952189836789830}
 --- !u!114 &2084833044355557849
