@@ -21,14 +21,22 @@ public class Object_System : MonoBehaviour , Idamage
     // 死亡事件，血量归零触发
     public event Action HealthEnd;
 
+    // 受击事件，携带攻击者位置
+    public event Action<Vector3> Damage_event;
+
     // 扣血
-    public void Takedamage(int hit, ulong killerId)
+    public void Takedamage(int hit, ulong killerId, Vector3 fromPos)
     {
         HP = Mathf.Clamp(HP - hit, 0, MaxHp);
         KillerId = killerId;
         healTimer = 0f;     // 受击打断回血
-        Debug.Log($"收到伤害{this.gameObject.name}");
 
+        // 编辑器下打印受击
+#if UNITY_EDITOR
+        Debug.Log($"收到伤害{this.gameObject.name}");
+#endif
+
+        Damage_event?.Invoke(fromPos);
     }
 
     // 重置血量

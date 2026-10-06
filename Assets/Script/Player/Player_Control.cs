@@ -21,6 +21,7 @@ public class Player_Control : Character_Move
     public Local_InputEvent Con_localInputEvent;        // 本机表现层输入事件
     public Object_System Con_ObjectSystem;          // 生命系统
     public Aim_Ring_UI Con_aimRing_UI;              // 本机瞄准圈显示
+    public Hit_Feedback_UI Con_hitFeedback_UI;      // 本机命中反馈
 
     // 本地对外变量
     [Header("头部位置")]
@@ -162,6 +163,7 @@ public class Player_Control : Character_Move
 
         // 注册生命事件
         if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd += OnHealthEnd;
+        if (Con_ObjectSystem != null) Con_ObjectSystem.Damage_event += OnDamaged;
 
         // 初始化同步
         if (IsServer && Con_ObjectSystem != null) netHealth.Value = Con_ObjectSystem.HP;
@@ -219,6 +221,10 @@ public class Player_Control : Character_Move
         {
             if (Con_aimRing_UI == null) Con_aimRing_UI = gameObject.AddComponent<Aim_Ring_UI>();
             Con_aimRing_UI.Aim_Ring_UI_Init(Con_gun_Control, Player_Main.player_Main.oUI_RectTransform, Con_camera);
+
+            // 本机命中与受击反馈
+            if (Con_hitFeedback_UI == null) Con_hitFeedback_UI = gameObject.AddComponent<Hit_Feedback_UI>();
+            Con_hitFeedback_UI.Hit_Feedback_UI_Init(Player_Main.player_Main.oUI_RectTransform, Con_camera);
         }
 
         // 客机本地预测，位置自己算
@@ -361,7 +367,7 @@ public class Player_Control : Character_Move
             if (gasTimer >= 1f)
             {
                 gasTimer = 0f;
-                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 0);
+                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 0, new Vector3());
             }
         }
         else gasTimer = 0f;
@@ -488,6 +494,9 @@ public class Player_Control : Character_Move
 
         // 瞄准圈
         if (Con_aimRing_UI != null) Con_aimRing_UI.Aim_Ring_UI_Show();
+
+        // 命中与受击反馈
+        if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show();
     }
 
     // 客户端每帧各端表现层更新
@@ -643,19 +652,22 @@ public class Player_Control : Character_Move
             aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
 
         if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
-            out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)) return;
+            out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)) return;
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
         // 本机开火震屏
         if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
 
-        Gun_Shoot_ClientRpc(origin, dir, isHit, hitPoint, hitNormal);
+        // 本机命中箭头
+        if (IsOwner && hitTarget && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Mark_Performance_Local();
+
+        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal);
     }
 
     // 客户端开火表现
     [ClientRpc]
-    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, Vector3 hitPoint, Vector3 hitNormal)
+    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal)
     {
         if (IsServer) return;   //主机已播放
 
@@ -665,10 +677,40 @@ public class Player_Control : Character_Move
         if (IsOwner)
         {
             Con_gun_Control.Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
+
+            // 本机命中箭头
+            if (hitTarget && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Mark_Performance_Local();
             return;
         }
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
+    }
+
+    // 主机受击，转发攻击者位置
+    void OnDamaged(Vector3 fromPos)
+    {
+        if (!IsServer) return;   //主机处理
+
+        // 主机自己直接显示
+        if (IsOwner && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
+
+        Damage_Dir_ClientRpc(fromPos);
+    }
+
+    // 客户端受击方向表现
+    [ClientRpc]
+    void Damage_Dir_ClientRpc(Vector3 fromPos)
+    {
+        if (IsServer) return;   //主机已显示
+        if (!IsOwner) return;   //只本机显示
+
+        if (Con_hitFeedback_UI == null)
+        {
+            Debug.LogError("Player_Control|Damage_Dir_ClientRpc|命中反馈UI 为空");
+            return;
+        }
+
+        Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
     }
 
 
@@ -762,6 +804,7 @@ public class Player_Control : Character_Move
 
         // 反注册生命事件
         if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd -= OnHealthEnd;
+        if (Con_ObjectSystem != null) Con_ObjectSystem.Damage_event -= OnDamaged;
     }
 
 
