@@ -9,11 +9,12 @@ public class Player_Body : Character_Move
     Vector3 direction = new Vector3(0, 0, 0);       // 目标移动方向
     Vector3 currentMoveDirection = Vector3.zero;    // 实际移动方向
     float currentForce = 0f;                        // 当前推力
-    public float moveForce = 700f;                  // 移动推力
+     float moveForce = 3000f;                  // 移动推力
+     float airForce = 0.1f;                  // 空中推力比例
 
     // 跳跃与落地
-    public float jumpForce = 235f;                  // 跳跃力
-    public float groundCheckDistance = 0.2f;        // 落地检测距离
+     float jumpForce = 250f;                  // 跳跃力
+     float groundCheckDistance = 0.2f;        // 落地检测距离
     public Rigidbody rb;                            // 刚体
 
     public bool IsGrounded { get; private set; }    // 是否在地面
@@ -112,7 +113,8 @@ public class Player_Body : Character_Move
     // 沿当前移动方向施加推力
     public void Body_Move()
     {
-        rb.AddForce(currentMoveDirection * currentForce, ForceMode.Force);
+        float factor = IsGrounded ? 1f : airForce;    // 空中只留少量操控
+        rb.AddForce(currentMoveDirection * currentForce * factor, ForceMode.Force);
     }
 
     // 表现，转向移动方向
