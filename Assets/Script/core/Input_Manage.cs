@@ -49,6 +49,8 @@ public class Input_Manage : NetworkBehaviour
         SendPacket();
     }
 
+    public InputPacket LastPacket { get; private set; }     //最近发出的输入包
+
     // 固定时段上传输入
     void SendPacket()
     {
@@ -59,7 +61,8 @@ public class Input_Manage : NetworkBehaviour
         if (sendTimer < 1f / sendRate) return;
 
         sendTimer = 0f;
-        SubmitInputServerRpc(GetPacket());
+        LastPacket = GetPacket();               //本机预测共用这个包
+        SubmitInputServerRpc(LastPacket);
     }
 
     // 服务器接收输入包，跳过所有权校验
