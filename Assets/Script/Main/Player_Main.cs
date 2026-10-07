@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 using Unity.Netcode;
+using Unity.Mathematics;
+using System;
 // 游戏场景的初始化与配置
 public class Player_Main : NetworkBehaviour
 {
@@ -17,12 +19,17 @@ public class Player_Main : NetworkBehaviour
     public RectTransform oUI_RectTransform;         // 准星UI
     public UI_Debug uI_Debug;                       //UI测试代码
     public UI_Player uI_Player;                     //本机弹药血量UI
+    public UI_curtain uI_Curtain;                   //UI幕布
+    public UI_Time uI_Time;                         //关卡时间UI
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
+    bool gameOver;                      // 游戏已结束
     public GameObject playerPrefab;     // 角色预制体    
     public Vector3 startPos;            // 出生起点
-    public Transform[] respawnPoints;   // 复活点，按玩家编号
+    public Transform[] Num1respawnPoints;   // 复活点，按玩家编号
+    public Transform[] Num2respawnPoints;   // 复活点，按玩家编号
+    public Transform[] Num3respawnPoints;   // 复活点，按玩家编号
     public bool isInit { get; private set; }                //初始化准备完成
 
 
@@ -31,6 +38,11 @@ public class Player_Main : NetworkBehaviour
     {
         if (!isInit) return;
 
+        // 游戏结束判定
+        if (IsServer && !gameOver && Player_level.Instance != null && Player_level.Instance.Level_end)
+            GameOver_Start();
+
+        // 玩家更新
         for (int i = 0; i < oplayer_Controls.Count; i++)
         {
             if (oplayer_Controls[i] == null)      //退出的玩家
@@ -38,19 +50,32 @@ public class Player_Main : NetworkBehaviour
                 oplayer_Controls.RemoveAt(i);
                 continue;
             }
-            oplayer_Controls[i].Player_Control_Update();
-            oplayer_Controls[i].Player_Control_Show_Update();
+            oplayer_Controls[i].Player_Control_Date_HostUpdate();
+            oplayer_Controls[i].Player_Control_Show_ClientUpdate();
         }
+
+        // 关卡时间与事件提示
+        if (uI_Time != null && Player_level.Instance != null)
+            uI_Time.UI_Time_Show_Time(Player_level.Instance.gameTime);
+
 
         // 本机表现层驱动
         if (oPlayer_Control != null)
         {
-            oPlayer_Control.Player_Control_LocalShow_Update();
+            oPlayer_Control.Player_Control_Show_ClientUpdate_Own();
 
             // 本机弹药血量
             if (uI_Player != null)
                 uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
                     oPlayer_Control.HP, oPlayer_Control.MaxHp);
+
+            // 死亡等待幕布
+            if (uI_Curtain != null && !gameOver)
+            {
+                float wait = oPlayer_Control.RespawnWait;
+                if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s");
+                else uI_Curtain.UI_curtain_Hide();
+            }
         }
     }
 
@@ -66,8 +91,12 @@ public class Player_Main : NetworkBehaviour
                 oplayer_Controls.RemoveAt(i);
                 continue;
             }
-            oplayer_Controls[i].Player_Control_FixedUpdate();
+            oplayer_Controls[i].Player_Control_Date_HostFixedUpdate();
         }
+
+        // 关卡计时与机关，各端自己跑
+        if (Player_level.Instance != null) Player_level.Instance.Player_level_FixUpdate();
+
     }
 
     //订阅场景初始化
@@ -111,6 +140,10 @@ public class Player_Main : NetworkBehaviour
                 GameManager.gameManager.networkManager.OnClientDisconnectCallback -= OnClientDisconnect;
         }
 
+        // 取消撤离点播报
+        if (Player_level.Instance != null && Player_level.Instance.level_EndCollider != null)
+            Player_level.Instance.level_EndCollider.Evac_Tip_event -= OnEvac_Tip;
+
         if (player_Main == this) player_Main = null;
     }
 
@@ -127,15 +160,95 @@ public class Player_Main : NetworkBehaviour
         Debug.Log($"Player_Main|OnClientDisconnect|玩家 {clientId} 已离开");
     }
 
+    // 击杀结算，重置击杀者死亡计数
+    public void Player_Kill(ulong killerId)
+    {
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null || control.OwnerClientId != killerId) continue;
+
+            control.Player_Death_Reset();
+            return;
+        }
+    }
+
+    // 游戏结束，广播胜利者
+    void GameOver_Start()
+    {
+        gameOver = true;
+
+        int winnerIndex = 0;                           //胜利者编号
+        ulong winnerId = Player_level.Instance.WinnerId;
+
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null || control.OwnerClientId != winnerId) continue;
+
+            winnerIndex = control.Player_Number;
+            break;
+        }
+
+        GameOverClientRpc(winnerIndex);
+        StartCoroutine(GameOver_End());
+    }
+
+    // 5秒后回大厅
+    IEnumerator GameOver_End()
+    {
+        yield return new WaitForSeconds(5f);
+
+        if (GameManager.gameManager == null)
+        {
+            Debug.LogError("Player_Main|GameOver_End|GameManager 为空");
+            yield break;
+        }
+        GameManager.gameManager.Scence_SwitchClientRpc(GameManager.GameState.房间中);
+    }
+
+    // 各端显示结束幕布
+    [ClientRpc]
+    void GameOverClientRpc(int winnerIndex)
+    {
+        gameOver = true;
+
+        if (uI_Curtain == null)
+        {
+            Debug.LogError("Player_Main|GameOverClientRpc|UI_Curtain 为空");
+            return;
+        }
+
+        uI_Curtain.UI_curtain_Show($"游戏结束 胜利者：玩家{winnerIndex}");
+    }
+
+    // 撤离点播报，playerNumber为玩家编号
+    void OnEvac_Tip(int playerNumber, float remain)
+    {
+        if (uI_Time == null)
+        {
+            Debug.LogError("Player_Main|OnEvac_Tip|UI_Time 为空");
+            return;
+        }
+
+        uI_Time.UI_Time_Show_Event($"玩家{playerNumber} 撤离中 剩余{remain:0}秒", Player_level.Instance.gameTime);
+    }
+
     //初始化游戏场景
     void GameScence_Init()
     {
-        // 首次进关卡生成玩家
+        // 主机负责生成玩家
         if (!levelEntered)
         {
             levelEntered = true;
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
                 SpawnPlayers();
+
+            // 主机关卡初始化
+            Player_level.Instance.Player_Level_Init();
+
+            // 撤离点播报
+            Player_level.Instance.level_EndCollider.Evac_Tip_event += OnEvac_Tip;
         }
     }
 
@@ -174,7 +287,7 @@ public class Player_Main : NetworkBehaviour
 
             // 主机初始化该玩家
             go_control.Player_Control_Start(Input_Manage.Instance);
-            go_control.Player_Control_Local_Init(oCamera, Input_Manage.Instance, oPlayer_Camera);   //只有本机玩家生效
+            go_control.Player_Control_Start_Own(oCamera, Input_Manage.Instance, oPlayer_Camera);   //只有本机玩家生效
 
             //重置位置
             Player_Respawn(go_control);
@@ -193,14 +306,9 @@ public class Player_Main : NetworkBehaviour
             return;
         }
 
-        int index = control.respawnIndex;   //玩家编号
-        if (respawnPoints == null || index < 0 || index >= respawnPoints.Length)
-        {
-            Debug.LogError("Player_Main|Player_Respawn|复活点数量不足");
-            return;
-        }
+        int index = control.RespawnIndex;   //玩家编号，各端一致
 
-        Transform point = respawnPoints[index];
+        Transform point = Respawn_Point(index);
         if (point == null)
         {
             Debug.LogError("Player_Main|Player_Respawn|复活点未绑定");
@@ -208,6 +316,38 @@ public class Player_Main : NetworkBehaviour
         }
 
         control.Player_Respawn_Date(point.position, point.rotation);
+    }
+
+    // 按编号取复活点
+    Transform Respawn_Point(int index)
+    {
+        switch (index / 10)
+        {
+            case 0:
+                return Num1respawnPoints[index];
+            case 1:
+                return Num2respawnPoints[UnityEngine.Random.Range(0, Num2respawnPoints.Length)];
+            case 2:
+                return Num3respawnPoints[UnityEngine.Random.Range(0, Num3respawnPoints.Length)];
+        }
+        return null;
+    }
+
+    // 近处落点触发本机压制
+    public void Suppress_Check_Local(Vector3 hitPoint)
+    {
+        if (oPlayer_Control == null)
+        {
+            Debug.LogError("Player_Main|Suppress_Check_Local|本机玩家为空");
+            return;
+        }
+        if (oPlayer_Control.Con_player_camera == null)
+        {
+            Debug.LogError("Player_Main|Suppress_Check_Local|本机相机为空");
+            return;
+        }
+
+        oPlayer_Control.Con_player_camera.Camera_Suppress_Performance_Local(hitPoint);
     }
 
     // 各端收集玩家并寻找本地玩家
@@ -256,7 +396,8 @@ public class Player_Main : NetworkBehaviour
         }
 
         oPlayer_Control.Player_Control_Start(Input_Manage.Instance);
-        oPlayer_Control.Player_Control_Local_Init(oCamera, Input_Manage.Instance, oPlayer_Camera);
+        oPlayer_Control.Player_Control_Start_Own(oCamera, Input_Manage.Instance, oPlayer_Camera);
+
         uI_Debug.UI_Debug_Start(oPlayer_Control, oPlayer_Control.Con_input_Manage);
 
         // 本机弹药血量
@@ -266,8 +407,22 @@ public class Player_Main : NetworkBehaviour
         }
         else uI_Player.UI_Player_Init();
 
+        // UI幕布
+        if (uI_Curtain == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Curtain 为空");
+        }
+        else uI_Curtain.UI_curtain_Init();
+
+        // 关卡时间UI
+        if (uI_Time == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Time 为空");
+        }
+        else uI_Time.UI_Time_Init();
+
         isInit = true;
 
-        Debug.Log("Player_Main|InitScenceClientRpc|完成初始化");
+        Debug.Log($"Player_Main|InitScenceClientRpc|完成初始化{oPlayer_Control.transform.position}");
     }
 }

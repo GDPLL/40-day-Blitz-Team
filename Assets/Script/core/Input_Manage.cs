@@ -49,6 +49,8 @@ public class Input_Manage : NetworkBehaviour
         SendPacket();
     }
 
+    public InputPacket LastPacket { get; private set; }     //最近发出的输入包
+
     // 固定时段上传输入
     void SendPacket()
     {
@@ -59,7 +61,8 @@ public class Input_Manage : NetworkBehaviour
         if (sendTimer < 1f / sendRate) return;
 
         sendTimer = 0f;
-        SubmitInputServerRpc(GetPacket());
+        LastPacket = GetPacket();               //本机预测共用这个包
+        SubmitInputServerRpc(LastPacket);
     }
 
     // 服务器接收输入包，跳过所有权校验
@@ -76,7 +79,11 @@ public class Input_Manage : NetworkBehaviour
         packet.clientId = NetworkManager.Singleton.LocalClientId;
 
         Camera cam = Player_Main.player_Main != null ? Player_Main.player_Main.oCamera : null;
-        if (cam != null) packet.viewDir = cam.transform.forward;    //本机视角朝向
+        if (cam != null)
+        {
+            packet.viewDir = cam.transform.forward;    //本机视角朝向
+            packet.viewPos = cam.transform.position;   //本机相机位置
+        }
 
         packet.aimPoint = AimPoint;     //举枪瞄准落点
 
@@ -105,14 +112,22 @@ public class Input_Manage : NetworkBehaviour
         else AimPoint = ray.GetPoint(focusDistance);                   // 未命中取固定焦点距离
     }
 
-    // 取射线命中点，跳过玩家
+    // 取射线命中点
     bool TryGetAimPoint(Ray ray, out Vector3 point)
     {
         point = Vector3.zero;
+
+        Transform self = Player_Main.player_Main != null && Player_Main.player_Main.oPlayer_Control != null
+            ? Player_Main.player_Main.oPlayer_Control.transform
+            : null;
+
         RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+
         foreach (RaycastHit hit in hits)
         {
             if (hit.collider.CompareTag("Player")) continue;   // 跳过玩家
+            if (self != null && hit.collider.transform.IsChildOf(self)) continue;   // 跳过自己
+
             point = hit.point;
             return true;
         }
