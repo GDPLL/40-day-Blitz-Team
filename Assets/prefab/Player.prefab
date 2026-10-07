@@ -128,7 +128,6 @@ MonoBehaviour:
     nearDistance: 30
     farDistance: 500
     farFactor: 1
-  aimAlignAngle: 8
   moveFactorSquatStand: 1.3
   moveFactorStand: 1
   moveFactorSquatWalk: 0.7
@@ -697,7 +696,7 @@ Transform:
   m_GameObject: {fileID: 7709504677304415273}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 28.627, y: 6.15, z: -2.39}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -807,6 +806,9 @@ MonoBehaviour:
   isRuning: 0
   isReload: 0
   isSquat: 0
+  deathCount: 0
+  reconcileRadius: 0.8
+  reconcileSpeed: 3
 --- !u!114 &581025581722992385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -829,7 +831,7 @@ Rigidbody:
   m_GameObject: {fileID: 7709504677304415273}
   serializedVersion: 4
   m_Mass: 75
-  m_Drag: 2
+  m_Drag: 0
   m_AngularDrag: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}

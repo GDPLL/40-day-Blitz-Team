@@ -70,6 +70,7 @@ public class Gun_Control : MonoBehaviour
     bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
     Vector3 aimDirection;    // 准星方向
+    ulong ownerId;           // 持有者编号
     Vector3 aimOrigin;       // 准星射线起点
 
     float currentAngle;                                       // 当前精度圈
@@ -146,11 +147,12 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 注入完成
-    public void Gun_Control_Init()
+    public void Gun_Control_Init(ulong id)
     {
         if (line == null) line = GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
 
+        ownerId = id;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
 
@@ -258,7 +260,7 @@ public class Gun_Control : MonoBehaviour
                 if (damageable != null)
                 {
                     hitTarget = true;
-                    damageable.Takedamage(damage, transform.root.position);
+                    damageable.Takedamage(damage, ownerId, transform.root.position);
                 }
             }
         }
