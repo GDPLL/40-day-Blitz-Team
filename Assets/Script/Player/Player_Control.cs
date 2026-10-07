@@ -435,6 +435,13 @@ public class Player_Control : Character_Move
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
+        // 本机受近处落点压制
+        if (isHit && !IsOwner)
+        {
+            if (Player_Main.player_Main == null) Debug.LogError("Player_Control|Player_Fire|Player_Main 为空");
+            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
+        }
+
         // 本机开火震屏
         if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
 
@@ -449,6 +456,13 @@ public class Player_Control : Character_Move
     void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal)
     {
         if (IsServer) return;   //主机已播放
+
+        // 本机受近处落点压制
+        if (isHit && !IsOwner)
+        {
+            if (Player_Main.player_Main == null) Debug.LogError("Player_Control|Gun_Shoot_ClientRpc|Player_Main 为空");
+            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
+        }
 
         if (Con_gun_Control == null) return;
 

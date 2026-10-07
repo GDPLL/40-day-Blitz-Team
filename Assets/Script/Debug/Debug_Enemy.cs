@@ -187,6 +187,10 @@ public class Debug_Enemy : MonoBehaviour
         if (!isHit) return;
         if (hit.collider.transform.IsChildOf(enemy.transform)) return;
 
+        // 近处落点触发本机压制
+        if (Player_Main.player_Main == null) Debug.LogError("Debug_Enemy|Fire|Player_Main 为空");
+        else Player_Main.player_Main.Suppress_Check_Local(hit.point);
+
         if (NetworkManager.Singleton == null)
         {
             Debug.LogError("Debug_Enemy|Fire|NetworkManager 为空");
