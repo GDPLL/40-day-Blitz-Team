@@ -32,15 +32,19 @@ public class Player_Main : NetworkBehaviour
     public Transform[] Num3respawnPoints;   // 复活点，按玩家编号
     public bool isInit { get; private set; }                //初始化准备完成
 
+    NetworkVariable<float> netGameTime = new NetworkVariable<float>();   //关卡时间，同步显示
+    //关卡时间，主机权威
+    float Level_Time => IsServer ? Player_level.Instance.gameTime : netGameTime.Value;
+
 
     //游戏场景总驱动器
     void Update()
     {
         if (!isInit) return;
 
-        // 游戏结束判定
+        // 游戏结束判定，撤离成功即获胜
         if (IsServer && !gameOver && Player_level.Instance != null && Player_level.Instance.Level_end)
-            GameOver_Start();
+            GameOver_Start(Player_level.Instance.WinnerId);
 
         // 玩家更新
         for (int i = 0; i < oplayer_Controls.Count; i++)
@@ -56,7 +60,7 @@ public class Player_Main : NetworkBehaviour
 
         // 关卡时间与事件提示
         if (uI_Time != null && Player_level.Instance != null)
-            uI_Time.UI_Time_Show_Time(Player_level.Instance.gameTime);
+            uI_Time.UI_Time_Show_Time(Level_Time);
 
 
         // 本机表现层驱动
@@ -69,11 +73,13 @@ public class Player_Main : NetworkBehaviour
                 uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
                     oPlayer_Control.HP, oPlayer_Control.MaxHp);
 
-            // 死亡等待幕布
+            // 死亡等待幕布，淘汰后常驻
             if (uI_Curtain != null && !gameOver)
             {
                 float wait = oPlayer_Control.RespawnWait;
-                if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s");
+
+                if (oPlayer_Control.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束");
+                else if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s");
                 else uI_Curtain.UI_curtain_Hide();
             }
         }
@@ -94,8 +100,15 @@ public class Player_Main : NetworkBehaviour
             oplayer_Controls[i].Player_Control_Date_HostFixedUpdate();
         }
 
-        // 关卡计时与机关，各端自己跑
-        if (Player_level.Instance != null) Player_level.Instance.Player_level_FixUpdate();
+        // 关卡计时与机关，主机检测各端表现
+        if (Player_level.Instance != null)
+        {
+            Player_level.Instance.Player_level_FixUpdate();
+            Player_level.Instance.Player_level_FixUpdate_Performance();
+
+            // 关卡时间同步各端
+            if (IsServer) netGameTime.Value = Player_level.Instance.gameTime;
+        }
 
     }
 
@@ -140,9 +153,14 @@ public class Player_Main : NetworkBehaviour
                 GameManager.gameManager.networkManager.OnClientDisconnectCallback -= OnClientDisconnect;
         }
 
-        // 取消撤离点播报
-        if (Player_level.Instance != null && Player_level.Instance.level_EndCollider != null)
-            Player_level.Instance.level_EndCollider.Evac_Tip_event -= OnEvac_Tip;
+        // 取消撤离点播报与关卡节点
+        if (Player_level.Instance != null)
+        {
+            if (Player_level.Instance.level_EndCollider != null)
+                Player_level.Instance.level_EndCollider.Evac_Tip_event -= OnEvac_Tip;
+
+            Player_level.Instance.Node_event -= OnLevel_Node;
+        }
 
         if (player_Main == this) player_Main = null;
     }
@@ -158,11 +176,15 @@ public class Player_Main : NetworkBehaviour
         }
 
         Debug.Log($"Player_Main|OnClientDisconnect|玩家 {clientId} 已离开");
+
+        // 对手离开，剩余者获胜
+        if (IsServer) JudgeWinner_Date();
     }
 
     // 击杀结算，重置击杀者死亡计数
     public void Player_Kill(ulong killerId)
     {
+        if ((int)killerId > oplayer_Controls.Count - 1) return;
         for (int i = 0; i < oplayer_Controls.Count; i++)
         {
             Player_Control control = oplayer_Controls[i];
@@ -174,12 +196,13 @@ public class Player_Main : NetworkBehaviour
     }
 
     // 游戏结束，广播胜利者
-    void GameOver_Start()
+    void GameOver_Start(ulong winnerId)
     {
+        if (gameOver) return;      //只结算一次
+
         gameOver = true;
 
         int winnerIndex = 0;                           //胜利者编号
-        ulong winnerId = Player_level.Instance.WinnerId;
 
         for (int i = 0; i < oplayer_Controls.Count; i++)
         {
@@ -225,13 +248,105 @@ public class Player_Main : NetworkBehaviour
     // 撤离点播报，playerNumber为玩家编号
     void OnEvac_Tip(int playerNumber, float remain)
     {
-        if (uI_Time == null)
+        Level_Tip_Date($"玩家{playerNumber} 撤离中 剩余{remain:0}秒");
+    }
+
+    // 玩家被击败，各端提示
+    public void Player_Death_Date(Player_Control control)
+    {
+        if (!IsServer) return;      //只有主机产生
+
+        if (control == null)
         {
-            Debug.LogError("Player_Main|OnEvac_Tip|UI_Time 为空");
+            Debug.LogError("Player_Main|Player_Death_Date|Player_Control 为空");
             return;
         }
 
-        uI_Time.UI_Time_Show_Event($"玩家{playerNumber} 撤离中 剩余{remain:0}秒", Player_level.Instance.gameTime);
+        Level_Tip_Date($"玩家{control.Player_Number} 已阵亡");
+    }
+
+    // 玩家淘汰，各端提示并判定胜负
+    public void Player_Out_Date(Player_Control control)
+    {
+        if (!IsServer) return;      //只有主机产生
+
+        if (control == null)
+        {
+            Debug.LogError("Player_Main|Player_Out_Date|Player_Control 为空");
+            return;
+        }
+
+        Level_Tip_Date($"玩家{control.Player_Number} 已淘汰");
+        JudgeWinner_Date();
+    }
+
+    // 只剩一人则其获胜
+    void JudgeWinner_Date()
+    {
+        if (!IsServer || gameOver || !isInit) return;
+
+        Player_Control last = null;     //最后存活者
+
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null || control.Is_Out) continue;
+
+            if (last != null) return;   //还有两人以上
+            last = control;
+        }
+
+        if (last != null) GameOver_Start(last.OwnerClientId);
+    }
+
+    // 主机显示关卡文本并广播各端
+    void Level_Tip_Date(string text)
+    {
+        if (!IsServer) return;      //只有主机产生
+
+        if (uI_Time == null)
+        {
+            Debug.LogError("Player_Main|Level_Tip_Date|UI_Time 为空");
+            return;
+        }
+
+        // 主机自己直接显示
+        uI_Time.UI_Time_Show_Event(text, Level_Time);
+
+        // 通知客机显示
+        Level_Tip_ClientRpc(text);
+    }
+
+    // 客机显示关卡文本
+    [ClientRpc]
+    void Level_Tip_ClientRpc(string text)
+    {
+        if (IsServer) return;       //主机已显示
+
+        if (uI_Time == null)
+        {
+            Debug.LogError("Player_Main|Level_Tip_ClientRpc|UI_Time 为空");
+            return;
+        }
+
+        uI_Time.UI_Time_Show_Event(text, Level_Time);
+    }
+
+    // 关卡节点，主机广播各端
+    void OnLevel_Node(int index)
+    {
+        if (!IsServer) return;      //只有主机广播
+
+        Level_Node_ClientRpc(index);
+    }
+
+    // 客机跑关卡节点
+    [ClientRpc]
+    void Level_Node_ClientRpc(int index)
+    {
+        if (IsServer) return;       //主机已跑
+
+        Player_level.Instance.Player_level_Event_Date(index);
     }
 
     //初始化游戏场景
@@ -247,8 +362,15 @@ public class Player_Main : NetworkBehaviour
             // 主机关卡初始化
             Player_level.Instance.Player_Level_Init();
 
-            // 撤离点播报
-            Player_level.Instance.level_EndCollider.Evac_Tip_event += OnEvac_Tip;
+            // 播报与节点只有主机会产生，客机不注册
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            {
+                // 撤离点播报
+                Player_level.Instance.level_EndCollider.Evac_Tip_event += OnEvac_Tip;
+
+                // 关卡节点分发
+                Player_level.Instance.Node_event += OnLevel_Node;
+            }
         }
     }
 
@@ -318,13 +440,13 @@ public class Player_Main : NetworkBehaviour
         control.Player_Respawn_Date(point.position, point.rotation);
     }
 
-    // 按编号取复活点
+    // 按编号取复活点，十位为楼层个位为点序号
     Transform Respawn_Point(int index)
     {
         switch (index / 10)
         {
             case 0:
-                return Num1respawnPoints[index];
+                return Num1respawnPoints[index % Num1respawnPoints.Length];
             case 1:
                 return Num2respawnPoints[UnityEngine.Random.Range(0, Num2respawnPoints.Length)];
             case 2:

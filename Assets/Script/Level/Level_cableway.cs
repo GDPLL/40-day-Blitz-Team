@@ -23,16 +23,20 @@ public class Level_cableway : MonoBehaviour, IScene_Interaction
             return;
         }
 
-        // 持续上升力
-        control.rigidbody.AddForce(Vector3.up * upForce, ForceMode.Force);
-        
-        // 未到目标高度,锁定玩家位置
+        // 未到目标高度，持续上升并锁住水平位置
         if (control.transform.position.y < target.position.y)
         {
-            Vector3 vector3 = new Vector3(this.transform.position.x,control.transform.position.y,this.transform.position.z);
+            control.rigidbody.AddForce(Vector3.up * upForce, ForceMode.Force);
+
+            Vector3 vector3 = new Vector3(this.transform.position.x, control.transform.position.y, this.transform.position.z);
             control.transform.position = vector3;
             return;
-        } 
+        }
+
+        // 到目标高度，清掉向上速度
+        Vector3 velocity = control.rigidbody.velocity;
+        velocity.y = 0f;
+        control.rigidbody.velocity = velocity;
 
         // 朝目标点水平抛出
         Vector3 dir = target.position - transform.position;

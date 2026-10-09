@@ -6,6 +6,7 @@ using UnityEngine;
 public class Level_ProgressCollider : MonoBehaviour, IScene_Interaction
 {
     public int Level_Num;
+    //主机FixUpdate驱动
     public void Scene_Interaction(Player_Control player_Control)
     {
         if (player_Control.respawnIndex < Level_Num) player_Control.respawnIndex = Level_Num;

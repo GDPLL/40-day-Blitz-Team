@@ -92,6 +92,9 @@ public class GameManager : NetworkBehaviour
         //由主机负责切换
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost)
         {
+            // 清掉当前场景玩家
+            Clear_Scence_Player_Date();
+
             switch (gameState)
             {
                 case GameState.房间中:
@@ -103,6 +106,27 @@ public class GameManager : NetworkBehaviour
             }
         }
 
+    }
+
+    // 清除当前场景玩家对象，主机执行
+    void Clear_Scence_Player_Date()
+    {
+        if (networkManager == null || networkManager.SpawnManager == null)
+        {
+            Debug.LogError("GameManager|Clear_Scence_Player_Date|SpawnManager 为空");
+            return;
+        }
+
+        // 先拷贝再销毁，避免遍历中改集合
+        List<NetworkObject> players = new List<NetworkObject>();
+        foreach (NetworkObject player in networkManager.SpawnManager.SpawnedObjectsList)
+            players.Add(player);
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i] == null) continue;
+            players[i].Despawn(true);      //连同对象一起销毁
+        }
     }
 
     //场景加载完成后分发事件

@@ -41,8 +41,8 @@ public class Player_Control : Character_Move
     //复活点编号，各端一致
     public int RespawnIndex => IsServer ? respawnIndex : netRespawnIndex.Value;
 
-    //玩家编号，界面显示用
-    public int Player_Number => RespawnIndex % 10 + 1;
+    //玩家编号，按加入编号，界面显示用
+    public int Player_Number => (int)OwnerClientId + 1;
 
     //本地变量
     private bool IsComplete;            //组件层完善判断
@@ -94,11 +94,13 @@ public class Player_Control : Character_Move
     float respawnTimer;                             //等待计时
     NetworkVariable<float> netRespawnWait = new NetworkVariable<float>();   //等待剩余
     public float RespawnWait => netRespawnWait.Value;                       //对外读取
+    NetworkVariable<bool> netOut = new NetworkVariable<bool>();             //已淘汰，不再复活
+    public bool Is_Out => netOut.Value;                                     //对外读取
 
     //本机预测纠偏
-     float reconcileRadius = 0.5f;    //误差阈值,米
-     float reconcileSpeed = 5f;       //拉回速度,米每秒
-     float reconcileSnap = 5f;        //超过此偏差直接归位,米
+    float reconcileRadius = 0.5f;    //误差阈值,米
+    float reconcileSpeed = 5f;       //拉回速度,米每秒
+    float reconcileSnap = 5f;        //超过此偏差直接归位,米
     Vector3 authPos;                        //主机权威位置
     int reconcileFrame;                     //回传计时
 
@@ -309,6 +311,7 @@ public class Player_Control : Character_Move
     {
         if (!IsServer) return;      //主机处理
         if (isDead) return;         //已在等待
+        if (netOut.Value) return;   //已淘汰
 
         if (Player_Main.player_Main == null)
         {
@@ -325,12 +328,33 @@ public class Player_Control : Character_Move
         respawnTimer = 0f;
         isDead = true;
         netRespawnWait.Value = respawnDelay;
+
+        // 各端提示阵亡
+        Player_Main.player_Main.Player_Death_Date(this);
     }
 
     // 击杀敌人，清空死亡计数
     public void Player_Death_Reset()
     {
         deathCount = 0;
+    }
+
+    // 淘汰，9分钟后死亡不再复活
+    void Player_Out_Date()
+    {
+        if (netOut.Value) return;   //已淘汰
+
+        if (Player_Main.player_Main == null)
+        {
+            Debug.LogError("Player_Control|Player_Out_Date|Player_Main 为空");
+            return;
+        }
+
+        isDead = false;
+        netRespawnWait.Value = 0f;
+        netOut.Value = true;
+
+        Player_Main.player_Main.Player_Out_Date(this);   //各端提示并判定胜负
     }
 
     // 主机每帧各端逻辑更新
@@ -347,7 +371,11 @@ public class Player_Control : Character_Move
         // 死亡等待复活，9分钟后不再复活
         if (isDead)
         {
-            if (Player_level.Instance != null && Player_level.Instance.Respawn_Off) return;
+            if (Player_level.Instance != null && Player_level.Instance.Respawn_Off)
+            {
+                Player_Out_Date();      //9分钟后死亡即淘汰
+                return;
+            }
 
             respawnTimer += Time.deltaTime;
             netRespawnWait.Value = Mathf.Max(respawnDelay - respawnTimer, 0f);
@@ -355,10 +383,13 @@ public class Player_Control : Character_Move
 
             isDead = false;
             netRespawnWait.Value = 0f;
-            Con_ObjectSystem.ResetHealth();
             Player_Main.player_Main.Player_Respawn(this);
+            Con_ObjectSystem.ResetHealth();
+
             return;
         }
+
+        if (netOut.Value) return;   //已淘汰不再参与
 
         // 毒气，低于毒气高度每秒扣血
         if (Player_level.Instance != null && transform.position.y < Player_level.Instance.Gas_Height)
@@ -367,7 +398,7 @@ public class Player_Control : Character_Move
             if (gasTimer >= 1f)
             {
                 gasTimer = 0f;
-                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 0, new Vector3());
+                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 999, new Vector3());
             }
         }
         else gasTimer = 0f;
@@ -394,11 +425,12 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetAimDirection(aimDir);
         Con_gun_Control.SetAimOrigin(origin);
 
-        // 复活点随楼层上移
+        // 复活点随楼层上移，进度可提前
         if (Player_level.Instance != null)
         {
-            respawnIndex = respawnIndex % 10 + Player_level.Instance.Respawn_Floor * 10;
-            netRespawnIndex.Value = respawnIndex;
+            int floor = Mathf.Max(respawnIndex / 10, Player_level.Instance.Respawn_Floor);
+            respawnIndex = respawnIndex % 10 + floor * 10;
+            if (netRespawnIndex.Value < respawnIndex) netRespawnIndex.Value = respawnIndex;
         }
 
         // 生命系统状态
@@ -440,6 +472,9 @@ public class Player_Control : Character_Move
             };
             Player_ReconcileClientRpc(transform.position, ps);
         }
+
+        // 坠落伤害，按垂直速度变化率算
+        if (rigidbody != null) Con_ObjectSystem.Fall_Damage_Date(rigidbody.velocity.y, Time.fixedDeltaTime);
 
         InputPacket packet = Con_player_HostNetworkEvent.Packet;   //纯数据来源
         // 计算移动数据
