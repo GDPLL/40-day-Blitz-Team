@@ -453,6 +453,23 @@ public class Player_Main : NetworkBehaviour
         return null;
     }
 
+    // 近处落点触发本机压制
+    public void Suppress_Check_Local(Vector3 hitPoint)
+    {
+        if (oPlayer_Control == null)
+        {
+            Debug.LogError("Player_Main|Suppress_Check_Local|本机玩家为空");
+            return;
+        }
+        if (oPlayer_Control.Con_player_camera == null)
+        {
+            Debug.LogError("Player_Main|Suppress_Check_Local|本机相机为空");
+            return;
+        }
+
+        oPlayer_Control.Con_player_camera.Camera_Suppress_Performance_Local(hitPoint);
+    }
+
     // 各端收集玩家并寻找本地玩家
     [ClientRpc]
     void JudgePlayerClientRpc()

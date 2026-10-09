@@ -22,6 +22,7 @@ public class Player_Control : Character_Move
     public Object_System Con_ObjectSystem;          // 生命系统
     public Aim_Ring_UI Con_aimRing_UI;              // 本机瞄准圈显示
     public Hit_Feedback_UI Con_hitFeedback_UI;      // 本机命中反馈
+    public Player_XRay Con_xRay;                    // 本机透视
 
     // 本地对外变量
     [Header("头部位置")]
@@ -228,6 +229,10 @@ public class Player_Control : Character_Move
             if (Con_hitFeedback_UI == null) Con_hitFeedback_UI = gameObject.AddComponent<Hit_Feedback_UI>();
             Con_hitFeedback_UI.Hit_Feedback_UI_Init(Player_Main.player_Main.oUI_RectTransform, Con_camera);
         }
+
+        // 本机透视
+        if (Con_xRay == null) Con_xRay = gameObject.AddComponent<Player_XRay>();
+        Con_xRay.Player_XRay_Init(Con_camera, enemyMask);
 
         // 客机本地预测，位置自己算
         if (!IsServer && rigidbody != null)
@@ -532,6 +537,15 @@ public class Player_Control : Character_Move
 
         // 命中与受击反馈
         if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show();
+
+        // 本机透视
+        if (Con_xRay != null)
+        {
+            if (Player_Main.player_Main == null)
+                Debug.LogError("Player_Control|Player_Control_Show_ClientUpdate_Own|Player_Main 为空");
+            else
+                Con_xRay.Player_XRay_Show(Player_Main.player_Main.oplayer_Controls, OwnerClientId);
+        }
     }
 
     // 客户端每帧各端表现层更新
@@ -691,6 +705,13 @@ public class Player_Control : Character_Move
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
+        // 本机受近处落点压制
+        if (isHit && !IsOwner)
+        {
+            if (Player_Main.player_Main == null) Debug.LogError("Player_Control|Player_Fire|Player_Main 为空");
+            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
+        }
+
         // 本机开火震屏
         if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
 
@@ -705,6 +726,13 @@ public class Player_Control : Character_Move
     void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal)
     {
         if (IsServer) return;   //主机已播放
+
+        // 本机受近处落点压制
+        if (isHit && !IsOwner)
+        {
+            if (Player_Main.player_Main == null) Debug.LogError("Player_Control|Gun_Shoot_ClientRpc|Player_Main 为空");
+            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
+        }
 
         if (Con_gun_Control == null) return;
 
@@ -840,6 +868,9 @@ public class Player_Control : Character_Move
         // 反注册生命事件
         if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd -= OnHealthEnd;
         if (Con_ObjectSystem != null) Con_ObjectSystem.Damage_event -= OnDamaged;
+
+        // 关闭本机透视
+        if (Con_xRay != null) Con_xRay.Player_XRay_Clear();
     }
 
 
