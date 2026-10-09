@@ -741,6 +741,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HP: 100
   MaxHp: 100
+  healCap: 75
+  healDelay: 6
+  healSpeed: 10
+  fallAccel: 400
+  fallDamageRate: 0.1
 --- !u!114 &-8760748900487357536
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -787,6 +792,7 @@ MonoBehaviour:
   Con_localInputEvent: {fileID: 954743277171575806}
   Con_ObjectSystem: {fileID: 3882853619959400029}
   Con_aimRing_UI: {fileID: 8262661752330729875}
+  Con_hitFeedback_UI: {fileID: 0}
   Head: {fileID: 7295220296533284295}
   Con_camera: {fileID: 0}
   Con_player_camera: {fileID: 0}
@@ -807,8 +813,6 @@ MonoBehaviour:
   isReload: 0
   isSquat: 0
   deathCount: 0
-  reconcileRadius: 0.8
-  reconcileSpeed: 3
 --- !u!114 &581025581722992385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -908,9 +912,6 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
-  moveForce: 3000
-  jumpForce: 500
-  groundCheckDistance: 0.2
   rb: {fileID: 6445952189836789830}
 --- !u!114 &2084833044355557849
 MonoBehaviour:

@@ -28,9 +28,10 @@ public class GameManager : NetworkBehaviour
     // 跨场景保留
     void Awake()
     {
+        // 已有单例，重复对象整个销毁，防撞 GlobalObjectIdHash
         if (gameManager != null && gameManager != this)
         {
-            Destroy(this);
+            Destroy(gameObject);
             return;
         }
 
@@ -42,6 +43,19 @@ public class GameManager : NetworkBehaviour
         ScenceChange += Scence_OnChange;
 
         Debug.Log("GameManager|Awake|完成初始化");
+    }
+
+    // 销毁时清空单例，防悬空引用
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+
+        if (gameManager != this) return;
+
+        ScenceChange -= Scence_OnChange;
+        gameManager = null;
+
+        Debug.Log("GameManager|OnDestroy|单例已释放");
     }
 
 
@@ -125,6 +139,7 @@ public class GameManager : NetworkBehaviour
         for (int i = 0; i < players.Count; i++)
         {
             if (players[i] == null) continue;
+            if(players[i].GetComponent<Player_Control>()==null) continue;
             players[i].Despawn(true);      //连同对象一起销毁
         }
     }

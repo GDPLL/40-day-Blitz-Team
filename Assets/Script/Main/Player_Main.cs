@@ -132,12 +132,12 @@ public class Player_Main : NetworkBehaviour
         else Debug.LogError("Player_Main|Awake|GameManager 为空");
 
         // 订阅玩家断开
-        if (GameManager.gameManager == null || GameManager.gameManager.networkManager == null)
+        if (NetworkManager.Singleton == null)
         {
             Debug.LogError("Player_Main|Awake|NetworkManager 为空");
             return;
         }
-        GameManager.gameManager.networkManager.OnClientDisconnectCallback += OnClientDisconnect;
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
     }
 
     // 取消订阅
@@ -146,12 +146,10 @@ public class Player_Main : NetworkBehaviour
         base.OnDestroy();
 
         if (GameManager.gameManager != null)
-        {
             GameManager.gameManager.GameAction -= GameScence_Init;
 
-            if (GameManager.gameManager.networkManager != null)
-                GameManager.gameManager.networkManager.OnClientDisconnectCallback -= OnClientDisconnect;
-        }
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnect;
 
         // 取消撤离点播报与关卡节点
         if (Player_level.Instance != null)
