@@ -679,6 +679,7 @@ GameObject:
   - component: {fileID: 2084833044355557849}
   - component: {fileID: 954743277171575806}
   - component: {fileID: 8262661752330729875}
+  - component: {fileID: 1223612852435951202}
   m_Layer: 8
   m_HasEditorInfo: 1
   m_Name: Player
@@ -741,6 +742,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HP: 100
   MaxHp: 100
+  healCap: 75
+  healDelay: 6
+  healSpeed: 10
 --- !u!114 &-8760748900487357536
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -753,7 +757,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3580946079
+  GlobalObjectIdHash: 815433573
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -787,6 +791,9 @@ MonoBehaviour:
   Con_localInputEvent: {fileID: 954743277171575806}
   Con_ObjectSystem: {fileID: 3882853619959400029}
   Con_aimRing_UI: {fileID: 8262661752330729875}
+  Con_hitFeedback_UI: {fileID: 1223612852435951202}
+  Con_lockOn_UI: {fileID: 0}
+  Con_xRay: {fileID: 0}
   Head: {fileID: 7295220296533284295}
   Con_camera: {fileID: 0}
   Con_player_camera: {fileID: 0}
@@ -807,8 +814,6 @@ MonoBehaviour:
   isReload: 0
   isSquat: 0
   deathCount: 0
-  reconcileRadius: 0.8
-  reconcileSpeed: 3
 --- !u!114 &581025581722992385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -908,9 +913,6 @@ MonoBehaviour:
   walkSpeed: 3
   runSpeed: 6
   squatSpeed: 1
-  moveForce: 3000
-  jumpForce: 500
-  groundCheckDistance: 0.2
   rb: {fileID: 6445952189836789830}
 --- !u!114 &2084833044355557849
 MonoBehaviour:
@@ -948,6 +950,39 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd0edb96851cac74a84546680e3bb5c5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1223612852435951202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc87cc9bbb7df4445916908ae987e408, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hitCrossSize: 40
+  hitCrossLife: 0.25
+  killWobbleSpeed: 30
+  killWobbleAngle: 15
+  crossKick: 1.35
+  crossKickBack: 12
+  killShake: 0.12
+  jumpTextLife: 0.7
+  jumpTextRise: 60
+  jumpTextSize: 30
+  jumpTextCount: 8
+  scoreFontSize: 40
+  scoreOffset: {x: -40, y: -40}
+  scoreAddFontSize: 30
+  scoreAddLife: 0.8
+  scoreAddRise: 50
+  scoreAddCount: 6
+  arcMargin: 0.08
+  arcSpread: 35
+  arcLife: 0.8
+  arcAlpha: 0.5
 --- !u!1001 &3258126144818772609
 PrefabInstance:
   m_ObjectHideFlags: 0

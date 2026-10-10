@@ -82,6 +82,7 @@ public class Player_Control : Character_Move
     NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
     NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
     NetworkVariable<int> netRespawnIndex = new NetworkVariable<int>();      //复活点编号
+    NetworkVariable<int> netScore = new NetworkVariable<int>();             //玩家积分
 
     //本机表现状态
     float localFireTime;    //本机开火计时
@@ -386,7 +387,7 @@ public class Player_Control : Character_Move
             if (gasTimer >= 1f)
             {
                 gasTimer = 0f;
-                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 0, new Vector3());
+                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 0, new Vector3(), out _);
             }
         }
         else gasTimer = 0f;
@@ -516,7 +517,7 @@ public class Player_Control : Character_Move
         if (Con_aimRing_UI != null) Con_aimRing_UI.Aim_Ring_UI_Show();
 
         // 命中与受击反馈
-        if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show();
+        if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show(netScore.Value);
 
         // 本机透视
         if (Con_xRay != null)
@@ -684,7 +685,8 @@ public class Player_Control : Character_Move
         Con_gun_Control.SetAimDirection(Con_player_HostNetworkEvent.Packet.viewDir);
 
         if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
-            out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)) return;
+            out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
+            out int hitDamage, out bool killed)) return;
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
@@ -698,15 +700,31 @@ public class Player_Control : Character_Move
         // 本机开火震屏
         if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
 
-        // 本机命中箭头
-        if (IsOwner && hitTarget && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Mark_Performance_Local();
+        // 命中积分，击杀分单独计算
+        int killScore = killed ? KillScore : 0;
+        if (hitTarget) Score_Add(hitDamage + killScore);
 
-        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal);
+        // 本机命中反馈
+        if (IsOwner && hitTarget && Con_hitFeedback_UI != null)
+            Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint);
+
+        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal, hitDamage, killScore);
+    }
+
+    const int KillScore = 100;      //击杀加分
+
+    // 累加积分，主机处理
+    void Score_Add(int add)
+    {
+        if (!IsServer) return;
+
+        netScore.Value += add;
     }
 
     // 客户端开火表现
     [ClientRpc]
-    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal)
+    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal,
+        int hitDamage, int killScore)
     {
         if (IsServer) return;   //主机已播放
 
@@ -724,8 +742,9 @@ public class Player_Control : Character_Move
         {
             Con_gun_Control.Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
-            // 本机命中箭头
-            if (hitTarget && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Mark_Performance_Local();
+            // 本机命中反馈
+            if (hitTarget && Con_hitFeedback_UI != null)
+                Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint);
             return;
         }
 

@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,13 +11,51 @@ public class Hit_Feedback_UI : MonoBehaviour
     Canvas canvas;         // 反馈所在画布
     bool isReady;          // 引用就绪
 
-    [Header("命中箭头")]
-    public float hitMarkDistance = 26f;   // 箭头离准星距离
-    public float hitMarkSize = 20f;       // 箭头尺寸
-    public float hitMarkLife = 0.25f;     // 箭头显示时长
-    Image[] hitMarks = new Image[4];      // 四角箭头
-    float hitMarkTimer;                   // 箭头计时
-    Sprite arrowSprite;                   // 箭头贴图
+    [Header("命中X")]
+    public float hitCrossSize = 40f;         // X尺寸
+    public float hitCrossLife = 0.25f;       // X显示时长
+    public float killWobbleSpeed = 30f;      // 击杀波动速度
+    public float killWobbleAngle = 18f;      // 击杀波动角度
+    Image hitCross;                          // 命中X
+    float hitCrossTimer;                     // X计时
+    bool hitCrossKill;                       // 本次击杀
+    Sprite crossSprite;                      // X贴图
+    Color hitColor = new Color(1f, 0.85f, 0.2f, 1f);   // 命中黄
+    Color killColor = new Color(1f, 0.2f, 0.2f, 1f);   // 击杀红
+
+    [Header("准心")]
+    public float crossKick = 1.35f;          // 命中放大倍率
+    public float crossKickBack = 12f;        // 回弹速度
+    public float killShake = 0.12f;          // 击杀波动幅度
+    float crossKickValue;                    // 当前放大倍率
+    float killShakeTimer;                    // 击杀波动计时
+
+    [Header("伤害跳字")]
+    public float jumpTextLife = 0.7f;        // 跳字时长
+    public float jumpTextRise = 60f;         // 跳字上浮像素
+    public float jumpTextSize = 40f;         // 跳字字号
+    public int jumpTextCount = 8;            // 跳字池大小
+    TextMeshProUGUI[] jumpTexts;             // 跳字池
+    float[] jumpTimers;                      // 跳字计时
+    Vector2[] jumpStart;                     // 跳字起点
+    int jumpIndex;                           // 跳字轮转
+
+    [Header("积分")]
+    public float scoreFontSize = 40f;        // 积分字号
+    public Vector2 scoreOffset = new Vector2(-40f, -40f);    // 右上内缩
+    TextMeshProUGUI scoreText;               // 积分文本
+    int scoreShown = -1;                     // 已显示积分
+
+    [Header("加分提示")]
+    public float scoreAddFontSize = 34f;     // 加分字号
+    public float scoreAddLife = 0.8f;        // 加分显示时长
+    public float scoreAddRise = 50f;         // 加分上浮像素
+    public int scoreAddCount = 6;            // 加分池大小
+    Color scoreAddColor = new Color(1f, 0.85f, 0.2f, 1f);   // 加分黄
+    TextMeshProUGUI[] scoreAdds;             // 加分池
+    float[] scoreAddTimers;                  // 加分计时
+    Vector2[] scoreAddBase;                  // 加分起点
+    int scoreAddIndex;                       // 加分轮转
 
     [Header("受击圆弧")]
     public float arcMargin = 0.08f;       // 离屏幕边缘比例
@@ -26,14 +65,6 @@ public class Hit_Feedback_UI : MonoBehaviour
     Image damageArc;                      // 受击圆弧
     float arcTimer;                       // 圆弧计时
     Sprite arcSprite;                     // 圆弧贴图
-
-    static readonly Vector2[] MarkDirs =   // 四角方向
-    {
-        new Vector2(-1f, 1f), new Vector2(1f, 1f),
-        new Vector2(1f, -1f), new Vector2(-1f, -1f)
-    };
-
-    static readonly float[] MarkAngles = { -135f, 135f, 45f, -45f };   // 四角朝向
 
     // 初始化，绑定准星与相机
     public void Hit_Feedback_UI_Init(RectTransform uiFocus, Camera camera)
@@ -59,27 +90,45 @@ public class Hit_Feedback_UI : MonoBehaviour
             return;
         }
 
-        for (int i = 0; i < hitMarks.Length; i++) hitMarks[i] = MakeHitMark(i);
-
+        hitCross = MakeCross();
+        MakeJumpTexts();
+        MakeScoreText();
+        MakeScoreAdds();
         damageArc = MakeArc();
         isReady = true;
 
         Debug.Log("Hit_Feedback_UI|Hit_Feedback_UI_Init|完成初始化");
     }
 
-    // 显示命中箭头
-    public void Hit_Mark_Performance_Local()
+    // 显示命中反馈，damage为实际伤害，killScore为击杀分
+    public void Hit_Result_Performance_Local(int damage, int killScore, Vector3 hitPoint)
     {
         if (!isReady)
         {
-            Debug.LogError("Hit_Feedback_UI|Hit_Mark_Performance_Local|未完成初始化");
+            Debug.LogError("Hit_Feedback_UI|Hit_Result_Performance_Local|未完成初始化");
             return;
         }
 
-        LayoutHitMarks();
+        bool kill = killScore > 0;
 
-        hitMarkTimer = hitMarkLife;
-        SetHitMarkAlpha(1f);
+        // 命中X，击杀红字与更长波动
+        hitCrossKill = kill;
+        hitCrossTimer = kill ? hitCrossLife * 2f : hitCrossLife;
+        hitCross.color = kill ? killColor : hitColor;
+        hitCross.rectTransform.position = focus.position;
+        hitCross.rectTransform.localRotation = Quaternion.identity;
+        hitCross.gameObject.SetActive(true);
+
+        // 准心放大，击杀叠加波动
+        crossKickValue = crossKick;
+        if (kill) killShakeTimer = hitCrossLife * 2f;
+
+        // 伤害跳字
+        ShowJumpText(damage, kill, hitPoint);
+
+        // 伤害分与击杀分分开提示
+        ShowScoreAdd(damage, scoreAddColor, 0f);
+        if (kill) ShowScoreAdd(killScore, killColor, scoreAddFontSize);
     }
 
     // 显示受击圆弧，sourcePos为攻击者位置
@@ -125,16 +174,75 @@ public class Hit_Feedback_UI : MonoBehaviour
         SetArcAlpha(arcAlpha);
     }
 
-    // 本机每帧刷新反馈计时
-    public void Hit_Feedback_UI_Show()
+    // 本机每帧刷新反馈与积分，score为当前积分
+    public void Hit_Feedback_UI_Show(int score)
     {
         if (!isReady) return;
 
-        // 箭头计时淡出
-        if (hitMarkTimer > 0f)
+        // 命中X淡出与击杀波动
+        if (hitCrossTimer > 0f)
         {
-            hitMarkTimer -= Time.deltaTime;
-            SetHitMarkAlpha(Mathf.Clamp01(hitMarkTimer / hitMarkLife));
+            hitCrossTimer -= Time.deltaTime;
+
+            SetCrossAlpha(Mathf.Clamp01(hitCrossTimer / hitCrossLife));
+
+            if (hitCrossKill)
+                hitCross.rectTransform.localRotation =
+                    Quaternion.Euler(0f, 0f, Mathf.Sin(Time.time * killWobbleSpeed) * killWobbleAngle);
+        }
+
+        // 准心回弹
+        crossKickValue = Mathf.MoveTowards(crossKickValue, 1f, crossKickBack * Time.deltaTime);
+
+        // 击杀波动逐步减弱
+        float shake = 0f;
+        if (killShakeTimer > 0f)
+        {
+            killShakeTimer -= Time.deltaTime;
+            shake = Mathf.Sin(Time.time * killWobbleSpeed) * killShake
+                    * Mathf.Clamp01(killShakeTimer / (hitCrossLife * 2f));
+        }
+        focus.localScale = Vector3.one * (crossKickValue + shake);
+
+        // 跳字上浮淡出
+        for (int i = 0; i < jumpTexts.Length; i++)
+        {
+            if (jumpTimers[i] <= 0f) continue;
+
+            jumpTimers[i] -= Time.deltaTime;
+            float k = Mathf.Clamp01(jumpTimers[i] / jumpTextLife);
+
+            jumpTexts[i].rectTransform.position = jumpStart[i] + Vector2.up * (jumpTextRise * (1f - k));
+
+            Color c = jumpTexts[i].color;
+            c.a = k;
+            jumpTexts[i].color = c;
+
+            if (jumpTimers[i] <= 0f) jumpTexts[i].gameObject.SetActive(false);
+        }
+
+        // 积分显示
+        if (score != scoreShown)
+        {
+            scoreShown = score;
+            scoreText.text = score.ToString();
+        }
+
+        // 加分上浮淡出
+        for (int i = 0; i < scoreAdds.Length; i++)
+        {
+            if (scoreAddTimers[i] <= 0f) continue;
+
+            scoreAddTimers[i] -= Time.deltaTime;
+            float k = Mathf.Clamp01(scoreAddTimers[i] / scoreAddLife);
+
+            scoreAdds[i].rectTransform.anchoredPosition = scoreAddBase[i] + Vector2.up * (scoreAddRise * (1f - k));
+
+            Color c = scoreAdds[i].color;
+            c.a = k;
+            scoreAdds[i].color = c;
+
+            if (scoreAddTimers[i] <= 0f) scoreAdds[i].gameObject.SetActive(false);
         }
 
         // 圆弧计时淡出
@@ -145,29 +253,40 @@ public class Hit_Feedback_UI : MonoBehaviour
         }
     }
 
-    // 箭头排到准星四角
-    void LayoutHitMarks()
+    // 显示伤害跳字，kill为是否击杀
+    void ShowJumpText(int damage, bool kill, Vector3 hitPoint)
     {
-        for (int i = 0; i < hitMarks.Length; i++)
+        if (jumpTexts == null || jumpTexts.Length == 0)
         {
-            hitMarks[i].rectTransform.position = focus.position + (Vector3)(MarkDirs[i] * hitMarkDistance);
-            hitMarks[i].rectTransform.localRotation = Quaternion.Euler(0f, 0f, MarkAngles[i]);
+            Debug.LogError("Hit_Feedback_UI|ShowJumpText|跳字池未生成");
+            return;
         }
+
+        int i = jumpIndex;
+        jumpIndex = (jumpIndex + 1) % jumpTexts.Length;
+
+        Vector3 sp = cam.WorldToScreenPoint(hitPoint);
+        Vector2 start = sp.z > 0f ? (Vector2)sp : (Vector2)focus.position;   //背对时退到准星
+
+        TextMeshProUGUI t = jumpTexts[i];
+        t.text = damage.ToString();
+        t.color = kill ? killColor : hitColor;
+        t.rectTransform.position = start;
+        t.gameObject.SetActive(true);
+
+        jumpStart[i] = start;
+        jumpTimers[i] = jumpTextLife;
     }
 
-    // 设置箭头透明度
-    void SetHitMarkAlpha(float alpha)
+    // 设置X透明度
+    void SetCrossAlpha(float alpha)
     {
+        Color c = hitCross.color;
+        c.a = alpha;
+        hitCross.color = c;
+
         bool visible = alpha > 0.001f;   //显示阈值
-
-        for (int i = 0; i < hitMarks.Length; i++)
-        {
-            Color c = hitMarks[i].color;
-            c.a = alpha;
-            hitMarks[i].color = c;
-
-            if (hitMarks[i].gameObject.activeSelf != visible) hitMarks[i].gameObject.SetActive(visible);
-        }
+        if (hitCross.gameObject.activeSelf != visible) hitCross.gameObject.SetActive(visible);
     }
 
     // 设置圆弧透明度
@@ -181,20 +300,114 @@ public class Hit_Feedback_UI : MonoBehaviour
         if (damageArc.gameObject.activeSelf != visible) damageArc.gameObject.SetActive(visible);
     }
 
-    // 生成一个命中箭头
-    Image MakeHitMark(int index)
+    // 生成命中X
+    Image MakeCross()
     {
-        GameObject go = new GameObject("HitMark" + index, typeof(Image));
+        GameObject go = new GameObject("HitCross", typeof(Image));
         go.transform.SetParent(canvas.transform, false);
 
         Image img = go.GetComponent<Image>();
-        img.sprite = GetArrowSprite();
-        img.color = new Color(1f, 1f, 1f, 0f);
+        img.sprite = GetCrossSprite();
+        img.color = hitColor;
         img.raycastTarget = false;
-        img.rectTransform.sizeDelta = Vector2.one * (hitMarkSize / canvas.scaleFactor);
+        img.rectTransform.sizeDelta = Vector2.one * (hitCrossSize / canvas.scaleFactor);
         go.SetActive(false);
 
         return img;
+    }
+
+    // 生成跳字池
+    void MakeJumpTexts()
+    {
+        jumpTexts = new TextMeshProUGUI[jumpTextCount];
+        jumpTimers = new float[jumpTextCount];
+        jumpStart = new Vector2[jumpTextCount];
+
+        for (int i = 0; i < jumpTextCount; i++)
+        {
+            GameObject go = new GameObject("JumpText" + i, typeof(TextMeshProUGUI));
+            go.transform.SetParent(canvas.transform, false);
+
+            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
+            t.fontSize = jumpTextSize;
+            t.alignment = TextAlignmentOptions.Center;
+            t.raycastTarget = false;
+            t.rectTransform.sizeDelta = new Vector2(200f, 80f);
+            go.SetActive(false);
+
+            jumpTexts[i] = t;
+        }
+    }
+
+    // 生成积分文本
+    void MakeScoreText()
+    {
+        GameObject go = new GameObject("ScoreText", typeof(TextMeshProUGUI));
+        go.transform.SetParent(canvas.transform, false);
+
+        scoreText = go.GetComponent<TextMeshProUGUI>();
+        scoreText.fontSize = scoreFontSize;
+        scoreText.alignment = TextAlignmentOptions.Right;
+        scoreText.raycastTarget = false;
+        scoreText.color = Color.white;
+        scoreText.text = "0";
+        scoreText.rectTransform.anchorMin = Vector2.one;
+        scoreText.rectTransform.anchorMax = Vector2.one;
+        scoreText.rectTransform.pivot = Vector2.one;
+        scoreText.rectTransform.anchoredPosition = scoreOffset;
+        scoreText.rectTransform.sizeDelta = new Vector2(300f, 80f);
+    }
+
+    // 生成加分池
+    void MakeScoreAdds()
+    {
+        scoreAdds = new TextMeshProUGUI[scoreAddCount];
+        scoreAddTimers = new float[scoreAddCount];
+        scoreAddBase = new Vector2[scoreAddCount];
+
+        for (int i = 0; i < scoreAddCount; i++)
+        {
+            GameObject go = new GameObject("ScoreAdd" + i, typeof(TextMeshProUGUI));
+            go.transform.SetParent(canvas.transform, false);
+
+            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
+            t.fontSize = scoreAddFontSize;
+            t.alignment = TextAlignmentOptions.Right;
+            t.raycastTarget = false;
+            t.color = scoreAddColor;
+            t.rectTransform.anchorMin = Vector2.one;
+            t.rectTransform.anchorMax = Vector2.one;
+            t.rectTransform.pivot = Vector2.one;
+            t.rectTransform.sizeDelta = new Vector2(300f, 60f);
+            go.SetActive(false);
+
+            scoreAdds[i] = t;
+        }
+    }
+
+    // 显示加分提示，delta为加分，stack为叠放偏移
+    void ShowScoreAdd(int delta, Color color, float stack)
+    {
+        if (scoreAdds == null || scoreAdds.Length == 0)
+        {
+            Debug.LogError("Hit_Feedback_UI|ShowScoreAdd|加分池未生成");
+            return;
+        }
+        if (delta <= 0) return;
+
+        int i = scoreAddIndex;
+        scoreAddIndex = (scoreAddIndex + 1) % scoreAdds.Length;
+
+        Vector2 basePos = scoreOffset + Vector2.down * (scoreFontSize + stack);
+
+        TextMeshProUGUI t = scoreAdds[i];
+        t.text = "+" + delta;
+        t.color = color;
+        t.rectTransform.anchoredPosition = basePos;
+        t.gameObject.SetActive(true);
+
+        scoreAddBase[i] = basePos;
+        scoreAddTimers[i] = scoreAddLife;
     }
 
     // 生成受击圆弧
@@ -212,29 +425,31 @@ public class Hit_Feedback_UI : MonoBehaviour
         return img;
     }
 
-    // 生成箭头贴图
-    Sprite GetArrowSprite()
+    // 生成X贴图
+    Sprite GetCrossSprite()
     {
-        if (arrowSprite != null) return arrowSprite;
+        if (crossSprite != null) return crossSprite;
 
         int size = 64;
-        float cx = size * 0.5f;
+        float half = size * 0.5f;
+        float line = size * 0.12f;   //线宽
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
 
         for (int y = 0; y < size; y++)
         {
-            float half = size * 0.3f * (size - y) / size;   // 三角半宽
-
             for (int x = 0; x < size; x++)
             {
-                bool inside = Mathf.Abs(x + 0.5f - cx) <= half;
+                // 两条对角线到像素的垂直距离
+                float d1 = Mathf.Abs((x + 0.5f - half) - (y + 0.5f - half)) * 0.7071f;
+                float d2 = Mathf.Abs((x + 0.5f - half) + (y + 0.5f - half)) * 0.7071f;
+                bool inside = d1 <= line || d2 <= line;
                 tex.SetPixel(x, y, inside ? Color.white : Color.clear);
             }
         }
 
         tex.Apply();
-        arrowSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
-        return arrowSprite;
+        crossSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+        return crossSprite;
     }
 
     // 生成圆弧贴图
