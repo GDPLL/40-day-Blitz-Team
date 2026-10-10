@@ -22,6 +22,7 @@ public class Player_Control : Character_Move
     public Object_System Con_ObjectSystem;          // 生命系统
     public Aim_Ring_UI Con_aimRing_UI;              // 本机瞄准圈显示
     public Hit_Feedback_UI Con_hitFeedback_UI;      // 本机命中反馈
+    public Lock_On_UI Con_lockOn_UI;                // 本机锁定提示
     public Player_XRay Con_xRay;                    // 本机透视
 
     // 本地对外变量
@@ -84,6 +85,14 @@ public class Player_Control : Character_Move
 
     //本机表现状态
     float localFireTime;    //本机开火计时
+
+    //锁定提示
+    Player_Control lockTarget;      //本帧锁定目标
+    Player_Control lockSentTarget;  //已通知目标
+    bool lockDone;                  //已发完成提示
+    readonly HashSet<ulong> lockSources = new HashSet<ulong>();      //锁定我的来源
+    readonly HashSet<ulong> lockDoneSources = new HashSet<ulong>();  //完成锁定的来源
+    int lockSentStage;              //已下发阶段
 
     //毒气
     float gasTimer;         //扣血计时
@@ -228,6 +237,9 @@ public class Player_Control : Character_Move
             Con_hitFeedback_UI.Hit_Feedback_UI_Init(Player_Main.player_Main.oUI_RectTransform, Con_camera);
         }
 
+        // 本机锁定提示
+        if (Con_lockOn_UI == null) Con_lockOn_UI = gameObject.AddComponent<Lock_On_UI>();
+
         // 本机透视
         if (Con_xRay == null) Con_xRay = gameObject.AddComponent<Player_XRay>();
         Con_xRay.Player_XRay_Init(Con_camera, enemyMask);
@@ -314,6 +326,8 @@ public class Player_Control : Character_Move
     {
         if (!IsServer) return;      //主机处理
         if (isDead) return;         //已在等待
+
+        Lock_On_Reset();            //死亡清空锁定提示
 
         if (Player_Main.player_Main == null)
         {
@@ -413,6 +427,7 @@ public class Player_Control : Character_Move
 
         // 锁敌
         UpdateAimTarget(origin, aimDir);
+        Lock_On_Date(isAimDown, Con_gun_Control.CurrentAngle, Con_gun_Control.InnerAngle);
 
         // 同步瞄准表现数据
         netHasTarget.Value = isAimDown && Con_gun_Control.HasTarget;   //举枪才显示锁圈
@@ -824,6 +839,8 @@ public class Player_Control : Character_Move
     {
         base.OnDestroy();
 
+        Lock_On_Release();      //退出解除锁定
+
         UnregisterInputEvents();
         UnregisterPredictEvents();
 
@@ -963,6 +980,7 @@ public class Player_Control : Character_Move
             if (col.transform.IsChildOf(transform)) continue;
 
             Con_gun_Control.SetTarget(true, col.ClosestPoint(aimPoint));
+            SetLockTarget(true, col.GetComponentInParent<Player_Control>());
             return;
         }
 
@@ -988,6 +1006,7 @@ public class Player_Control : Character_Move
             (enemyMask.value & (1 << closest.collider.gameObject.layer)) != 0)
         {
             Con_gun_Control.SetTarget(true, closest.point);
+            SetLockTarget(true, closest.collider.GetComponentInParent<Player_Control>());
             return;
         }
 
@@ -998,6 +1017,7 @@ public class Player_Control : Character_Move
 
         float bestAngle = float.MaxValue;
         Vector3 bestPoint = Vector3.zero;
+        Player_Control bestTarget = null;   //外圈内最近目标玩家
 
         foreach (Collider col in cols)
         {
@@ -1016,9 +1036,127 @@ public class Player_Control : Character_Move
 
             bestAngle = angle;
             bestPoint = point;
+            bestTarget = col.GetComponentInParent<Player_Control>();
         }
 
-        Con_gun_Control.SetTarget(bestAngle < float.MaxValue, bestPoint);
+        bool has = bestAngle < float.MaxValue;   //外圈内有目标
+        Con_gun_Control.SetTarget(has, bestPoint);
+        SetLockTarget(has, bestTarget);
+    }
+
+    // 记录锁定目标，has是否锁定
+    void SetLockTarget(bool has, Player_Control target)
+    {
+        if (has && target == null) Debug.LogError("Player_Control|SetLockTarget|锁定目标无玩家组件");
+
+        lockTarget = has ? target : null;
+    }
+
+    // 汇总锁定目标下发提示
+    void Lock_On_Date(bool aimDown, float aimAngle, float innerAngle)
+    {
+        Player_Control now = aimDown ? lockTarget : null;   //举枪才算锁定
+
+        // 目标变化先解除旧目标
+        if (lockSentTarget != now)
+        {
+            Lock_On_Release();
+            if (now == null) return;
+
+            lockSentTarget = now;
+            lockSentTarget.Lock_On_Source_Date(OwnerClientId, 1);
+            return;
+        }
+
+        if (lockSentTarget == null) return;
+
+        // 精度圈到内圈算完成
+        if (!lockDone && aimAngle <= innerAngle)
+        {
+            lockDone = true;
+            lockSentTarget.Lock_On_Source_Date(OwnerClientId, 2);
+        }
+    }
+
+    // 解除本机已发的锁定
+    void Lock_On_Release()
+    {
+        if (lockSentTarget != null) lockSentTarget.Lock_On_Source_Date(OwnerClientId, 0);
+
+        lockSentTarget = null;
+        lockDone = false;
+    }
+
+    // 合并锁定来源阶段
+    public void Lock_On_Source_Date(ulong shooterId, int stage)
+    {
+        if (!IsServer) return;   //主机处理
+
+        if (stage == 1) lockSources.Add(shooterId);
+        else if (stage == 2) lockDoneSources.Add(shooterId);
+        else if (stage == 0)
+        {
+            lockSources.Remove(shooterId);
+            lockDoneSources.Remove(shooterId);
+        }
+        else
+        {
+            Debug.LogError("Player_Control|Lock_On_Source_Date|阶段参数非法");
+            return;
+        }
+
+        int stageNow = lockSources.Count == 0 ? 0 : (lockDoneSources.Count > 0 ? 2 : 1);
+
+        if (stageNow == lockSentStage) return;   //阶段没变不下发
+
+        lockSentStage = stageNow;
+        Lock_On_Send(stageNow);
+    }
+
+    // 本机显示并下发提示
+    void Lock_On_Send(int stage)
+    {
+        if (IsOwner)
+        {
+            if (Con_lockOn_UI == null) Debug.LogError("Player_Control|Lock_On_Send|锁定提示UI 为空");
+            else Con_lockOn_UI.Lock_On_Performance_Local(stage);
+        }
+
+        ClientRpcParams ps = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+        };
+        Lock_On_ClientRpc(stage, ps);
+    }
+
+    // 锁定提示通知受害者本机
+    [ClientRpc]
+    void Lock_On_ClientRpc(int stage, ClientRpcParams ps = default)
+    {
+        if (IsServer) return;   //主机已显示
+        if (!IsOwner) return;   //只本机显示
+
+        if (Con_lockOn_UI == null)
+        {
+            Debug.LogError("Player_Control|Lock_On_ClientRpc|锁定提示UI 为空");
+            return;
+        }
+
+        Con_lockOn_UI.Lock_On_Performance_Local(stage);
+    }
+
+    // 死亡清空锁定状态
+    void Lock_On_Reset()
+    {
+        Lock_On_Release();      //解除自己发出的锁定
+
+        lockSources.Clear();
+        lockDoneSources.Clear();
+
+        if (lockSentStage == 0) return;
+
+        lockSentStage = 0;
+        Lock_On_Send(0);
     }
 
     readonly RaycastHit[] hitBuffer = new RaycastHit[16];   //遮挡检测缓存
