@@ -106,6 +106,9 @@ public class Gun_Control : MonoBehaviour
         Vector3 aim = aimDirection;
         aim.y = 0f;
 
+        // 垂直瞄准无水平朝向
+        if (aim.sqrMagnitude <= 0.001f) return true;
+
         Vector3 body = transform.root.forward;
         body.y = 0f;
 
@@ -218,7 +221,7 @@ public class Gun_Control : MonoBehaviour
     Vector2 GetSpreadOffset()
         => Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
-    // 开火逻辑，返回是否成功
+    // 开火逻辑，aimDir为弹道方向
     public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
         out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)
     {
@@ -228,8 +231,6 @@ public class Gun_Control : MonoBehaviour
         hitTarget = false;
         hitPoint = Vector3.zero;
         hitNormal = Vector3.up;
-
-        SetAimDirection(aimDir);      // 更新准星方向
 
         if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
         if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定

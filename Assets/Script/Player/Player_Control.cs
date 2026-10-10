@@ -665,6 +665,9 @@ public class Player_Control : Character_Move
         if (flatAim.sqrMagnitude <= 0.001f || Vector3.Dot(flatAim, flatView) <= 0f)
             aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
 
+        // 对准判定取准星朝向
+        Con_gun_Control.SetAimDirection(Con_player_HostNetworkEvent.Packet.viewDir);
+
         if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
             out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)) return;
 
