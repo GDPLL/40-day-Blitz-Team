@@ -1,19 +1,19 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!1 &1492095119738686510
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 7426276862511459663}
   - component: {fileID: 8427754106243936369}
   - component: {fileID: 6478668832671096114}
-  - component: {fileID: 8043472392636628770}
   - component: {fileID: 1571084827541213858}
   m_Layer: 0
+  m_HasEditorInfo: 1
   m_Name: "\u706B\u5149"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -53,6 +53,10 @@ ParticleSystemRenderer:
   m_ReflectionProbeUsage: 0
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_virtualGeometry: 0
+  m_ShadingRate: 0
+  m_ForceDisableGRD: 0
+  m_ForceDisableSmallMeshCull: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -4832,20 +4836,6 @@ ParticleSystem:
         m_PostInfinity: 2
         m_RotationOrder: 4
     vectorLabel1_3: W
---- !u!114 &8043472392636628770
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1492095119738686510}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f707b42a8ec448d43bd8498f46cea9a1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  particle: {fileID: 6478668832671096114}
-  time: 0.1
 --- !u!108 &1571084827541213858
 Light:
   m_ObjectHideFlags: 0
@@ -4908,17 +4898,19 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
+  m_UseOcclusionCulling: 1
 --- !u!1 &2654986424484326109
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 813211715177921030}
-  - component: {fileID: 2523813727819379086}
+  - component: {fileID: 3125239771860823149}
   m_Layer: 0
+  m_HasEditorInfo: 1
   m_Name: "\u5F00\u706B\u70B9"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4943,7 +4935,7 @@ Transform:
   - {fileID: 7426276862511459663}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2523813727819379086
+--- !u!114 &3125239771860823149
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -4955,20 +4947,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f707b42a8ec448d43bd8498f46cea9a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  particle: {fileID: 0}
-  time: 1
+  particles:
+  - {fileID: 8540811154283021731}
+  - {fileID: 970687110298216251}
+  - {fileID: 6478668832671096114}
+  audioSource: {fileID: 0}
+  hitClip: {fileID: 0}
+  ricochetClip: {fileID: 0}
+  time: 2
+  ricochetRate: 0.1
+  volumeMin: 0.8
+  volumeMax: 1.2
+  IsAudio: 0
 --- !u!1 &8474182917357672881
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 6674400172874607667}
   - component: {fileID: 8540811154283021731}
   - component: {fileID: 1256729841504410342}
   m_Layer: 0
+  m_HasEditorInfo: 1
   m_Name: "\u706B\u820C"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -9731,6 +9734,10 @@ ParticleSystemRenderer:
   m_ReflectionProbeUsage: 0
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_virtualGeometry: 0
+  m_ShadingRate: 0
+  m_ForceDisableGRD: 0
+  m_ForceDisableSmallMeshCull: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -9793,12 +9800,13 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 6116748878793950641}
   - component: {fileID: 970687110298216251}
   - component: {fileID: 9221935840298365960}
   m_Layer: 0
+  m_HasEditorInfo: 1
   m_Name: "\u70DF\u96FE"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -14561,6 +14569,10 @@ ParticleSystemRenderer:
   m_ReflectionProbeUsage: 0
   m_RayTracingMode: 0
   m_RayTraceProcedural: 0
+  m_virtualGeometry: 0
+  m_ShadingRate: 0
+  m_ForceDisableGRD: 0
+  m_ForceDisableSmallMeshCull: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:

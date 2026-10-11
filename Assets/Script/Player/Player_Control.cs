@@ -22,6 +22,7 @@ public class Player_Control : Character_Move
     public Object_System Con_ObjectSystem;          // 生命系统
     public Aim_Ring_UI Con_aimRing_UI;              // 本机瞄准圈显示
     public Hit_Feedback_UI Con_hitFeedback_UI;      // 本机命中反馈
+    public Player_Audio Con_player_Audio;           // 玩家音效表现
     public Player_XRay Con_xRay;                    // 本机透视
 
     // 本地对外变量
@@ -73,7 +74,7 @@ public class Player_Control : Character_Move
     public bool isSquat;        //蹲下输入
 
     //同步表现状态
-    NetworkVariable<byte> netShowState = new NetworkVariable<byte>();        //表现状态位
+    NetworkVariable<ushort> netShowState = new NetworkVariable<ushort>();    //表现状态位
     NetworkVariable<Vector3> netAimPoint = new NetworkVariable<Vector3>();  //瞄准落点
     NetworkVariable<Vector3> netTargetPos = new NetworkVariable<Vector3>(); //锁定点
     NetworkVariable<bool> netHasTarget = new NetworkVariable<bool>();       //是否锁定
@@ -157,6 +158,8 @@ public class Player_Control : Character_Move
             Debug.LogError("Player_Control|Start|rigidbody 为空");
             IsComplete = false;
         }
+        if (Con_player_Audio == null) Con_player_Audio = GetComponent<Player_Audio>();
+        if (Con_player_Audio == null) Debug.LogError("Player_Control|Start|未找到 Player_Audio");
 
         // 注册输入包接收
         if (Con_player_HostNetworkEvent != null) Con_player_HostNetworkEvent.Host_Input_Init(Con_input_Manage);
@@ -178,6 +181,7 @@ public class Player_Control : Character_Move
         {
             Con_gun_Control.Gun_Control_Init(OwnerClientId);//持有者编号
         }
+        if (Con_player_Audio != null) Con_player_Audio.Player_Audio_Init(Con_gun_Control);
 
         Debug.Log("Player_Control|Player_Control_Start|完成初始化");
     }
@@ -252,32 +256,38 @@ public class Player_Control : Character_Move
 
 
     // 打包表现状态位
-    byte PackShowState()
+    ushort PackShowState()
     {
-        byte state = 0;
+        ushort state = 0;
         if (isWASDDowm) state |= Player_animation.BitWalk;
         if (isRuning) state |= Player_animation.BitRun;
         if (isSquat) state |= Player_animation.BitSquat;
         if (isAimDown) state |= Player_animation.BitGun;
         if (isJumpDown) state |= Player_animation.BitJump;
-        if (!isOnGround) state |= Player_animation.BitAir;
+        if (isOnGround) state |= Player_animation.BitGround;
+        if (isDead || Is_Out) state |= Player_animation.BitDeath;
+
+        // 移动方向取输入包，各端一致
+        state |= Player_animation.Pack_Move(Con_player_HostNetworkEvent.Packet.move);
         return state;
     }
 
     // 打包本机表现状态位
-    byte PackLocalShowState()
+    ushort PackLocalShowState()
     {
         if (Con_input_Manage == null) return netShowState.Value;
 
-        byte state = 0;
+        ushort state = 0;
         if (Con_input_Manage.WASDHeld) state |= Player_animation.BitWalk;
         if (Con_input_Manage.RunHeld) state |= Player_animation.BitRun;
         if (Con_input_Manage.SquatHeld) state |= Player_animation.BitSquat;
         if (Con_input_Manage.MouseHeld || Con_input_Manage.ShoulderHeld || Con_input_Manage.AdsHeld) state |= Player_animation.BitGun;
         if (Con_input_Manage.JumpDownHeld) state |= Player_animation.BitJump;
+        if (RespawnWait > 0f || Is_Out) state |= Player_animation.BitDeath;
 
-        // 离地本机无权威检测，沿用同步值
-        state |= (byte)(netShowState.Value & Player_animation.BitAir);
+        // 落地与方向取本机数据
+        if (isOnGround) state |= Player_animation.BitGround;
+        state |= Player_animation.Pack_Move(Con_input_Manage.LastPacket.move);
         return state;
     }
 
@@ -342,6 +352,31 @@ public class Player_Control : Character_Move
     public void Player_Death_Reset()
     {
         deathCount = 0;
+    }
+
+    // 击杀提示，主机下发
+    public void Player_Kill_Date()
+    {
+        if (!IsServer) return;      //只有主机下发
+
+        // 主机自己直接播
+        if (IsOwner && Con_player_Audio != null) Con_player_Audio.Kill_Show();
+
+        ClientRpcParams ps = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+        };
+        Player_KillClientRpc(ps);
+    }
+
+    // 击杀者提示
+    [ClientRpc]
+    void Player_KillClientRpc(ClientRpcParams ps = default)
+    {
+        if (IsServer) return;       //主机已播
+        if (!IsOwner) return;       //只击杀者
+
+        if (Con_player_Audio != null) Con_player_Audio.Kill_Show();
     }
 
     // 淘汰，9分钟后死亡不再复活
@@ -412,6 +447,10 @@ public class Player_Control : Character_Move
 
         // 落地检测
         isOnGround = IsGrounded();
+
+        // 本机坠地音效
+        if (IsOwner && Con_player_Audio != null && rigidbody != null)
+            Con_player_Audio.Land_Check(rigidbody.velocity.y, isOnGround);
 
         // 同步表现状态
         netShowState.Value = PackShowState();
@@ -493,6 +532,7 @@ public class Player_Control : Character_Move
         {
             jumpRequest = false;
             Con_body.Body_Jump_Date();
+            if (IsOwner && Con_player_Audio != null) Con_player_Audio.Jump_Show();
         }
 
         // 输入施推力
@@ -538,6 +578,18 @@ public class Player_Control : Character_Move
         // 命中与受击反馈
         if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show();
 
+        // 呼吸与咳嗽，血量与毒气驱动
+        if (Con_player_Audio != null && Con_ObjectSystem != null)
+        {
+            bool inGas = Player_level.Instance != null
+                && transform.position.y < Player_level.Instance.Gas_Height;
+            Con_player_Audio.Player_Audio_Body_Show(Con_ObjectSystem.HP, Con_ObjectSystem.healCap, inGas);
+        }
+
+        // 速度越大风声越响
+        if (Con_player_Audio != null && rigidbody != null)
+            Con_player_Audio.Wind_Performance(rigidbody.velocity.magnitude);
+
         // 本机透视
         if (Con_xRay != null)
         {
@@ -551,10 +603,13 @@ public class Player_Control : Character_Move
     // 客户端每帧各端表现层更新
     public void Player_Control_Show_ClientUpdate()
     {
-        byte state = IsOwner ? PackLocalShowState() : netShowState.Value;   //本机用本地输入预测
+        ushort state = IsOwner ? PackLocalShowState() : netShowState.Value;   //本机用本地输入预测
 
         // 动画
         if (Con_player_Animation != null) Con_player_Animation.Player_animation_Show(state);
+
+        // 脚步与装备晃动
+        if (Con_player_Audio != null) Con_player_Audio.Player_Audio_Show(state);
 
         // 血量同步到本地
         if (!IsServer && Con_ObjectSystem != null) Con_ObjectSystem.HP = netHealth.Value;
@@ -600,6 +655,11 @@ public class Player_Control : Character_Move
         Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning, isSquat);
         Con_body.Body_Fixed_Date();
         isOnGround = Con_body.IsGrounded;
+
+        // 本机坠地音效
+        if (Con_player_Audio != null && rigidbody != null)
+            Con_player_Audio.Land_Check(rigidbody.velocity.y, isOnGround);
+
         if (isWASDDowm) Con_body.Body_Move();
 
         // 起跳
@@ -607,6 +667,7 @@ public class Player_Control : Character_Move
         {
             jumpRequest = false;
             Con_body.Body_Jump_Date();
+            if (Con_player_Audio != null) Con_player_Audio.Jump_Show();
         }
 
         // 场景交互，索道等本机自己走
@@ -671,7 +732,7 @@ public class Player_Control : Character_Move
         if (IsServer) return;               //主机已播放
         if (Con_gun_Control == null || Con_input_Manage == null) return;
         if (!Con_gun_Control.HasAmmo()) return;
-        if (Time.time - localFireTime < 1f / Con_gun_Control.fireRate) return;   //未到射速
+        if (Time.time - localFireTime < Con_gun_Control.FireInterval) return;   //未到射速
 
         localFireTime = Time.time;
 
@@ -718,6 +779,9 @@ public class Player_Control : Character_Move
         // 本机命中箭头
         if (IsOwner && hitTarget && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Mark_Performance_Local();
 
+        // 本机命中音效
+        if (IsOwner && hitTarget && Con_player_Audio != null) Con_player_Audio.Hit_Show();
+
         Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal);
     }
 
@@ -741,8 +805,9 @@ public class Player_Control : Character_Move
         {
             Con_gun_Control.Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
-            // 本机命中箭头
+            // 本机命中箭头与音效
             if (hitTarget && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Mark_Performance_Local();
+            if (hitTarget && Con_player_Audio != null) Con_player_Audio.Hit_Show();
             return;
         }
 
@@ -756,6 +821,9 @@ public class Player_Control : Character_Move
 
         // 主机自己直接显示
         if (IsOwner && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
+
+        // 被射中提示，环境伤害位置为零不播
+        if (IsOwner && Con_player_Audio != null && fromPos != Vector3.zero) Con_player_Audio.Hurt_Show();
 
         Damage_Dir_ClientRpc(fromPos);
     }
@@ -774,6 +842,9 @@ public class Player_Control : Character_Move
         }
 
         Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
+
+        // 被射中提示，环境伤害位置为零不播
+        if (Con_player_Audio != null && fromPos != Vector3.zero) Con_player_Audio.Hurt_Show();
     }
 
 
@@ -905,13 +976,19 @@ public class Player_Control : Character_Move
     // 左键开火
     void OnMouse1(bool on)
     {
+        bool isPress = on && !isMouse1Down;     //按下那一帧
+
         isMouse1Down = on;
+
         if (Con_gun_Control == null)
         {
             Debug.LogError("Player_Control|OnMouse1|gun_Control 为空");
             return;
         }
         if (!on) return;
+
+        // 没子弹扣扳机，空仓提示一次
+        if (isPress && !Con_gun_Control.HasAmmo()) Con_gun_Control.Gun_Empty_Date();
 
         if (IsServer) Player_Fire();    //主机算伤害
         else OnLocalFire();             //客机只本机表现

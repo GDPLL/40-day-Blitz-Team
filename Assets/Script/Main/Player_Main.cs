@@ -21,6 +21,7 @@ public class Player_Main : NetworkBehaviour
     public UI_Player uI_Player;                     //本机弹药血量UI
     public UI_curtain uI_Curtain;                   //UI幕布
     public UI_Time uI_Time;                         //关卡时间UI
+    public UI_CallATime_Text uI_CallATime;           //通讯设备UI
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
@@ -61,6 +62,10 @@ public class Player_Main : NetworkBehaviour
         // 关卡时间与事件提示
         if (uI_Time != null && Player_level.Instance != null)
             uI_Time.UI_Time_Show_Time(Level_Time);
+
+        // 通讯设备时间与播报
+        if (uI_CallATime != null && Player_level.Instance != null)
+            uI_CallATime.UI_CallATime_Update(Level_Time);
 
 
         // 本机表现层驱动
@@ -104,7 +109,7 @@ public class Player_Main : NetworkBehaviour
         if (Player_level.Instance != null)
         {
             Player_level.Instance.Player_level_FixUpdate();
-            Player_level.Instance.Player_level_FixUpdate_Performance();
+            Player_level.Instance.Player_level_FixUpdate_Performance(Level_Time);
 
             // 关卡时间同步各端
             if (IsServer) netGameTime.Value = Player_level.Instance.gameTime;
@@ -189,6 +194,7 @@ public class Player_Main : NetworkBehaviour
             if (control == null || control.OwnerClientId != killerId) continue;
 
             control.Player_Death_Reset();
+            control.Player_Kill_Date();     //击杀提示
             return;
         }
     }
@@ -330,6 +336,25 @@ public class Player_Main : NetworkBehaviour
         uI_Time.UI_Time_Show_Event(text, Level_Time);
     }
 
+    // 撤离突发，主机广播各端
+    void OnEvac_Event(int index)
+    {
+        if (!IsServer) return;      //只有主机广播
+
+        if (uI_CallATime != null) uI_CallATime.UI_CallATime_Event_Show(index);   //主机自己
+
+        Evac_Event_ClientRpc(index);
+    }
+
+    // 客机播撤离突发
+    [ClientRpc]
+    void Evac_Event_ClientRpc(int index)
+    {
+        if (IsServer) return;       //主机已播
+
+        if (uI_CallATime != null) uI_CallATime.UI_CallATime_Event_Show(index);
+    }
+
     // 关卡节点，主机广播各端
     void OnLevel_Node(int index)
     {
@@ -365,6 +390,7 @@ public class Player_Main : NetworkBehaviour
             {
                 // 撤离点播报
                 Player_level.Instance.level_EndCollider.Evac_Tip_event += OnEvac_Tip;
+                Player_level.Instance.level_EndCollider.Evac_Event_event += OnEvac_Event;
 
                 // 关卡节点分发
                 Player_level.Instance.Node_event += OnLevel_Node;
@@ -490,6 +516,8 @@ public class Player_Main : NetworkBehaviour
 
             oplayer_Controls.Add(control);
 
+            control.Player_Control_Start(Input_Manage.Instance);   //各端初始化所有玩家
+
             if (kv.Value.OwnerClientId == netSingle.LocalClientId)
             {
                 oPlayer_Control = control;
@@ -540,6 +568,13 @@ public class Player_Main : NetworkBehaviour
             Debug.LogError("Player_Main|InitScenceClientRpc|UI_Time 为空");
         }
         else uI_Time.UI_Time_Init();
+
+        // 通讯设备UI
+        if (uI_CallATime == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_CallATime 为空");
+        }
+        else uI_CallATime.UI_CallATime_Init();
 
         isInit = true;
 

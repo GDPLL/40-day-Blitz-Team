@@ -37,6 +37,20 @@ public class Player_level : MonoBehaviour
     public float Gas_Height => gasHeight;   //对外读取
     int gasShowIndex;                       //毒气粒子进度
 
+    //毒气释放节点序号，与 nodeGasY 对应
+    readonly int[] gasNode = { 1, 3, 4, 5 };
+    public float alarmWarn = 30f;           //警报提前秒数
+    public AudioSource alarmSource;         //警报音源，循环
+    public AudioSource[] gasSources;        //每层毒气音源
+    public AudioClip alarmClip;             //毒气警报
+    public AudioClip releaseClip;           //毒气释放声
+    int alarmIndex;                         //毒气警报进度
+
+    public AudioSource cablewaySource;      //索道提示音源，循环
+    public AudioClip cablewayClip;          //索道提示音
+    public float cablewayWarn = 10f;        //索道提示提前秒数
+    bool cablewayTip;                       //索道提示已响
+
     //复活楼层，3m10s二楼 4m三楼
     public int Respawn_Floor => gameTime >= 240f ? 2 : gameTime >= 190f ? 1 : 0;
 
@@ -91,7 +105,19 @@ public class Player_level : MonoBehaviour
         // 毒气层与粒子重置
         gasHeight = 0f;
         gasShowIndex = 0;
+        alarmIndex = 0;
         pointIndex = 0;
+
+        // 警报循环音
+        if (alarmSource != null)
+        {
+            alarmSource.loop = true;
+            alarmSource.Stop();
+        }
+
+        // 索道提示重置
+        cablewayTip = false;
+        if (cablewaySource != null) cablewaySource.Stop();
 
         for (int i = 0; i < gasParticle.Length; i++)
         {
@@ -102,6 +128,9 @@ public class Player_level : MonoBehaviour
     // 3m10s显示索道
     void Time3m10s_Show()
     {
+        // 索道出现，停提示音
+        if (cablewaySource != null && cablewaySource.isPlaying) cablewaySource.Stop();
+
         if (time3mObject == null)
         {
             Debug.LogError("Player_level|Time3m10s_Show|time3mObject 为空");
@@ -130,11 +159,44 @@ public class Player_level : MonoBehaviour
         }
     }
 
-    // 关卡表现，各端每物理帧跑
-    public void Player_level_FixUpdate_Performance()
+    // 关卡表现，各端每物理帧跑，time为当前关卡时间
+    public void Player_level_FixUpdate_Performance(float time)
     {
         // 电梯运行
         if (level_elevator != null) level_elevator.Level_elevator_FixUpdate();
+
+        // 毒气警报，释放前 alarmWarn 秒开始响
+        if (alarmIndex < gasNode.Length && time >= nodeTime[gasNode[alarmIndex]] - alarmWarn)
+        {
+            alarmIndex++;
+
+            if (alarmSource != null && alarmClip != null)
+            {
+                alarmSource.clip = alarmClip;
+                alarmSource.loop = true;    //释放时只关循环，不硬切
+                alarmSource.Play();
+            }
+        }
+
+        // 索道刷新提示，提前 cablewayWarn 秒循环
+        if (!cablewayTip && time >= nodeTime[2] - cablewayWarn)
+        {
+            cablewayTip = true;
+
+            if (cablewaySource != null && cablewayClip != null)
+            {
+                cablewaySource.clip = cablewayClip;
+                cablewaySource.loop = true;
+                cablewaySource.Play();
+            }
+        }
+    }
+
+    // 第 index 层毒气音源
+    AudioSource Gas_Source(int index)
+    {
+        if (gasSources == null || index < 0 || index >= gasSources.Length) return null;
+        return gasSources[index];
     }
 
     // 节点表现，index为节点序号，各端按主机节点跑
@@ -150,6 +212,11 @@ public class Player_level : MonoBehaviour
         if (nodeGasY[index] > 0f)
         {
             gasHeight = nodeGasY[index];
+
+            // 释放声，警报播完当前一轮再停
+            if (alarmSource != null) alarmSource.loop = false;
+            AudioSource source = Gas_Source(gasShowIndex);
+            if (source != null && releaseClip != null) source.PlayOneShot(releaseClip);
 
             if (gasShowIndex > 0 && gasParticle[gasShowIndex - 1] != null)
                 gasParticle[gasShowIndex - 1].Stop();

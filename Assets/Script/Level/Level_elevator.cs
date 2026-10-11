@@ -11,6 +11,13 @@ public class Level_elevator : MonoBehaviour
     public Transform door1;         // 一楼门
     public Transform door2;         // 二楼门
 
+    // 音效
+    public AudioSource audioSource;     // 一次性音源
+    public AudioSource riseSource;      // 运行音源，循环
+    public AudioClip startClip;         // 启动声
+    public AudioClip arriveClip;        // 到达铃声
+    public AudioClip riseClip;          // 运行声
+
     // 行程
     float doorUp = 5f;       // 开门上移
     float floorUp = 48.2f;     // 地板升高
@@ -23,6 +30,7 @@ public class Level_elevator : MonoBehaviour
     Vector3 door2Base;      // 二楼门初始位置
     Vector3 floorNow;       // 地板当前位置
     int stage;              // 运行阶段
+    bool startup;           // 开局下行中
 
     // 初始化，重置所有位置
     public void Level_elevator_Init()
@@ -38,15 +46,24 @@ public class Level_elevator : MonoBehaviour
         door1Base = door1.position;
         door2Base = door2.position;
 
-        // 重置所有位置，地板由刚体驱动
-        floorNow = floorBase;
-        floorBody.isKinematic = true;
-        floorBody.position = floorBase;
-        floor.position = floorBase;
-        door1.position = door1Base;
-        door2.position = door2Base;
+        // 运行循环音
+        if (riseSource != null)
+        {
+            riseSource.clip = riseClip;
+            riseSource.loop = true;
+            riseSource.Stop();
+        }
 
-        stage = 0;      // 开始开一楼门
+        // 开局停在二楼，先下行到一楼再待机
+        floorBody.isKinematic = true;
+        floorNow = floorBase + Vector3.up * floorUp;
+        floorBody.position = floorNow;
+        floor.position = floorNow;
+        door1.position = door1Base;
+        door2.position = door2Base + Vector3.up * doorUp;
+
+        startup = true;
+        stage = 7;      // 关二楼门下行开一楼门
     }
 
     // 启动，关一楼门上行开二楼门
@@ -55,6 +72,7 @@ public class Level_elevator : MonoBehaviour
         if (stage != 1) return;     //未就绪不启动
 
         stage = 2;      // 开始关一楼门
+        Play_Once(startClip);       // 启动声
     }
 
     // 回一楼，关二楼门下去重开一楼门
@@ -63,6 +81,7 @@ public class Level_elevator : MonoBehaviour
         if (stage != 6) return;     //上行结束才回
 
         stage = 7;      // 开始关二楼门
+        Play_Once(startClip);       // 启动声
     }
 
     // 每物理帧驱动电梯运行
@@ -80,6 +99,14 @@ public class Level_elevator : MonoBehaviour
         Vector3 door2Open = door2Base + Vector3.up * doorUp;
         Vector3 floorTop = floorBase + Vector3.up * floorUp;
         Vector3 floorDip = floorBase - Vector3.up * floorDown;
+
+        // 地板运行声
+        bool moving = stage == 3 || stage == 4 || stage == 8;
+        if (riseSource != null)
+        {
+            if (moving && !riseSource.isPlaying) riseSource.Play();
+            else if (!moving && riseSource.isPlaying) riseSource.Stop();
+        }
 
         switch (stage)
         {
@@ -99,7 +126,10 @@ public class Level_elevator : MonoBehaviour
             case 4:     // 地板上行
                 floorNow = Vector3.MoveTowards(floorNow, floorTop, step);
                 floorBody.MovePosition(floorNow);
-                if (floorNow == floorTop) stage = 5;
+                if (floorNow != floorTop) break;
+
+                stage = 5;
+                Play_Once(arriveClip);      // 到达铃声
                 break;
             case 5:     // 开二楼门
                 door2.position = Vector3.MoveTowards(door2.position, door2Open, step);
@@ -112,13 +142,28 @@ public class Level_elevator : MonoBehaviour
             case 8:     // 地板下行
                 floorNow = Vector3.MoveTowards(floorNow, floorBase, step);
                 floorBody.MovePosition(floorNow);
-                if (floorNow == floorBase) stage = 9;
+                if (floorNow != floorBase) break;
+
+                stage = 9;
+                Play_Once(arriveClip);      // 到达铃声
                 break;
             case 9:     // 开一楼门
                 door1.position = Vector3.MoveTowards(door1.position, door1Open, step);
-                if (door1.position == door1Open) stage = 10;
+                if (door1.position != door1Open) break;
+
+                // 开局下行回到待机，其余回到结束
+                stage = startup ? 1 : 10;
+                startup = false;
                 break;
             default: return;    // 运行结束
         }
+    }
+
+    // 播一次音效
+    void Play_Once(AudioClip clip)
+    {
+        if (clip == null || audioSource == null) return;
+
+        audioSource.PlayOneShot(clip);
     }
 }

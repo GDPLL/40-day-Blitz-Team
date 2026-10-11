@@ -1,16 +1,28 @@
+using System;
 using UnityEngine;
 
 public class Gun_Control : MonoBehaviour
 {
     public Transform shootPoint;   // 枪口
     public LineRenderer line;      // 射线显示
-    public AudioSource audioSource;   // 音源
+
+    // 表现层事件，音效等外部注册
+    public event Action Shoot_event;    //开火一次
+    public event Action Empty_event;    //空仓，没子弹扣扳机
+    public event Action Raise_event;    //举枪
+    public event Action Lower_event;    //放枪
+    public event Action Shoulder_event;    //据枪
+    public event Action Ads_event;      //瞄准
+    public event Action Reload_event;   //换弹
 
     public int ammo = 30;          // 弹药
     public int maxAmmo = 30;       // 弹匣容量
-    public float fireRate = 10f;   // 射速
+    public float fireRate = 900f;   // 射速，发每分钟
     public float range = 100f;     // 射程
     public int damage = 34;        // 单发伤害
+
+    // 两发之间的最小间隔
+    public float FireInterval => 60f / fireRate;
 
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
@@ -22,7 +34,7 @@ public class Gun_Control : MonoBehaviour
     // 计时
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
-    float lastShotTime;            // 上次射击时间
+    bool isRaised;                 // 举枪中
 
     // 一种姿态对应的一组参数
     // 外圈、内圈、增长速度与距离衰减
@@ -118,6 +130,10 @@ public class Gun_Control : MonoBehaviour
     {
         if (aimingShoulder == shoulder && aimingAds == adsOn) return;   //姿态没变
 
+        // 姿态切换提示音
+        if (shoulder && !aimingShoulder) Shoulder_event?.Invoke();
+        if (adsOn && !aimingAds) Ads_event?.Invoke();
+
         aimingShoulder = shoulder;
         aimingAds = adsOn;
         currentAngle = CurrentProfile().outerAngle;   //立刻重置到新外圈
@@ -167,16 +183,12 @@ public class Gun_Control : MonoBehaviour
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
     }
 
-    // 物理帧表现，射线与音效计时
+    // 物理帧表现，射线显示计时
     public void Gun_Fixed_Performance()
     {
         // 射线短暂显示后消失
         lineTimer -= Time.deltaTime;
         if (line != null && lineTimer <= 0f) line.enabled = false;
-
-        // 长时间未射击停止音效
-        if (audioSource != null && audioSource.isPlaying && Time.time - lastShotTime > 0.2f)
-            audioSource.Stop();
     }
 
     // 按目标与移动状态更新精度
@@ -216,7 +228,7 @@ public class Gun_Control : MonoBehaviour
 
     // 精度圈内随机偏移
     Vector2 GetSpreadOffset()
-        => Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
+        => UnityEngine.Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
     // 开火逻辑，返回是否成功
     public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
@@ -232,7 +244,7 @@ public class Gun_Control : MonoBehaviour
         SetAimDirection(aimDir);      // 更新准星方向
 
         if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
-        if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
+        if ((fireTimer >= FireInterval && ammo > 0) == false) return false;    // 射速与弹药判定
 
         ammo--;
         fireTimer = 0f;
@@ -275,13 +287,11 @@ public class Gun_Control : MonoBehaviour
         Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
     }
 
-    // 本机开火表现，枪口特效与音效
+    // 本机开火表现，枪口特效与开火事件
     public void Gun_Shoot_Local_Performance(Vector3 origin, Vector3 dir)
     {
-        lastShotTime = Time.time;   //记录本次开火时刻
-
-        // 播放射击音效
-        if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
+        // 通知外部播放表现，音效等
+        Shoot_event?.Invoke();
 
         // 在开火点生成对象
         if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
@@ -318,11 +328,17 @@ public class Gun_Control : MonoBehaviour
     // 换弹逻辑，弹匣补满
     public void Gun_Reload_Date()
     {
+        if (ammo == maxAmmo) return;    //满弹不换，防重复触发
+
         ammo = maxAmmo;
+        Reload_event?.Invoke();     //换弹音效
     }
 
     // 是否有弹药
     public bool HasAmmo() => ammo > 0;
+
+    // 空仓，没子弹扣扳机
+    public void Gun_Empty_Date() => Empty_event?.Invoke();
 
     // 目标是否在射程内
     public bool InRange(Transform target) =>
@@ -331,6 +347,12 @@ public class Gun_Control : MonoBehaviour
     // 举枪朝向瞄准落点
     public void Gun_Aim_Performance(Vector3 aimPoint)
     {
+        if (!isRaised)
+        {
+            isRaised = true;
+            Raise_event?.Invoke();      //举枪
+        }
+
         if (aimPoint == Vector3.zero) return;   //无落点不转向
 
         Vector3 dir = aimPoint - transform.position;
@@ -347,6 +369,12 @@ public class Gun_Control : MonoBehaviour
     // 收枪
     public void Gun_AimDown_Performance()
     {
+        if (isRaised)
+        {
+            isRaised = false;
+            Lower_event?.Invoke();      //放枪
+        }
+
         transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
     }
 }
