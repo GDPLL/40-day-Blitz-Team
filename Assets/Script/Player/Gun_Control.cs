@@ -224,7 +224,7 @@ public class Gun_Control : MonoBehaviour
     // 开火逻辑，aimDir为弹道方向
     public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
         out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
-        out int hitDamage, out bool killed)
+        out int hitDamage, out bool killed, out Bounds hitBounds)
     {
         origin = MuzzlePosition;
         dir = transform.forward;
@@ -234,6 +234,7 @@ public class Gun_Control : MonoBehaviour
         hitNormal = Vector3.up;
         hitDamage = 0;
         killed = false;
+        hitBounds = new Bounds();
 
         if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
         if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
@@ -265,6 +266,7 @@ public class Gun_Control : MonoBehaviour
                 {
                     hitTarget = true;
                     hitDamage = damageable.Takedamage(damage, ownerId, transform.root.position, out killed);
+                    hitBounds = hit.collider.bounds;
                 }
             }
         }

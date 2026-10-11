@@ -964,20 +964,41 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hitCrossSize: 40
   hitCrossLife: 0.25
+  hitCrossPopTime: 0.12
+  hitCrossPopHit: 1.3
+  hitCrossPopKill: 1.9
+  hitCrossHold: 0.6
+  hitCrossFlash: 0.06
+  hitCrossGlowScale: 1.6
+  hitCrossGlowAlpha: 0.45
+  hitCrossKillScale: 1.6
   killWobbleSpeed: 30
-  killWobbleAngle: 15
+  killWobbleAngle: 25
+  killBurstSize: 90
+  killBurstLife: 0.22
   crossKick: 1.35
   crossKickBack: 12
   killShake: 0.12
   jumpTextLife: 0.7
   jumpTextRise: 60
+  jumpTextGravity: 1200
+  jumpTextGap: 200
   jumpTextSize: 30
+  jumpTextKillSize: 56
+  jumpTextPop: 0.15
+  jumpTextOvershoot: 0.25
+  jumpTextKillOvershoot: 0.5
+  jumpTextTilt: 6
+  jumpTextOutline: 0.2
   jumpTextCount: 8
   scoreFontSize: 40
   scoreOffset: {x: -40, y: -40}
-  scoreAddFontSize: 30
+  scoreAddFontSize: 25
   scoreAddLife: 0.8
-  scoreAddRise: 50
+  scoreAddSide: 120
+  scoreAddDown: -30
+  scoreAddGap: 50
+  scoreAddSlide: 900
   scoreAddCount: 6
   arcMargin: 0.08
   arcSpread: 35

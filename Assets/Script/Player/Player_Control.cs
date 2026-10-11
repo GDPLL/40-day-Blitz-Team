@@ -687,7 +687,7 @@ public class Player_Control : Character_Move
 
         if (!Con_gun_Control.Gun_Shoot_Date(aimDir, out Vector3 origin, out Vector3 dir,
             out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
-            out int hitDamage, out bool killed)) return;
+            out int hitDamage, out bool killed, out Bounds hitBounds)) return;
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
@@ -707,9 +707,10 @@ public class Player_Control : Character_Move
 
         // 本机命中反馈
         if (IsOwner && hitTarget && Con_hitFeedback_UI != null)
-            Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint);
+            Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint, hitBounds.center, hitBounds.size);
 
-        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal, hitDamage, killScore);
+        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal, hitDamage, killScore,
+            hitBounds.center, hitBounds.size);
     }
 
     const int KillScore = 100;      //击杀加分
@@ -725,7 +726,7 @@ public class Player_Control : Character_Move
     // 客户端开火表现
     [ClientRpc]
     void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal,
-        int hitDamage, int killScore)
+        int hitDamage, int killScore, Vector3 hitCenter, Vector3 hitSize)
     {
         if (IsServer) return;   //主机已播放
 
@@ -745,7 +746,7 @@ public class Player_Control : Character_Move
 
             // 本机命中反馈
             if (hitTarget && Con_hitFeedback_UI != null)
-                Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint);
+                Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint, hitCenter, hitSize);
             return;
         }
 
