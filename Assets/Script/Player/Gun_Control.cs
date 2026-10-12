@@ -53,9 +53,6 @@ public class Gun_Control : MonoBehaviour
     public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f);   // 据枪
     public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f);       // 开镜
 
-    [Header("瞄准")]
-    public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
-
     [Header("精度：移动姿态系数")]
     public float moveFactorSquatStand = 1.3f;   // 蹲下
     public float moveFactorStand = 1.0f;   // 站立
@@ -73,6 +70,8 @@ public class Gun_Control : MonoBehaviour
     bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
     Vector3 aimDirection;    // 准星方向
+    ulong ownerId;           // 持有者编号
+    Vector3 aimOrigin;       // 准星射线起点
 
     float currentAngle;                                       // 当前精度圈
     public float CurrentAngle => currentAngle;                // 对外读取
@@ -95,16 +94,26 @@ public class Gun_Control : MonoBehaviour
         aimDirection = dir.normalized;
     }
 
+    // 注入准星射线起点
+    public void SetAimOrigin(Vector3 origin)
+    {
+        aimOrigin = origin;
+    }
+
      // 朝向是否对准准星
     bool AimAligned()
     {
         Vector3 aim = aimDirection;
         aim.y = 0f;
 
+        // 垂直瞄准无水平朝向
+        if (aim.sqrMagnitude <= 0.001f) return true;
+
         Vector3 body = transform.root.forward;
         body.y = 0f;
 
-        return Vector3.Angle(aim, body) <= aimAlignAngle;
+        // 允许偏差取当前外圈
+        return Vector3.Angle(aim, body) <= CurrentProfile().outerAngle * 0.5f;
     }
 
     // 设置姿态，shoulder为据枪，adsOn为开镜
@@ -141,11 +150,12 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 注入完成
-    public void Gun_Control_Init()
+    public void Gun_Control_Init(ulong id)
     {
         if (line == null) line = GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
 
+        ownerId = id;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
 
@@ -178,8 +188,10 @@ public class Gun_Control : MonoBehaviour
         AimProfile p = CurrentProfile();
 
         // 判定目标是否还在当前外圈
-        targetInRing = hasTarget &&
-            Vector3.Angle(aimDirection, targetPos - MuzzlePosition) <= p.outerAngle * 0.5f;   //外圈按直径算
+        float distance = (targetPos - MuzzlePosition).magnitude;
+        Vector3 toTarget = targetPos - aimOrigin;
+        targetInRing = hasTarget && (distance < 1f ||
+            Vector3.Angle(aimDirection, toTarget) <= p.outerAngle * 0.5f);   //外圈按直径算
 
         // 离开范围或朝向没对准准星都不收圈
         if (!targetInRing || !AimAligned())
@@ -188,7 +200,6 @@ public class Gun_Control : MonoBehaviour
             return;
         }
 
-        float distance = (targetPos - MuzzlePosition).magnitude;
         float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance, p);
         currentAngle = Mathf.MoveTowards(currentAngle, p.innerAngle, speed * dt);   // 收缩到内圈
     }
@@ -210,17 +221,20 @@ public class Gun_Control : MonoBehaviour
     Vector2 GetSpreadOffset()
         => Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
-    // 开火逻辑，返回是否成功
+    // 开火逻辑，aimDir为弹道方向
     public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
-        out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)
+        out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
+        out int hitDamage, out bool killed, out Bounds hitBounds)
     {
         origin = MuzzlePosition;
         dir = transform.forward;
         isHit = false;
+        hitTarget = false;
         hitPoint = Vector3.zero;
         hitNormal = Vector3.up;
-
-        SetAimDirection(aimDir);      // 更新准星方向
+        hitDamage = 0;
+        killed = false;
+        hitBounds = new Bounds();
 
         if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
         if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
@@ -231,8 +245,9 @@ public class Gun_Control : MonoBehaviour
         // 精度圈散布
         Vector2 offset = GetSpreadOffset();
 
-        // 锁定圈内时子弹直指目标
-        dir = targetInRing ? (targetPos - origin).normalized : aimDir.normalized;
+        // 锁定直指目标，反向用准星
+        Vector3 toTarget = targetPos - origin;
+        dir = (targetInRing && Vector3.Dot(toTarget, aimDir) > 0f) ? toTarget.normalized : aimDir.normalized;
         dir += transform.right * offset.x + transform.up * offset.y;
         dir.Normalize();
 
@@ -243,8 +258,17 @@ public class Gun_Control : MonoBehaviour
             hitPoint = hit.point;
             hitNormal = hit.normal;
 
-            Idamage damageable = hit.collider.GetComponent<Idamage>();
-            if (damageable != null) damageable.Takedamage(damage);
+            // 不打自己
+            if (!hit.collider.transform.IsChildOf(transform.root))
+            {
+                Idamage damageable = hit.collider.GetComponent<Idamage>();
+                if (damageable != null)
+                {
+                    hitTarget = true;
+                    hitDamage = damageable.Takedamage(damage, ownerId, transform.root.position, out killed);
+                    hitBounds = hit.collider.bounds;
+                }
+            }
         }
 
         return true;    // 本次已开火

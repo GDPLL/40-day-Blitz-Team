@@ -9,6 +9,7 @@ public struct InputPacket : INetworkSerializable
 
     // 输入状态
     public Vector3 viewDir;         // 本机视角朝向
+    public Vector3 viewPos;         // 本机相机位置
     public Vector3 aimPoint;        // 举枪瞄准落点
     public Vector2 move;            // 移动轴
     public bool jump;               // 跳跃
@@ -26,6 +27,7 @@ public struct InputPacket : INetworkSerializable
     {
         serializer.SerializeValue(ref clientId);
         serializer.SerializeValue(ref viewDir);
+        serializer.SerializeValue(ref viewPos);
         serializer.SerializeValue(ref aimPoint);
         serializer.SerializeValue(ref move);
         serializer.SerializeValue(ref jump);

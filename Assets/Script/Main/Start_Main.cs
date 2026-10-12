@@ -27,6 +27,7 @@ public class Start_Main : MonoBehaviour
         startButton.onClick.AddListener(StartGame);
 
         GameManager.gameManager.networkManager.OnConnectionEvent += OnPlayerJoin;
+        GameManager.gameManager.StartAction += Room_Enter;      //回到房间
 
         Debug.Log("Start_Main|Awake|完成初始化");
     }
@@ -34,6 +35,7 @@ public class Start_Main : MonoBehaviour
     void OnDestroy()
     {
         GameManager.gameManager.networkManager.OnConnectionEvent -= OnPlayerJoin;
+        GameManager.gameManager.StartAction -= Room_Enter;
     }
 
     // 开主机，创建中继房间
@@ -57,15 +59,27 @@ public class Start_Main : MonoBehaviour
     // 有玩家连接时生成对象
     void OnPlayerJoin(NetworkManager manager, ConnectionEventData data)
     {
-        if (data.EventType == ConnectionEvent.ClientConnected && manager.IsServer)
-            SpawnPlayer();
+        if (data.EventType != ConnectionEvent.ClientConnected || !manager.IsServer) return;
+
+        SpawnPlayer(manager.ConnectedClients.Count - 1);    //新玩家编号
     }
 
-    // 生成玩家对象，位置依次右移 2
-    void SpawnPlayer()
+    // 回到房间，放开鼠标并重建成员
+    void Room_Enter()
     {
-        int index = GameManager.gameManager.networkManager.ConnectedClients.Count - 1;
+        Cursor.lockState = CursorLockMode.None;     //房间内放开鼠标
+        Cursor.visible = true;
 
+        if (!GameManager.gameManager.networkManager.IsServer) return;   //只有主机生成
+
+        // 按当前人数重新生成
+        int count = GameManager.gameManager.networkManager.ConnectedClients.Count;
+        for (int i = 0; i < count; i++) SpawnPlayer(i);
+    }
+
+    // 生成玩家对象，index为编号
+    void SpawnPlayer(int index)
+    {
         GameObject go = Instantiate(ObjectPrefab,
             StartVector3 + Vector3.right * 2f * index, Quaternion.identity);
         // destroyWithScene 为 true，切场景时销毁
