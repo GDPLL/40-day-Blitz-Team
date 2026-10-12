@@ -51,6 +51,11 @@ public class Player_level : MonoBehaviour
     public float cablewayWarn = 10f;        //索道提示提前秒数
     bool cablewayTip;                       //索道提示已响
 
+    public AudioSource battleSource;        //决战音源，循环
+    public AudioClip battleClip;            //决战音乐
+    public float battleTime = 510f;         //决战音乐时刻，8分30秒
+    bool battleOn;                          //决战音乐已播
+
     //复活楼层，3m10s二楼 4m三楼
     public int Respawn_Floor => gameTime >= 240f ? 2 : gameTime >= 190f ? 1 : 0;
 
@@ -118,6 +123,10 @@ public class Player_level : MonoBehaviour
         // 索道提示重置
         cablewayTip = false;
         if (cablewaySource != null) cablewaySource.Stop();
+
+        // 决战音乐重置
+        battleOn = false;
+        if (battleSource != null) battleSource.Stop();
 
         for (int i = 0; i < gasParticle.Length; i++)
         {
@@ -188,6 +197,19 @@ public class Player_level : MonoBehaviour
                 cablewaySource.clip = cablewayClip;
                 cablewaySource.loop = true;
                 cablewaySource.Play();
+            }
+        }
+
+        // 决战音乐，8分30秒起循环
+        if (!battleOn && time >= battleTime)
+        {
+            battleOn = true;
+
+            if (battleSource != null && battleClip != null)
+            {
+                battleSource.clip = battleClip;
+                battleSource.loop = true;
+                battleSource.Play();
             }
         }
     }
