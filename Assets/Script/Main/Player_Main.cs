@@ -22,6 +22,7 @@ public class Player_Main : NetworkBehaviour
     public UI_curtain uI_Curtain;                   //UI幕布
     public UI_Time uI_Time;                         //关卡时间UI
     public UI_CallATime_Text uI_CallATime;           //通讯设备UI
+    public UI_Body uI_Body;                         //本机人形状态图
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
@@ -77,6 +78,10 @@ public class Player_Main : NetworkBehaviour
             if (uI_Player != null)
                 uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
                     oPlayer_Control.HP, oPlayer_Control.MaxHp);
+
+            // 本机人形状态图
+            if (uI_Body != null)
+                uI_Body.UI_Body_Show(oPlayer_Control.HP, oPlayer_Control.MaxHp, oPlayer_Control.Show_State);
 
             // 死亡等待幕布，淘汰后常驻
             if (uI_Curtain != null && !gameOver)
@@ -575,6 +580,13 @@ public class Player_Main : NetworkBehaviour
             Debug.LogError("Player_Main|InitScenceClientRpc|UI_CallATime 为空");
         }
         else uI_CallATime.UI_CallATime_Init();
+
+        // 人形状态图
+        if (uI_Body == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Body 为空");
+        }
+        else uI_Body.UI_Body_Init();
 
         isInit = true;
 

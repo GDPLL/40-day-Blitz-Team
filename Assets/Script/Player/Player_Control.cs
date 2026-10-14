@@ -58,6 +58,9 @@ public class Player_Control : Character_Move
     public int HP => Con_ObjectSystem != null ? Con_ObjectSystem.HP : 0;         //当前血量
     public int MaxHp => Con_ObjectSystem != null ? Con_ObjectSystem.MaxHp : 0;   //血量上限
 
+    //对外读取表现状态位
+    public ushort Show_State => netShowState.Value;
+
     //本地状态中转
     public bool isOnGround;  //在地面
     public bool isJumpDown;    //跳跃空格
