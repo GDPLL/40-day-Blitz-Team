@@ -28,9 +28,10 @@ public class GameManager : NetworkBehaviour
     // 跨场景保留
     void Awake()
     {
+        // 已有单例，重复对象整个销毁，防撞 GlobalObjectIdHash
         if (gameManager != null && gameManager != this)
         {
-            Destroy(this);
+            Destroy(gameObject);
             return;
         }
 
@@ -42,6 +43,19 @@ public class GameManager : NetworkBehaviour
         ScenceChange += Scence_OnChange;
 
         Debug.Log("GameManager|Awake|完成初始化");
+    }
+
+    // 销毁时清空单例，防悬空引用
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+
+        if (gameManager != this) return;
+
+        ScenceChange -= Scence_OnChange;
+        gameManager = null;
+
+        Debug.Log("GameManager|OnDestroy|单例已释放");
     }
 
 
@@ -92,6 +106,9 @@ public class GameManager : NetworkBehaviour
         //由主机负责切换
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost)
         {
+            // 清掉当前场景玩家
+            Clear_Scence_Player_Date();
+
             switch (gameState)
             {
                 case GameState.房间中:
@@ -103,6 +120,28 @@ public class GameManager : NetworkBehaviour
             }
         }
 
+    }
+
+    // 清除当前场景玩家对象，主机执行
+    void Clear_Scence_Player_Date()
+    {
+        if (networkManager == null || networkManager.SpawnManager == null)
+        {
+            Debug.LogError("GameManager|Clear_Scence_Player_Date|SpawnManager 为空");
+            return;
+        }
+
+        // 先拷贝再销毁，避免遍历中改集合
+        List<NetworkObject> players = new List<NetworkObject>();
+        foreach (NetworkObject player in networkManager.SpawnManager.SpawnedObjectsList)
+            players.Add(player);
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i] == null) continue;
+            if(players[i].GetComponent<Player_Control>()==null) continue;
+            players[i].Despawn(true);      //连同对象一起销毁
+        }
     }
 
     //场景加载完成后分发事件

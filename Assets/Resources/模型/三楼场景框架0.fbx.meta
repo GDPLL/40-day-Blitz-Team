@@ -1,0 +1,461 @@
+fileFormatVersion: 2
+guid: CS4ati/+BShRE/Sb1dNF+row8kReM5yqYCx9i9i3l2RA9ttcXcvNa38=
+ModelImporter:
+  serializedVersion: 22361
+  internalIDToNameTable: []
+  externalObjects: {}
+  materials:
+    materialImportMode: 2
+    materialName: 0
+    materialSearch: 1
+    materialLocation: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    resampleCurves: 1
+    optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
+    motionNodeName: 
+    rigImportErrors: 
+    rigImportWarnings: 
+    animationImportErrors: 
+    animationImportWarnings: 
+    animationRetargetingWarnings: 
+    animationDoRetargetingWarnings: 0
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 1
+    aCLCompressionLevel: 3
+    aCLCurvePrecision: 0.01
+    aCLFastSampleMode: 1
+    animationRotationError: 0.5
+    animationPositionError: 0.5
+    animationScaleError: 0.5
+    animationWrapMode: 0
+    extraExposedTransformPaths: []
+    extraUserProperties: []
+    clipAnimations: []
+    isReadable: 0
+    tuanjieGIEnable: 0
+    tuanjieGIGenSDFFactor: 1
+    tuanjieGIGenSDFBias: 0.25
+    tuanjieGIDoubleSidedMode: 0
+    tuanjieGIGenFacetNums: 12
+  meshes:
+    lODScreenPercentages: []
+    globalScale: 1.59
+    meshCompression: 0
+    totalVerticesCount: 3402
+    totalTrianglesCount: 1800
+    addColliders: 0
+    useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 1
+    importVisibility: 1
+    importBlendShapes: 1
+    importCameras: 1
+    importLights: 1
+    nodeNameCollisionStrategy: 1
+    fileIdsGeneration: 2
+    swapUVChannels: 0
+    generateSecondaryUV: 0
+    useFileUnits: 1
+    keepQuads: 0
+    weldVertices: 1
+    bakeAxisConversion: 0
+    preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    meshOptimizationFlags: -1
+    indexFormat: 0
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15.000001
+    secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 1
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
+    secondaryUVPackMargin: 4
+    useFileScale: 1
+    strictVertexDataChecks: 0
+  virtualGeometry:
+    virtualGeometry: 0
+    useTransparent: 0
+    setVGForeachMesh: 0
+    isFirstUse: 1
+    virtualGeometrySettings:
+      generateGeometryBuffer: 0
+      surfaceCompensation: 0
+      allMeshUse: 1
+      ignoreSimpleMesh: 0
+      transformScaleState: 0
+      isPossibleOverflow: 0
+      hasBoneData: 0
+      isBoneCountOverflow: 0
+    virtualGeometryPlatformSettings:
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: DefaultVirtualGeometryPlatform
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: Standalone
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: iPhone
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: Android
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    selectedVGMeshes:
+    - index: 0
+      meshName: "\u67F1\u4F53.001"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 1
+      meshName: "\u67F1\u4F53.006"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 2
+      meshName: "\u67F1\u4F53.010"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 3
+      meshName: "\u67F1\u4F53.015"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 4
+      meshName: "\u7ACB\u65B9\u4F53.147"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 5
+      meshName: "\u7ACB\u65B9\u4F53.148"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 6
+      meshName: "\u7ACB\u65B9\u4F53.149"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 7
+      meshName: "\u7ACB\u65B9\u4F53.150"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 8
+      meshName: "\u7ACB\u65B9\u4F53.151"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 9
+      meshName: "\u7ACB\u65B9\u4F53.152"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 10
+      meshName: "\u7ACB\u65B9\u4F53.153"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 11
+      meshName: "\u7ACB\u65B9\u4F53.154"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 12
+      meshName: "\u7ACB\u65B9\u4F53.155"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 13
+      meshName: "\u7ACB\u65B9\u4F53.156"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 14
+      meshName: "\u7ACB\u65B9\u4F53.157"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 15
+      meshName: "\u7ACB\u65B9\u4F53.158"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 16
+      meshName: "\u7ACB\u65B9\u4F53.159"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 17
+      meshName: "\u7ACB\u65B9\u4F53.160"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 18
+      meshName: "\u7ACB\u65B9\u4F53.161"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 19
+      meshName: "\u7ACB\u65B9\u4F53.162"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 20
+      meshName: "\u7ACB\u65B9\u4F53.163"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 21
+      meshName: "\u7ACB\u65B9\u4F53.164"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 22
+      meshName: "\u7ACB\u65B9\u4F53.165"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 23
+      meshName: "\u7ACB\u65B9\u4F53.166"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 24
+      meshName: "\u7ACB\u65B9\u4F53.171"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 25
+      meshName: "\u7ACB\u65B9\u4F53.172"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 26
+      meshName: "\u7ACB\u65B9\u4F53.173"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 27
+      meshName: "\u7ACB\u65B9\u4F53.174"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 28
+      meshName: "\u7ACB\u65B9\u4F53.175"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 29
+      meshName: "\u7ACB\u65B9\u4F53.176"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 30
+      meshName: "\u7ACB\u65B9\u4F53.177"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 31
+      meshName: "\u7ACB\u65B9\u4F53.178"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 32
+      meshName: "\u82CF\u73CA\u5A1C.003"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    supportVGMeshes:
+    - index: 0
+      meshName: "\u67F1\u4F53.001"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 1
+      meshName: "\u67F1\u4F53.006"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 2
+      meshName: "\u67F1\u4F53.010"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 3
+      meshName: "\u67F1\u4F53.015"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 4
+      meshName: "\u7ACB\u65B9\u4F53.147"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 5
+      meshName: "\u7ACB\u65B9\u4F53.148"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 6
+      meshName: "\u7ACB\u65B9\u4F53.149"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 7
+      meshName: "\u7ACB\u65B9\u4F53.150"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 8
+      meshName: "\u7ACB\u65B9\u4F53.151"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 9
+      meshName: "\u7ACB\u65B9\u4F53.152"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 10
+      meshName: "\u7ACB\u65B9\u4F53.153"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 11
+      meshName: "\u7ACB\u65B9\u4F53.154"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 12
+      meshName: "\u7ACB\u65B9\u4F53.155"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 13
+      meshName: "\u7ACB\u65B9\u4F53.156"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 14
+      meshName: "\u7ACB\u65B9\u4F53.157"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 15
+      meshName: "\u7ACB\u65B9\u4F53.158"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 16
+      meshName: "\u7ACB\u65B9\u4F53.159"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 17
+      meshName: "\u7ACB\u65B9\u4F53.160"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 18
+      meshName: "\u7ACB\u65B9\u4F53.161"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 19
+      meshName: "\u7ACB\u65B9\u4F53.162"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 20
+      meshName: "\u7ACB\u65B9\u4F53.163"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 21
+      meshName: "\u7ACB\u65B9\u4F53.164"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 22
+      meshName: "\u7ACB\u65B9\u4F53.165"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 23
+      meshName: "\u7ACB\u65B9\u4F53.166"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 24
+      meshName: "\u7ACB\u65B9\u4F53.171"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 25
+      meshName: "\u7ACB\u65B9\u4F53.172"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 26
+      meshName: "\u7ACB\u65B9\u4F53.173"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 27
+      meshName: "\u7ACB\u65B9\u4F53.174"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 28
+      meshName: "\u7ACB\u65B9\u4F53.175"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 29
+      meshName: "\u7ACB\u65B9\u4F53.176"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 30
+      meshName: "\u7ACB\u65B9\u4F53.177"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 31
+      meshName: "\u7ACB\u65B9\u4F53.178"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 32
+      meshName: "\u82CF\u73CA\u5A1C.003"
+      lodLevel: 0
+      meshGeometryBuffer: 0
+  tangentSpace:
+    normalSmoothAngle: 60
+    normalImportMode: 0
+    tangentImportMode: 3
+    normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  referencedClips: []
+  importAnimation: 1
+  overrideDefaultPose: 0
+  humanDescription:
+    serializedVersion: 3
+    human: []
+    skeleton: []
+    namedPoseList:
+    - name: Default
+      skeleton: []
+    armTwist: 0.5
+    foreArmTwist: 0.5
+    upperLegTwist: 0.5
+    legTwist: 0.5
+    armStretch: 0.05
+    legStretch: 0.05
+    feetSpacing: 0
+    globalScale: 0.015899999
+    rootMotionBoneName: 
+    defaultPoseIndex: -1
+    hasTranslationDoF: 0
+    hasExtraRoot: 0
+    skeletonHasParents: 1
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  autoGenerateAvatarMappingIfUnspecified: 1
+  animationType: 2
+  humanoidOversampling: 1
+  avatarSetup: 0
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 1
+  importBlendShapeDeformPercent: 1
+  remapMaterialsIfMaterialImportModeIsNone: 0
+  additionalBone: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

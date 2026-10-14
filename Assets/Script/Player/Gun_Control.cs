@@ -1,30 +1,31 @@
+using System;
 using UnityEngine;
 
 public class Gun_Control : MonoBehaviour
 {
     public Transform shootPoint;   // 枪口
     public LineRenderer line;      // 射线显示
-    public AudioSource audioSource;   // 音源
+
+    // 表现层事件，音效等外部注册
+    public event Action Shoot_event;    //开火一次
+    public event Action Empty_event;    //空仓，没子弹扣扳机
+    public event Action Raise_event;    //举枪
+    public event Action Lower_event;    //放枪
+    public event Action Shoulder_event;    //据枪
+    public event Action Ads_event;      //瞄准
+    public event Action Reload_event;   //换弹
 
     public int ammo = 30;          // 弹药
     public int maxAmmo = 30;       // 弹匣容量
-    public float fireRate = 10f;   // 射速
+    public float fireRate = 900f;   // 射速，发每分钟
     public float range = 100f;     // 射程
     public int damage = 34;        // 单发伤害
 
+    // 两发之间的最小间隔
+    public float FireInterval => 60f / fireRate;
+
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
-
-    [Header("后坐力")]
-    public float recoilX = 0.03f;            // 随机后坐力横向幅度
-    public float recoilY = 0.06f;            // 随机后坐力上抬幅度
-    public float maxRecoil = 0.5f;           // 后坐力上限
-    public float recoilRecoverFactor = 2f;   // 后坐力恢复系数
-
-    // 后坐力状态
-    Vector2 recoil;                          // 当前累计后坐力
-    float recoilRecoverSpeed;                // 恢复速率
-    float originalRecoilX, originalRecoilY;  // 原始后坐力
 
     [Header("举枪 / 收枪")]
     public float aimSmooth = 10f;            // 插值速度
@@ -33,37 +34,36 @@ public class Gun_Control : MonoBehaviour
     // 计时
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
-    float lastShotTime;            // 上次射击时间
+    bool isRaised;                 // 举枪中
 
     // 一种姿态对应的一组参数
-    // 外圈、内圈与增长速度
+    // 外圈、内圈、增长速度与距离衰减
     [System.Serializable]
     public class AimProfile
     {
-        public float outerAngle = 20f;   // 外圈
-        public float innerAngle = 5f;   // 内圈
-        public float growSpeed = 8f;   // 精度增长速度
+        public float outerAngle = 20f;    // 外圈
+        public float innerAngle = 5f;     // 内圈
+        public float growSpeed = 8f;      // 精度增长速度
+        public float nearDistance = 5f;   // 最近参考距离
+        public float farDistance = 40f;   // 最远参考距离
+        public float farFactor = 0.15f;   // 远距离系数
 
-        public AimProfile(float outer, float inner, float speed)
+        public AimProfile(float outer, float inner, float speed,
+            float near, float far, float factor)
         {
             outerAngle = outer;
             innerAngle = inner;
             growSpeed = speed;
+            nearDistance = near;
+            farDistance = far;
+            farFactor = factor;
         }
     }
 
     [Header("精度：各姿态参数")]
-    AimProfile hipAim = new AimProfile(15f, 5f, 4f);   // 腰射
-    AimProfile shoulderAim = new AimProfile(20f, 5f, 2f);   // 据枪
-    AimProfile adsAim = new AimProfile(20f, 5f, 0.3f);   // 开镜
-
-    [Header("瞄准")]
-    public float aimAlignAngle = 8f;   // 朝向与准星最大夹角
-
-    [Header("精度：距离影响")]
-    public float nearDistance = 5f;      // 满速距离
-    public float farDistance = 40f;     // 最低速距离
-    public float farFactor = 0.15f;   // 远距离系数
+    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f);       // 腰射
+    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f);   // 据枪
+    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f);       // 开镜
 
     [Header("精度：移动姿态系数")]
     public float moveFactorSquatStand = 1.3f;   // 蹲下
@@ -82,6 +82,8 @@ public class Gun_Control : MonoBehaviour
     bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
     Vector3 aimDirection;    // 准星方向
+    ulong ownerId;           // 持有者编号
+    Vector3 aimOrigin;       // 准星射线起点
 
     float currentAngle;                                       // 当前精度圈
     public float CurrentAngle => currentAngle;                // 对外读取
@@ -104,15 +106,37 @@ public class Gun_Control : MonoBehaviour
         aimDirection = dir.normalized;
     }
 
-    // 朝向是否对准准星
+    // 注入准星射线起点
+    public void SetAimOrigin(Vector3 origin)
+    {
+        aimOrigin = origin;
+    }
+
+     // 朝向是否对准准星
     bool AimAligned()
-        => Vector3.Angle(aimDirection, transform.root.forward) <= aimAlignAngle;
+    {
+        Vector3 aim = aimDirection;
+        aim.y = 0f;
+
+        Vector3 body = transform.root.forward;
+        body.y = 0f;
+
+        // 允许偏差取当前外圈
+        return Vector3.Angle(aim, body) <= CurrentProfile().outerAngle * 0.5f;
+    }
 
     // 设置姿态，shoulder为据枪，adsOn为开镜
     public void SetAimState(bool shoulder, bool adsOn)
     {
+        if (aimingShoulder == shoulder && aimingAds == adsOn) return;   //姿态没变
+
+        // 姿态切换提示音
+        if (shoulder && !aimingShoulder) Shoulder_event?.Invoke();
+        if (adsOn && !aimingAds) Ads_event?.Invoke();
+
         aimingShoulder = shoulder;
         aimingAds = adsOn;
+        currentAngle = CurrentProfile().outerAngle;   //立刻重置到新外圈
     }
 
     // 设置移动状态
@@ -139,43 +163,32 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 注入完成
-    public void Gun_Control_Init()
+    public void Gun_Control_Init(ulong id)
     {
         if (line == null) line = GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
-        originalRecoilX = recoilX;   // 记录原始后坐力
-        originalRecoilY = recoilY;
 
+        ownerId = id;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
 
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
 
-    // 物理帧逻辑，计时与后坐力恢复
+    // 物理帧逻辑，射速计时与精度更新
     public void Gun_Fixed_Date()
     {
         fireTimer += Time.deltaTime;
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
-
-        // 后坐力恢复
-        if (recoil.sqrMagnitude > 0.0001f)
-            recoil = Vector2.MoveTowards(recoil, Vector2.zero, recoilRecoverSpeed * Time.deltaTime);
-        else
-            recoil = Vector2.zero;
     }
 
-    // 物理帧表现，射线与音效计时
+    // 物理帧表现，射线显示计时
     public void Gun_Fixed_Performance()
     {
         // 射线短暂显示后消失
         lineTimer -= Time.deltaTime;
         if (line != null && lineTimer <= 0f) line.enabled = false;
-
-        // 长时间未射击停止音效
-        if (audioSource != null && audioSource.isPlaying && Time.time - lastShotTime > 0.2f)
-            audioSource.Stop();
     }
 
     // 按目标与移动状态更新精度
@@ -184,8 +197,10 @@ public class Gun_Control : MonoBehaviour
         AimProfile p = CurrentProfile();
 
         // 判定目标是否还在当前外圈
-        targetInRing = hasTarget &&
-            Vector3.Angle(aimDirection, targetPos - MuzzlePosition) <= p.outerAngle * 0.5f;   //外圈按直径算
+        float distance = (targetPos - MuzzlePosition).magnitude;
+        Vector3 toTarget = targetPos - aimOrigin;
+        targetInRing = hasTarget && (distance < 1f ||
+            Vector3.Angle(aimDirection, toTarget) <= p.outerAngle * 0.5f);   //外圈按直径算
 
         // 离开范围或朝向没对准准星都不收圈
         if (!targetInRing || !AimAligned())
@@ -194,8 +209,7 @@ public class Gun_Control : MonoBehaviour
             return;
         }
 
-        float distance = (targetPos - MuzzlePosition).magnitude;
-        float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance);
+        float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance, p);
         currentAngle = Mathf.MoveTowards(currentAngle, p.innerAngle, speed * dt);   // 收缩到内圈
     }
 
@@ -209,42 +223,38 @@ public class Gun_Control : MonoBehaviour
     }
 
     // 距离系数
-    float DistanceFactor(float d)
-        => Mathf.Lerp(1f, farFactor, Mathf.InverseLerp(nearDistance, farDistance, d));
+    float DistanceFactor(float d, AimProfile p)
+        => Mathf.Lerp(1f, p.farFactor, Mathf.InverseLerp(p.nearDistance, p.farDistance, d));
 
     // 精度圈内随机偏移
     Vector2 GetSpreadOffset()
-        => Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
+        => UnityEngine.Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
     // 开火逻辑，返回是否成功
     public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
-        out bool isHit, out Vector3 hitPoint, out Vector3 hitNormal)
+        out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)
     {
         origin = MuzzlePosition;
         dir = transform.forward;
         isHit = false;
+        hitTarget = false;
         hitPoint = Vector3.zero;
         hitNormal = Vector3.up;
 
         SetAimDirection(aimDir);      // 更新准星方向
 
         if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
-        if ((fireTimer >= 1f / fireRate && ammo > 0) == false) return false;   // 射速与弹药判定
+        if ((fireTimer >= FireInterval && ammo > 0) == false) return false;    // 射速与弹药判定
 
         ammo--;
         fireTimer = 0f;
 
-        // 累计后坐力
-        recoil += new Vector2(Random.Range(-recoilX, recoilX), Random.Range(0f, recoilY));
-        recoil = Vector2.ClampMagnitude(recoil, maxRecoil);   // 限制后坐力上限
-        // 计算恢复速率
-        recoilRecoverSpeed = recoil.magnitude / (recoilRecoverFactor / fireRate);
+        // 精度圈散布
+        Vector2 offset = GetSpreadOffset();
 
-        // 后坐力叠加精度散布
-        Vector2 offset = recoil + GetSpreadOffset();
-
-        // 锁定圈内时子弹直指目标
-        dir = targetInRing ? (targetPos - origin).normalized : aimDir.normalized;
+        // 锁定直指目标，反向用准星
+        Vector3 toTarget = targetPos - origin;
+        dir = (targetInRing && Vector3.Dot(toTarget, aimDir) > 0f) ? toTarget.normalized : aimDir.normalized;
         dir += transform.right * offset.x + transform.up * offset.y;
         dir.Normalize();
 
@@ -255,8 +265,16 @@ public class Gun_Control : MonoBehaviour
             hitPoint = hit.point;
             hitNormal = hit.normal;
 
-            Idamage damageable = hit.collider.GetComponent<Idamage>();
-            if (damageable != null) damageable.Takedamage(damage);
+            // 不打自己
+            if (!hit.collider.transform.IsChildOf(transform.root))
+            {
+                Idamage damageable = hit.collider.GetComponent<Idamage>();
+                if (damageable != null)
+                {
+                    hitTarget = true;
+                    damageable.Takedamage(damage, ownerId, transform.root.position);
+                }
+            }
         }
 
         return true;    // 本次已开火
@@ -269,13 +287,11 @@ public class Gun_Control : MonoBehaviour
         Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
     }
 
-    // 本机开火表现，枪口特效与音效
+    // 本机开火表现，枪口特效与开火事件
     public void Gun_Shoot_Local_Performance(Vector3 origin, Vector3 dir)
     {
-        lastShotTime = Time.time;   //记录本次开火时刻
-
-        // 播放射击音效
-        if (audioSource != null && !audioSource.isPlaying) audioSource.Play();
+        // 通知外部播放表现，音效等
+        Shoot_event?.Invoke();
 
         // 在开火点生成对象
         if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
@@ -312,26 +328,31 @@ public class Gun_Control : MonoBehaviour
     // 换弹逻辑，弹匣补满
     public void Gun_Reload_Date()
     {
+        if (ammo == maxAmmo) return;    //满弹不换，防重复触发
+
         ammo = maxAmmo;
+        Reload_event?.Invoke();     //换弹音效
     }
 
     // 是否有弹药
     public bool HasAmmo() => ammo > 0;
 
+    // 空仓，没子弹扣扳机
+    public void Gun_Empty_Date() => Empty_event?.Invoke();
+
     // 目标是否在射程内
     public bool InRange(Transform target) =>
         target != null && Vector3.Distance(transform.position, target.position) <= range;
 
-    // 切换后坐力减免，on为真时减少 70%
-    public void SetRecoilReduction(bool on)
-    {
-        recoilX = originalRecoilX * (on ? 0.3f : 1f);
-        recoilY = originalRecoilY * (on ? 0.3f : 1f);
-    }
-
     // 举枪朝向瞄准落点
     public void Gun_Aim_Performance(Vector3 aimPoint)
     {
+        if (!isRaised)
+        {
+            isRaised = true;
+            Raise_event?.Invoke();      //举枪
+        }
+
         if (aimPoint == Vector3.zero) return;   //无落点不转向
 
         Vector3 dir = aimPoint - transform.position;
@@ -348,6 +369,12 @@ public class Gun_Control : MonoBehaviour
     // 收枪
     public void Gun_AimDown_Performance()
     {
+        if (isRaised)
+        {
+            isRaised = false;
+            Lower_event?.Invoke();      //放枪
+        }
+
         transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
     }
 }
