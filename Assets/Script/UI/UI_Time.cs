@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 using TMPro;
-using UnityEngine;
 
 // 游戏时间与事件提示UI，由 Player_Main 驱动
 public class UI_Time : MonoBehaviour

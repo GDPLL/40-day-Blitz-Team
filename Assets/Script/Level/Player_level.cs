@@ -14,6 +14,9 @@ public class Player_level : MonoBehaviour
     public int gasDamage = 5;               //毒气每秒伤害
     public float gameTime;    //关卡已进行时间
 
+    [Header("测试")]
+    public bool testStop;    //关闭关卡进程
+
     //时间节点事件
     public event Action Time30s_event;      //30秒
     public event Action Time3m_event;       //3分钟
@@ -153,6 +156,7 @@ public class Player_level : MonoBehaviour
     public void Player_level_FixUpdate()
     {
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;   //只有主机
+        if (testStop) return;   //测试关闭进程，时间停在当前
 
         gameTime += Time.fixedDeltaTime;
 

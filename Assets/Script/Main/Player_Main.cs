@@ -21,11 +21,15 @@ public class Player_Main : NetworkBehaviour
     public UI_Player uI_Player;                     //本机弹药血量UI
     public UI_curtain uI_Curtain;                   //UI幕布
     public UI_Time uI_Time;                         //关卡时间UI
+    public UI_Rank uI_Rank;                         //本机积分排行榜
     public UI_CallATime_Text uI_CallATime;           //通讯设备UI
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
     bool gameOver;                      // 游戏已结束
+    //排行榜排序缓存
+    int[] rankNumbers = new int[4];     //玩家编号
+    int[] rankScores = new int[4];      //积分
     public GameObject playerPrefab;     // 角色预制体    
     public Vector3 startPos;            // 出生起点
     public Transform[] Num1respawnPoints;   // 复活点，按玩家编号
@@ -66,6 +70,9 @@ public class Player_Main : NetworkBehaviour
         // 通讯设备时间与播报
         if (uI_CallATime != null && Player_level.Instance != null)
             uI_CallATime.UI_CallATime_Update(Level_Time);
+
+        // 结算积分榜
+        Rank_Show();
 
 
         // 本机表现层驱动
@@ -479,6 +486,40 @@ public class Player_Main : NetworkBehaviour
         return null;
     }
 
+    // 结算积分榜，游戏结束才显示
+    void Rank_Show()
+    {
+        if (uI_Rank == null) return;
+
+        if (!gameOver)
+        {
+            uI_Rank.UI_Rank_Hide();
+            return;
+        }
+
+        if (rankNumbers.Length < oplayer_Controls.Count)
+        {
+            rankNumbers = new int[oplayer_Controls.Count];
+            rankScores = new int[oplayer_Controls.Count];
+        }
+
+        int rankCount = 0;
+
+        // 取各玩家编号与积分
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null) continue;      //退出的玩家
+
+            rankNumbers[rankCount] = control.Player_Number;
+            rankScores[rankCount] = control.Score;
+            rankCount++;
+        }
+
+        Score_Rank.Score_Rank_Sort_Date(rankNumbers, rankScores, rankCount);
+        uI_Rank.UI_Rank_Show(rankNumbers, rankScores, rankCount);
+    }
+
     // 近处落点触发本机压制
     public void Suppress_Check_Local(Vector3 hitPoint)
     {
@@ -575,6 +616,13 @@ public class Player_Main : NetworkBehaviour
             Debug.LogError("Player_Main|InitScenceClientRpc|UI_CallATime 为空");
         }
         else uI_CallATime.UI_CallATime_Init();
+
+        // 积分排行榜
+        if (uI_Rank == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Rank 为空");
+        }
+        else uI_Rank.UI_Rank_Init();
 
         isInit = true;
 

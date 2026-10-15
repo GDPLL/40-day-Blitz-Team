@@ -29,12 +29,14 @@ public class Object_System : MonoBehaviour , Idamage
     // 受击事件，携带攻击者位置
     public event Action<Vector3> Damage_event;
 
-    // 扣血
-    public void Takedamage(int hit, ulong killerId, Vector3 fromPos)
+    // 扣血并返回实际伤害与击杀
+    public int Takedamage(int hit, ulong killerId, Vector3 fromPos, out bool killed)
     {
+        int before = HP;
         HP = Mathf.Clamp(HP - hit, 0, MaxHp);
         KillerId = killerId;
         healTimer = 0f;     // 受击打断回血
+        killed = HP <= 0;
 
         // 编辑器下打印受击
 #if UNITY_EDITOR
@@ -42,6 +44,7 @@ public class Object_System : MonoBehaviour , Idamage
 #endif
 
         Damage_event?.Invoke(fromPos);
+        return before - HP;     //实际扣血,残血不溢出
     }
 
     // 重置血量
@@ -62,7 +65,7 @@ public class Object_System : MonoBehaviour , Idamage
         if (lastVelocityY < 0f && velocityY <= 0f && accel > fallAccel)
         {
             int damage = (int)((accel - fallAccel) * fallDamageRate);
-            if (damage > 0) Takedamage(damage, 999, new Vector3());
+            if (damage > 0) Takedamage(damage, 999, new Vector3(), out _);
         }
 
         lastVelocityY = velocityY;
