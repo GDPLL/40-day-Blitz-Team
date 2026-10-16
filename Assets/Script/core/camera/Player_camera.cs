@@ -34,6 +34,7 @@ public class Player_camera : MonoBehaviour
     [Header("相机震动")]
     public float shakeDuration = 0.1f;   // 震动持续时间
     public float shakeMagnitude = 0.1f;  // 震动幅度
+    public float hurtShakeScale = 0.6f;  // 受击震动倍数
     bool isShaking;                      // 是否震动中
     float shakeTimer;                    // 震动计时
     Vector3 worldOffset;                 // 世界偏移
@@ -68,6 +69,42 @@ public class Player_camera : MonoBehaviour
     public float modeSwitchSmoothTime = 0.15f;   // 平滑时间
     Vector3 currentLocalOffset;                  // 当前局部偏移
     Vector3 localVelocity;                       // 平滑速度缓存
+
+    [Header("信号花屏")]
+    public float breakTime = 0.12f;          // 断裂段时长
+    public float holdTime = 0.2f;            // 保持段最短时长
+    public float recoverTime = 0.5f;         // 恢复段时长
+    public float strongTime = 0.2f;          // 恢复段强效时长
+    public float holdStrength = 0.8f;        // 保持段强度
+    public float recoverStrength = 0.85f;    // 恢复段起点强度
+    public float outStrength = 0.5f;         // 淘汰后强度
+    public float noiseMax = 0.85f;           // 雪花峰值
+    public float tearMax = 0.12f;            // 撕裂位移峰值，屏幕宽比例
+    public float chromaMax = 6f;             // 通道分离峰值，像素
+    public float greyMax = 0.7f;             // 去色峰值
+    public float brightMax = 0.18f;          // 亮度抖动峰值
+    public float blockMax = 0.6f;            // 马赛克峰值
+    public float rollPeriod = 1.6f;          // 滚动带周期，秒
+    public float seedRate = 12f;             // 花屏换帧频率，次每秒
+
+    [Header("信号花屏细节")]
+    public float scanline = 0.18f;           // 扫描线强度
+    public float bandBright = 0.35f;         // 滚动带亮度
+    public float flickerSpeed = 30f;         // 亮度抖动频率
+    public float flashChance = 0.05f;        // 白闪概率
+    public float flashBright = 0.2f;         // 白闪亮度
+    public float blockChance = 0.2f;         // 马赛克概率
+
+    Material signalMat;        // 花屏材质
+    bool signalReady;          // 花屏就绪
+    Signal_Phase signalPhase;  // 当前花屏阶段
+    float signalTimer;         // 阶段计时
+    int lastSignalHp = -1;     // 上帧血量
+    float signalSeed;          // 花屏随机种子
+    float seedTimer;           // 换帧计时
+
+    // 花屏阶段
+    enum Signal_Phase { None, Break, Hold, Recover, Out }
 
     NetworkObject pNet;   // 联网对象
     Camera cam;           // 相机组件
@@ -106,6 +143,18 @@ public class Player_camera : MonoBehaviour
         rotationY = transform.rotation.y;
         currentLocalOffset = new Vector3(0, 0, -radius) + startOffset;   // 初始为常规姿态
         cameraDistance = currentLocalOffset.magnitude;
+
+        // 信号花屏材质
+        Shader signalShader = Resources.Load<Shader>("Signal_Glitch");
+        if (signalShader == null)
+        {
+            Debug.LogError("Player_camera|Player_camera_Start|未找到 Signal_Glitch 着色器");
+        }
+        else
+        {
+            signalMat = new Material(signalShader);
+            signalReady = true;
+        }
 
         Debug.Log("Player_camera|Player_camera_Start|完成初始化");
     }
@@ -182,18 +231,24 @@ public class Player_camera : MonoBehaviour
         transform.localRotation = quat * Quaternion.Euler(suppressRotOffset);
     }
 
-    // 触发一次震动偏移
-    void ShakeOffset()
+    // 触发一次震动偏移，scale 为幅度倍数
+    void ShakeOffset(float scale = 1f)
     {
         isShaking = true;
         shakeTimer = 0;
-        shakeOffset = Random.insideUnitSphere * shakeMagnitude;
+        shakeOffset = Random.insideUnitSphere * shakeMagnitude * scale;
     }
 
     // 开火震动
     public void Camera_Shoot_Performance_Local()
     {
         ShakeOffset();
+    }
+
+    // 受击震动
+    public void Camera_Hurt_Performance_Local()
+    {
+        ShakeOffset(hurtShakeScale);
     }
 
     // 近处落点累加压制，参数为落点
@@ -275,5 +330,121 @@ public class Player_camera : MonoBehaviour
     {
         isShoulderAim = shoulder;
         isAds = ads;
+    }
+
+    // 信号花屏，hp 为血量 isOut 为淘汰
+    public void Camera_Signal_Performance_Local(int hp, bool isOut)
+    {
+        if (!signalReady) return;
+
+        // 血量归零开始断裂
+        if (hp <= 0 && lastSignalHp > 0) Signal_Switch(Signal_Phase.Break);
+
+        // 淘汰后不再恢复
+        if (isOut && signalPhase != Signal_Phase.Out) Signal_Switch(Signal_Phase.Out);
+
+        lastSignalHp = hp;
+
+        Signal_Timer(Time.deltaTime);
+        Signal_Params(Time.deltaTime);
+    }
+
+    // 推进花屏阶段，dt 为帧时间
+    void Signal_Timer(float dt)
+    {
+        if (signalPhase == Signal_Phase.None || signalPhase == Signal_Phase.Out) return;
+
+        signalTimer += dt;
+
+        // 断裂结束进入保持
+        if (signalPhase == Signal_Phase.Break && signalTimer >= breakTime) Signal_Switch(Signal_Phase.Hold);
+
+        // 已复活且保持够久进入恢复
+        if (signalPhase == Signal_Phase.Hold && lastSignalHp > 0 && signalTimer >= holdTime)
+            Signal_Switch(Signal_Phase.Recover);
+
+        // 恢复结束关闭花屏
+        if (signalPhase == Signal_Phase.Recover && signalTimer >= recoverTime) Signal_Switch(Signal_Phase.None);
+    }
+
+    // 切换花屏阶段
+    void Signal_Switch(Signal_Phase next)
+    {
+        signalPhase = next;
+        signalTimer = 0f;
+    }
+
+    // 按阶段写材质参数，dt 为帧时间
+    void Signal_Params(float dt)
+    {
+        float strength;
+        float band = 0f;
+
+        switch (signalPhase)
+        {
+            case Signal_Phase.Break:
+                strength = 1f;
+                break;
+
+            case Signal_Phase.Hold:
+                strength = holdStrength;
+                band = 1f;
+                break;
+
+            case Signal_Phase.Recover:
+                // 恢复段快落，只留轻微残余
+                float t = Mathf.Clamp01(signalTimer / recoverTime);
+                strength = recoverStrength * (1f - t) * (1f - t);
+                band = t < strongTime / recoverTime ? 1f : 0f;
+                break;
+
+            case Signal_Phase.Out:
+                strength = outStrength;
+                band = 1f;
+                break;
+
+            default:
+                return;
+        }
+
+        // 换帧随机种子
+        seedTimer += dt;
+        if (seedTimer >= 1f / seedRate)
+        {
+            seedTimer = 0f;
+            signalSeed = Random.value * 100f;
+        }
+
+        // 亮度抖动与偶发闪白
+        float flicker = Mathf.PerlinNoise(Time.time * flickerSpeed, signalSeed) * 2f - 1f;
+        float flash = Random.value < flashChance ? 1f : 0f;
+        float bright = brightMax * strength * flicker + flashBright * strength * flash;
+
+        // 马赛克只在部分帧出现
+        float blockGate = Random.value < blockChance ? 1f : 0f;
+
+        signalMat.SetFloat("_Noise", noiseMax * strength);
+        signalMat.SetFloat("_Tear", tearMax * strength);
+        signalMat.SetFloat("_Chroma", chromaMax * strength);
+        signalMat.SetFloat("_Grey", greyMax * strength);
+        signalMat.SetFloat("_Bright", bright);
+        signalMat.SetFloat("_Scanline", scanline);
+        signalMat.SetFloat("_BandBright", bandBright);
+        signalMat.SetFloat("_Block", blockMax * strength * blockGate);
+        signalMat.SetFloat("_Band", band * strength);
+        signalMat.SetFloat("_Roll", Mathf.Repeat(Time.time / rollPeriod, 1f));
+        signalMat.SetFloat("_Seed", signalSeed);
+    }
+
+    // 相机渲染后叠花屏
+    void OnRenderImage(RenderTexture src, RenderTexture dst)
+    {
+        if (!signalReady || signalPhase == Signal_Phase.None)
+        {
+            Graphics.Blit(src, dst);
+            return;
+        }
+
+        Graphics.Blit(src, dst, signalMat);
     }
 }

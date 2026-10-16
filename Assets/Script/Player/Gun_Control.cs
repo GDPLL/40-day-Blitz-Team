@@ -31,6 +31,15 @@ public class Gun_Control : MonoBehaviour
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
 
+    [Header("命中爆浆")]
+    public int bloodCount = 26;             // 每次命中粒子数
+    public float bloodLife = 1.2f;          // 粒子存活时长，秒
+    public float bloodSpeed = 4.5f;         // 喷射速度，米每秒
+    public float bloodSize = 0.16f;         // 粒子尺寸，米
+    public float bloodSpread = 38f;         // 喷射锥角，度
+    public Color bloodColor = new Color(0.62f, 0.05f, 0.05f);   // 血色
+    ParticleSystem bloodTemplate;           // 爆浆模板
+
     [Header("举枪 / 收枪")]
     public float aimSmooth = 10f;            // 插值速度
     Quaternion originalLocalRot;             // 初始局部旋转
@@ -191,7 +200,70 @@ public class Gun_Control : MonoBehaviour
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
 
+        Blood_Template_Init();
+
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
+    }
+
+    // 建爆浆粒子模板，隐藏备用
+    void Blood_Template_Init()
+    {
+        Texture2D tex = Resources.Load<Texture2D>("爆浆/血点");
+        Shader shader = Resources.Load<Shader>("爆浆/Blood_Particle");
+        if (tex == null || shader == null)
+        {
+            Debug.LogError("Gun_Control|Blood_Template_Init|爆浆资源缺失");
+            return;
+        }
+
+        GameObject go = new GameObject("BloodTemplate");
+        go.transform.SetParent(transform, false);
+        go.SetActive(false);
+
+        bloodTemplate = go.AddComponent<ParticleSystem>();
+
+        ParticleSystem.MainModule main = bloodTemplate.main;
+        main.loop = false;
+        main.playOnAwake = true;
+        main.startLifetime = bloodLife;
+        main.startSpeed = bloodSpeed;
+        main.startSize = bloodSize;
+        main.startColor = bloodColor;
+        main.gravityModifier = 0.8f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        ParticleSystem.EmissionModule emission = bloodTemplate.emission;
+        emission.enabled = false;       // 手动发射，不自动播
+
+        ParticleSystem.ShapeModule shape = bloodTemplate.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle = bloodSpread;
+        shape.radius = 0.04f;
+
+        Material mat = new Material(shader);
+        mat.mainTexture = tex;
+
+        ParticleSystemRenderer psRenderer = go.GetComponent<ParticleSystemRenderer>();
+        psRenderer.material = mat;
+        psRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+    }
+
+    // 命中敌人爆浆，dir 为弹道方向
+    public void Gun_Blood_Performance(Vector3 hitPoint, Vector3 dir)
+    {
+        if (bloodTemplate == null)
+        {
+            Debug.LogError("Gun_Control|Gun_Blood_Performance|爆浆模板为空");
+            return;
+        }
+
+        GameObject go = Instantiate(bloodTemplate.gameObject, hitPoint, Quaternion.LookRotation(-dir));
+        go.SetActive(true);
+
+        ParticleSystem ps = go.GetComponent<ParticleSystem>();
+        ps.Emit(bloodCount);
+
+        Destroy(go, bloodLife + 0.3f);
     }
 
     // 物理帧逻辑，射速计时与精度更新

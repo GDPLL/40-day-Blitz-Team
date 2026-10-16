@@ -103,6 +103,28 @@ public class Hit_Feedback_UI : MonoBehaviour
     float arcTimer;                       // 圆弧计时
     Sprite arcSprite;                     // 圆弧贴图
 
+    [Header("回血边缘")]
+    public float healPeak = 0.2f;         // 提示峰值透明度
+    public float healBreath = 0.25f;      // 呼吸频率，次每秒
+    public float healLife = 0.35f;        // 上升沿保持时长
+    public float healFade = 1.2f;         // 透明度过渡速度
+    public float healStart = 0.78f;       // 渐变起点，半屏比例
+    public float healRise = 5f;           // 单帧增量上限
+    public Color healColor = new Color(0.3f, 1f, 0.48f);   // 提示色
+    Image healEdge;                       // 回血边缘图
+    float healTimer;                      // 保持剩余
+    float healShow;                       // 当前透明度
+    int lastHealHp = -1;                  // 上次血量
+    Sprite edgeSprite;                    // 边缘贴图
+
+    static readonly Vector2[] MarkDirs =   // 四角方向
+    {
+        new Vector2(-1f, 1f), new Vector2(1f, 1f),
+        new Vector2(1f, -1f), new Vector2(-1f, -1f)
+    };
+
+    static readonly float[] MarkAngles = { -135f, 135f, 45f, -45f };   // 四角朝向
+
     // 初始化，绑定准星与相机
     public void Hit_Feedback_UI_Init(RectTransform uiFocus, Camera camera)
     {
@@ -138,6 +160,7 @@ public class Hit_Feedback_UI : MonoBehaviour
         MakeScoreText();
         MakeScoreAdds();
         damageArc = MakeArc();
+        healEdge = MakeHealEdge();
         isReady = true;
 
         Debug.Log("Hit_Feedback_UI|Hit_Feedback_UI_Init|完成初始化");
@@ -230,6 +253,20 @@ public class Hit_Feedback_UI : MonoBehaviour
 
         arcTimer = arcLife;
         SetArcAlpha(arcAlpha);
+    }
+
+    // 回血边缘，hp为当前血量，healCap为回血上限
+    public void Heal_Edge_Performance_Local(int hp, int healCap)
+    {
+        if (!isReady) return;
+
+        if (lastHealHp < 0) lastHealHp = hp;    //开局记录基准
+
+        int rise = hp - lastHealHp;
+        lastHealHp = hp;
+
+        // 回血上升沿才续期，挡复活大跳
+        if (rise > 0 && rise <= healRise && hp <= healCap) healTimer = healLife;
     }
 
     // 本机每帧刷新反馈与积分，score为当前积分
@@ -344,6 +381,14 @@ public class Hit_Feedback_UI : MonoBehaviour
             arcTimer -= Time.deltaTime;
             SetArcAlpha(arcAlpha * Mathf.Clamp01(arcTimer / arcLife));
         }
+
+        // 回血边缘呼吸脉动
+        if (healTimer > 0f) healTimer -= Time.deltaTime;
+        float healTarget = healTimer > 0f
+            ? healPeak * (0.6f + 0.4f * Mathf.Sin(Time.time * healBreath * Mathf.PI * 2f))
+            : 0f;
+        healShow = Mathf.MoveTowards(healShow, healTarget, healFade * Time.deltaTime);
+        SetHealAlpha(healShow);
     }
 
     // 显示伤害跳字，kill为是否击杀，hitCenter与hitSize为命中体包围盒
@@ -638,6 +683,37 @@ public class Hit_Feedback_UI : MonoBehaviour
         return img;
     }
 
+    // 生成回血边缘图，压在其余界面下
+    Image MakeHealEdge()
+    {
+        GameObject go = new GameObject("HealEdge", typeof(Image));
+        go.transform.SetParent(canvas.transform, false);
+        go.transform.SetAsFirstSibling();      // 底层，不挡HUD
+
+        Image img = go.GetComponent<Image>();
+        img.sprite = GetEdgeSprite();
+        img.color = new Color(healColor.r, healColor.g, healColor.b, 0f);
+        img.raycastTarget = false;
+        img.rectTransform.anchorMin = Vector2.zero;
+        img.rectTransform.anchorMax = Vector2.one;
+        img.rectTransform.offsetMin = Vector2.zero;
+        img.rectTransform.offsetMax = Vector2.zero;
+        go.SetActive(false);
+
+        return img;
+    }
+
+    // 设置边缘图透明度
+    void SetHealAlpha(float alpha)
+    {
+        Color c = healEdge.color;
+        c.a = alpha;
+        healEdge.color = c;
+
+        bool visible = alpha > 0.001f;   //显示阈值
+        if (healEdge.gameObject.activeSelf != visible) healEdge.gameObject.SetActive(visible);
+    }
+
     // 生成X贴图
     Sprite GetCrossSprite()
     {
@@ -692,5 +768,33 @@ public class Hit_Feedback_UI : MonoBehaviour
         tex.Apply();
         arcSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
         return arcSprite;
+    }
+
+    // 生成边缘贴图，中间透明四边渐亮
+    Sprite GetEdgeSprite()
+    {
+        if (edgeSprite != null) return edgeSprite;
+
+        int size = 256;
+        float half = size * 0.5f;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                // 归一化半径，1 落在四边中点
+                float rx = (x + 0.5f - half) / half;
+                float ry = (y + 0.5f - half) / half;
+                float r = Mathf.Sqrt(rx * rx + ry * ry);
+                float a = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(healStart, 1f, r));
+
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        }
+
+        tex.Apply();
+        edgeSprite = Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+        return edgeSprite;
     }
 }
