@@ -202,15 +202,19 @@ public class Gun_Control : MonoBehaviour
         // 换弹计时，走完才装填
         if (reloadTimer > 0f)
         {
-            reloadTimer -= Time.deltaTime;
-            if (reloadTimer <= 0f)
-            {
-                ammo = maxAmmo;
-                Arm_Rig_Date(true);     //恢复手臂IK
-            }
+            Gun_Reload_Tick(Time.deltaTime);
+            if (reloadTimer <= 0f) ammo = maxAmmo;
         }
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
+    }
+
+    // 换弹计时推进，客机本机预测用
+    public void Gun_Reload_Tick(float dt)
+    {
+        if (reloadTimer <= 0f) return;
+
+        reloadTimer -= dt;
     }
 
     // 物理帧表现，射线显示计时
@@ -384,7 +388,6 @@ public class Gun_Control : MonoBehaviour
         if (ammo == maxAmmo) return;    //满弹不换
 
         reloadTimer = reloadTime;
-        Arm_Rig_Date(false);        //松开手臂IK，让换弹动画自由播
         Reload_event?.Invoke();     //换弹音效
     }
 
@@ -392,11 +395,10 @@ public class Gun_Control : MonoBehaviour
     public void Gun_Reload_Cancel()
     {
         reloadTimer = 0f;
-        Arm_Rig_Date(true);
     }
 
     // 手臂IK开关，on为启用，按层序号取
-    void Arm_Rig_Date(bool on)
+    public void Arm_Rig_Date(bool on)
     {
         if (armRig == null) return;
         if (armRigLayer < 0 || armRigLayer >= armRig.layers.Count) return;

@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 // 玩家动画表现，状态位驱动
@@ -37,10 +36,9 @@ public class Player_animation : MonoBehaviour
         return new Vector2(x, y);
     }
 
-    // 按状态位同步动画参数
-    public void Player_animation_Show(ushort state)
+    // 按状态位同步动画参数，verticalSpeed为垂直速度
+    public void Player_animation_Show(ushort state, float verticalSpeed)
     {
-        string binary = Convert.ToString(state, 2);
         bool walk = (state & BitWalk) != 0;
         bool reload = (state & BitReload) != 0;
 
@@ -61,5 +59,8 @@ public class Player_animation : MonoBehaviour
         Vector2 move = (state & BitGun) != 0 && !reload ? UnPack_Move(state) : new Vector2(0f, 1f);
         animation.SetFloat("MoveX", move.x);
         animation.SetFloat("MoveY", move.y);
+
+        // 垂直速度，正升负降
+        animation.SetFloat("VerticalSpeed", verticalSpeed);
     }
 }

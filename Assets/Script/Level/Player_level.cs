@@ -33,7 +33,7 @@ public class Player_level : MonoBehaviour
     //节点时刻 30s 3m 3m10s 4m 5m 5m30s 9m
     readonly float[] nodeTime = { 30f, 180f, 190f, 240f, 300f, 330f, 540f };
     //节点毒气高度，0为不变
-    readonly float[] nodeGasY = { 0f, 45f, 0f, 95f, 120f, 165f, 0f };
+    readonly float[] nodeGasY = { -10f, 45f, 0f, 95f, 120f, 165f, 0f };
     //毒气粒子1-4
     public ParticleSystem[] gasParticle = new ParticleSystem[4];
     float gasHeight;                        //当前毒气高度

@@ -1334,6 +1334,7 @@ MonoBehaviour:
     nearDistance: 2
     farDistance: 15
     farFactor: 1
+    stableShots: 16
   shoulderAim:
     outerAngle: 16
     innerAngle: 2
@@ -1341,13 +1342,17 @@ MonoBehaviour:
     nearDistance: 6
     farDistance: 35
     farFactor: 1
+    stableShots: 5
   adsAim:
     outerAngle: 10
     innerAngle: 0.2
     growSpeed: 5
-    nearDistance: 30
+    nearDistance: 60
     farDistance: 500
     farFactor: 1
+    stableShots: 4
+  stableCost: 0.3
+  burstCost: 0.35
   moveFactorSquatStand: 1.3
   moveFactorStand: 1
   moveFactorSquatWalk: 0.7
@@ -1608,6 +1613,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   respawnIndex: 0
+  respawnSquatTime: 1.5
   isOnGround: 0
   isJumpDown: 0
   isMouse1Down: 0
@@ -1731,6 +1737,7 @@ MonoBehaviour:
   rollDelay: 0.8991
   rollTime: 0.5
   rollSquatScale: 0.5
+  deadSquatScale: 0.23
 --- !u!114 &2084833044355557849
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4209,12 +4216,7 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
-  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
-    are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform
-    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform
-    'mixamorig:LeftForeArm'\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform
-    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tand more ..."
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0

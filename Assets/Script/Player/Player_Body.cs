@@ -29,7 +29,8 @@ public class Player_Body : Character_Move
     public float rollSpeed = 9f;            // 翻滚最大速度
     public float rollDelay = 0.8991f;       // 翻滚施力延迟秒
     public float rollTime = 0.5f;           // 翻滚时长
-    public float rollSquatScale = 0.5f;     // 碰撞体高度缩放
+    public float rollSquatScale = 0.5f;     // 翻滚碰撞体比例
+    public float deadSquatScale = 0.23f;    // 死亡失重碰撞体比例
     Collider bodyCol;                       // 玩家碰撞体
     Vector3 colCenter;                      // 碰撞体原始中心
     float colHeight;                        // 碰撞体原始高度
@@ -167,13 +168,13 @@ public class Player_Body : Character_Move
         rb.AddForce(dir * rollForce, ForceMode.Impulse);
     }
 
-    // 碰撞体缩放，on为翻滚中
-    public void Body_Roll_Size(bool on)
+    // 碰撞体高度缩放，scale为比例
+    public void Body_Size_Date(float scale)
     {
         if (!(bodyCol is CapsuleCollider cap)) return;
 
-        cap.height = on ? colHeight * rollSquatScale : colHeight;
-        //cap.center = on ? colCenter * rollSquatScale : colCenter;
+        cap.height = colHeight * scale;
+        //cap.center = colCenter * scale;
     }
 
     // 按节奏沿移动方向施加推力

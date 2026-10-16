@@ -40,6 +40,7 @@ public class Player_Control : Character_Move
     public LayerMask enemyMask;      // 敌人层
     [Header("复活点")]
     public int respawnIndex;         // 复活点编号
+    public float respawnSquatTime = 0.23f;   // 复活倒地碰撞体保持秒
 
     //复活点编号，各端一致
     public int RespawnIndex => IsServer ? respawnIndex : netRespawnIndex.Value;
@@ -63,6 +64,9 @@ public class Player_Control : Character_Move
 
     //本地状态中转
     public bool isOnGround;  //在地面
+    bool isWeightLess;       //失重中
+    float bodyScale = 1f;    //碰撞体当前比例
+    float respawnSquatTimer; //复活倒地保持计时
     public bool isJumpDown;    //跳跃空格
     bool jumpRequest;          //本物理帧请求起跳
     public bool isMouse1Down;   //左键输入
@@ -87,6 +91,7 @@ public class Player_Control : Character_Move
     NetworkVariable<Vector3> netTargetPos = new NetworkVariable<Vector3>(); //锁定点
     NetworkVariable<bool> netHasTarget = new NetworkVariable<bool>();       //是否锁定
     NetworkVariable<float> netAimAngle = new NetworkVariable<float>();     //精度圈角度
+    NetworkVariable<float> netVerticalSpeed = new NetworkVariable<float>(); //垂直速度
     NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
     NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
     NetworkVariable<int> netRespawnIndex = new NetworkVariable<int>();      //复活点编号
@@ -289,6 +294,7 @@ public class Player_Control : Character_Move
         if (isDead || Is_Out) state |= Player_animation.BitDeath;
         if (rollTimer > 0f) state |= Player_animation.BitRoll;
         if (Is_Reload) state |= Player_animation.BitReload;    //换弹
+        if (isWeightLess) state |= Player_animation.BitWeightLess;    //失重
 
         // 移动方向取输入包，各端一致
         state |= Player_animation.Pack_Move(Con_player_HostNetworkEvent.Packet.move);
@@ -309,6 +315,7 @@ public class Player_Control : Character_Move
         if (RespawnWait > 0f || Is_Out) state |= Player_animation.BitDeath;
         if (rollTimer > 0f) state |= Player_animation.BitRoll;
         if (Is_Reload) state |= Player_animation.BitReload;    //换弹
+        if (isWeightLess) state |= Player_animation.BitWeightLess;    //失重
 
         // 落地与方向取本机数据
         if (isOnGround) state |= Player_animation.BitGround;
@@ -335,10 +342,15 @@ public class Player_Control : Character_Move
     {
         Player_Teleport_Date(position, rotation);
 
-        // 复活重置翻滚与碰撞体
+        // 复活重置翻滚，碰撞体保持倒地
         rollTimer = 0f;
         rollDelay = 0f;
-        if (Con_body != null) Con_body.Body_Roll_Size(false);
+        respawnSquatTimer = respawnSquatTime;
+        if (Con_body != null)
+        {
+            bodyScale = Con_body.deadSquatScale;
+            Con_body.Body_Size_Date(bodyScale);
+        }
 
         // 复活取消换弹
         if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Cancel();
@@ -483,6 +495,10 @@ public class Player_Control : Character_Move
         // 落地检测
         isOnGround = IsGrounded();
 
+        // 空中超致死速度算失重
+        isWeightLess = rigidbody != null &&
+            Con_ObjectSystem.WeightLess_Date(rigidbody.velocity.magnitude, isOnGround);
+
         // 本机坠地音效
         if (IsOwner && Con_player_Audio != null && rigidbody != null)
             Con_player_Audio.Land_Check(rigidbody.velocity.y, isOnGround);
@@ -515,6 +531,7 @@ public class Player_Control : Character_Move
         // 生命系统状态
         netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
         netAmmo.Value = Con_gun_Control.ammo;       //获取主机上各端玩家弹药
+        netVerticalSpeed.Value = rigidbody != null ? rigidbody.velocity.y : 0f;   //获取垂直速度
         Con_ObjectSystem.Object_System_Update();
 
         // 锁敌
@@ -538,6 +555,9 @@ public class Player_Control : Character_Move
         if (IsOwner && !IsServer && Con_input_Manage != null)
             Player_Control_Date_ClientFixedUpdate_Own(Con_input_Manage.LastPacket);
 
+        // 翻滚死亡失重共用碰撞体缩放
+        Body_Size_Date();
+
         if (!IsActive) return;
         if (isDead) return;     //等待复活不驱动
 
@@ -553,14 +573,16 @@ public class Player_Control : Character_Move
             Player_ReconcileClientRpc(transform.position, ps);
         }
 
-        // 坠落伤害，按垂直速度变化率算
-        if (rigidbody != null) Con_ObjectSystem.Fall_Damage_Date(rigidbody.velocity.y, Time.fixedDeltaTime);
-
         InputPacket packet = Con_player_HostNetworkEvent.Packet;   //纯数据来源
         // 计算移动数据
         Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !Is_Reload, isSquat);   //换弹只能走路
 
-        Con_body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速
+        Con_body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速，含落地检测
+
+        // 坠落伤害，按空中最大下落速度算
+        if (rigidbody != null)
+            Con_ObjectSystem.Fall_Damage_Date(rigidbody.velocity.y, Con_body.IsGrounded, Time.fixedDeltaTime);
+
         Con_gun_Control.Gun_Fixed_Date();
 
         // 起跳，每物理帧最多一次
@@ -582,7 +604,6 @@ public class Player_Control : Character_Move
                 rollDelay = Con_body.rollDelay;             //第二段延迟
                 rollTimer = Con_body.rollTime + rollDelay;
 
-                Con_body.Body_Roll_Size(true);
                 Con_body.Body_Roll_Date(rollDir, packet.viewDir);   //第一段立即施力
 
                 if (IsOwner && Con_player_Audio != null) Con_player_Audio.Roll_Show();
@@ -596,18 +617,37 @@ public class Player_Control : Character_Move
             if (rollDelay <= 0f) Con_body.Body_Roll_Date(rollDir, packet.viewDir);
         }
 
-        // 翻滚计时，结束还原碰撞体
-        if (rollTimer > 0f)
-        {
-            rollTimer -= Time.fixedDeltaTime;
-            if (rollTimer <= 0f) Con_body.Body_Roll_Size(false);
-        }
+        // 翻滚计时
+        if (rollTimer > 0f) rollTimer -= Time.fixedDeltaTime;
+
+
 
         // 输入施推力
         if (isWASDDowm && rollTimer <= 0f) Con_body.Body_Move();   //翻滚中不给移动力
 
         // 场景交互检测
         Player_Scene_Interaction_Date(GetComponent<Collider>());
+    }
+
+    // 翻滚死亡失重共用碰撞体缩放
+    void Body_Size_Date()   //主机调用
+    {
+        Body_Size_Date(isDead);
+    }
+
+    void Body_Size_Date(bool _isdead)   //客机本地调用
+    {
+        // 翻滚用翻滚比例，死亡失重倒地取更小比例
+        float scale = rollTimer > 0f ? Con_body.rollSquatScale : 1f;
+        if (_isdead || isWeightLess || respawnSquatTimer > 0f) scale = Con_body.deadSquatScale;
+
+        // 复活倒地保持计时
+        if (respawnSquatTimer > 0f) respawnSquatTimer -= Time.fixedDeltaTime;
+
+        if (bodyScale == scale) return;    //比例没变
+
+        bodyScale = scale;
+        Con_body.Body_Size_Date(scale);
     }
 
     // 场景交互检测，col为玩家碰撞体
@@ -673,8 +713,12 @@ public class Player_Control : Character_Move
     {
         ushort state = IsOwner ? PackLocalShowState() : netShowState.Value;   //本机用本地输入预测
 
-        // 动画
-        if (Con_player_Animation != null) Con_player_Animation.Player_animation_Show(state);
+        // 本机用本地垂直速度，其余读下发值
+        float verticalSpeed = IsOwner && rigidbody != null ? rigidbody.velocity.y : netVerticalSpeed.Value;
+
+        // 动画，垂直速度驱动失重与坠落
+        if (Con_player_Animation != null)
+            Con_player_Animation.Player_animation_Show(state, verticalSpeed);
 
         // 脚步与装备晃动
         if (Con_player_Audio != null) Con_player_Audio.Player_Audio_Show(state);
@@ -683,6 +727,9 @@ public class Player_Control : Character_Move
         if (!IsServer && Con_ObjectSystem != null) Con_ObjectSystem.HP = netHealth.Value;
 
         if (Con_gun_Control == null) return;
+
+        // 换弹期间松开手臂IK，各端按同步状态驱动
+        Con_gun_Control.Arm_Rig_Date((state & Player_animation.BitReload) == 0);
 
         // 弹药与瞄准数据同步到本地
         if (!IsServer)
@@ -712,7 +759,7 @@ public class Player_Control : Character_Move
         Con_gun_Control.Gun_Fixed_Performance();
     }
 
-    // 客机只本玩家物理帧更新，packet为本机输入
+    // 客户端每物理帧本机逻辑更新
     public void Player_Control_Date_ClientFixedUpdate_Own(InputPacket packet)
     {
         if (Con_body == null)
@@ -720,12 +767,22 @@ public class Player_Control : Character_Move
             Debug.LogError("Player_Control|Player_Control_Date_ClientFixedUpdate_Own|body 为空");
             return;
         }
+        // 翻滚死亡失重共用碰撞体缩放
+        Body_Size_Date(netRespawnWait.Value > 0f);
+
         if (netRespawnWait.Value > 0f) return;    //等待复活不驱动
 
         // 移动，与主机同一套逻辑
         Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !Is_Reload, isSquat);   //换弹只能走路
         Con_body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速
         isOnGround = Con_body.IsGrounded;
+
+        // 本机换弹计时
+        if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Tick(Time.fixedDeltaTime);
+
+        // 空中超致死速度算失重
+        isWeightLess = rigidbody != null &&
+            Con_ObjectSystem.WeightLess_Date(rigidbody.velocity.magnitude, isOnGround);
 
         // 本机坠地音效
         if (Con_player_Audio != null && rigidbody != null)
@@ -752,7 +809,6 @@ public class Player_Control : Character_Move
                 rollDelay = Con_body.rollDelay;             //第二段延迟
                 rollTimer = Con_body.rollTime + rollDelay;
 
-                Con_body.Body_Roll_Size(true);
                 Con_body.Body_Roll_Date(rollDir, packet.viewDir);   //第一段立即施力
 
                 if (Con_player_Audio != null) Con_player_Audio.Roll_Show();
@@ -766,12 +822,10 @@ public class Player_Control : Character_Move
             if (rollDelay <= 0f) Con_body.Body_Roll_Date(rollDir, packet.viewDir);
         }
 
-        // 翻滚计时，结束还原碰撞体
-        if (rollTimer > 0f)
-        {
-            rollTimer -= Time.fixedDeltaTime;
-            if (rollTimer <= 0f) Con_body.Body_Roll_Size(false);
-        }
+        // 翻滚计时
+        if (rollTimer > 0f) rollTimer -= Time.fixedDeltaTime;
+
+
 
         // 场景交互，索道等本机自己走
         Player_Scene_Interaction_Date(GetComponent<Collider>());
@@ -1032,6 +1086,7 @@ public class Player_Control : Character_Move
         Con_localInputEvent.Shoulder_event += OnShoulder;      //肩射
         Con_localInputEvent.Ads_event += OnAds;                //开镜
         Con_localInputEvent.Run_event += OnRun;                //奔跑
+        Con_localInputEvent.ReloadHeld_event += OnReloadHeld;  //换弹
         Con_localInputEvent.Squat_event += OnSquat;            //蹲下
         Con_localInputEvent.Roll_event += OnRoll;              //翻滚
     }
@@ -1049,6 +1104,7 @@ public class Player_Control : Character_Move
         Con_localInputEvent.Shoulder_event -= OnShoulder;
         Con_localInputEvent.Ads_event -= OnAds;
         Con_localInputEvent.Run_event -= OnRun;
+        Con_localInputEvent.ReloadHeld_event -= OnReloadHeld;
         Con_localInputEvent.Squat_event -= OnSquat;
         Con_localInputEvent.Roll_event -= OnRoll;
     }

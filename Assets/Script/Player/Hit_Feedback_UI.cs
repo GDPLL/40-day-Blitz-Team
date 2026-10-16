@@ -86,6 +86,7 @@ public class Hit_Feedback_UI : MonoBehaviour
     public float scoreAddSlide = 900f;       // 加分下滑速度
     public int scoreAddCount = 6;            // 加分池大小
     Color scoreAddColor = new Color(1f, 0.85f, 0.2f, 1f);   // 加分黄
+    Color deadColor = new Color(0.55f, 0.55f, 0.6f, 1f);    // 无效命中灰
     TextMeshProUGUI[] scoreAdds;             // 加分池
     float[] scoreAddTimers;                  // 加分计时
     float[] scoreAddY;                       // 加分当前Y
@@ -183,8 +184,8 @@ public class Hit_Feedback_UI : MonoBehaviour
         // 伤害跳字
         ShowJumpText(damage, kill, hitPoint, hitCenter, hitSize);
 
-        // 伤害分与击杀分分开提示
-        ShowScoreAdd(damage, scoreAddColor);
+        // 伤害分与击杀分分开提示，打尸体不加分转灰
+        ShowScoreAdd(damage, damage > 0 ? scoreAddColor : deadColor);
         if (kill) ShowScoreAdd(killScore, killColor);
     }
 
@@ -371,7 +372,7 @@ public class Hit_Feedback_UI : MonoBehaviour
         TextMeshProUGUI t = jumpTexts[i];
         t.text = damage.ToString();
         t.fontSize = kill ? jumpTextKillSize : jumpTextSize;
-        t.color = kill ? killColor : hitColor;
+        t.color = kill ? killColor : damage > 0 ? hitColor : deadColor;
         t.rectTransform.position = start;
         t.rectTransform.localScale = Vector3.one * 0.6f;
         t.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Random.Range(-jumpTextTilt, jumpTextTilt));
@@ -574,7 +575,7 @@ public class Hit_Feedback_UI : MonoBehaviour
             Debug.LogError("Hit_Feedback_UI|ShowScoreAdd|加分池未生成");
             return;
         }
-        if (delta <= 0) return;
+        if (delta < 0) return;    //零分也要提示
 
         int i = scoreAddIndex;
         scoreAddIndex = (scoreAddIndex + 1) % scoreAdds.Length;
