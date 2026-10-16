@@ -571,12 +571,20 @@ public class Player_Control : Character_Move
         // 相机跟随
         if (Con_player_camera != null) Con_player_camera.Camera_Follow_Performance_Local();
 
+        // 本机信号花屏
+        if (Con_player_camera != null && Con_ObjectSystem != null)
+            Con_player_camera.Camera_Signal_Performance_Local(Con_ObjectSystem.HP, Is_Out);
+
         // 姿态本地预测，避免按键延迟
         if (Con_gun_Control != null && Con_input_Manage != null)
             Con_gun_Control.SetAimState(Con_input_Manage.ShoulderHeld, Con_input_Manage.AdsHeld);
 
         // 瞄准圈
         if (Con_aimRing_UI != null) Con_aimRing_UI.Aim_Ring_UI_Show();
+
+        // 回血边缘提示
+        if (Con_hitFeedback_UI != null && Con_ObjectSystem != null)
+            Con_hitFeedback_UI.Heal_Edge_Performance_Local(Con_ObjectSystem.HP, Con_ObjectSystem.healCap);
 
         // 命中与受击反馈
         if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show();
@@ -769,6 +777,9 @@ public class Player_Control : Character_Move
 
         Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
 
+        // 命中敌人的爆浆
+        if (hitTarget) Con_gun_Control.Gun_Blood_Performance(hitPoint, aimDir);
+
         // 本机受近处落点压制
         if (isHit && !IsOwner)
         {
@@ -803,6 +814,9 @@ public class Player_Control : Character_Move
 
         if (Con_gun_Control == null) return;
 
+        // 命中敌人的爆浆
+        if (hitTarget) Con_gun_Control.Gun_Blood_Performance(hitPoint, dir);
+
         // 本机已预测枪口与震屏，只补弹道
         if (IsOwner)
         {
@@ -825,6 +839,9 @@ public class Player_Control : Character_Move
         // 主机自己直接显示
         if (IsOwner && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
 
+        // 受击震动
+        if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Hurt_Performance_Local();
+
         // 被射中提示，环境伤害位置为零不播
         if (IsOwner && Con_player_Audio != null && fromPos != Vector3.zero) Con_player_Audio.Hurt_Show();
 
@@ -845,6 +862,9 @@ public class Player_Control : Character_Move
         }
 
         Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
+
+        // 受击震动
+        if (Con_player_camera != null) Con_player_camera.Camera_Hurt_Performance_Local();
 
         // 被射中提示，环境伤害位置为零不播
         if (Con_player_Audio != null && fromPos != Vector3.zero) Con_player_Audio.Hurt_Show();

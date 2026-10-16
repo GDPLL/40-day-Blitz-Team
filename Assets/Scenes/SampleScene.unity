@@ -14962,7 +14962,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -180, y: -263.6}
+  m_AnchoredPosition: {x: -324.3, y: -263.6}
   m_SizeDelta: {x: 100, y: 120}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &688325672
@@ -14979,28 +14979,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bodyImage: {fileID: 688325673}
   poseSprites:
-  - {fileID: 21300000, guid: 6767540feb1d005418d665adb3970ea2, type: 3}
-  - {fileID: 21300000, guid: 404a3868626553a438d37de494237dcd, type: 3}
-  - {fileID: 21300000, guid: 0527d9f2936b95c40a78fe5ff6e68d58, type: 3}
-  - {fileID: 21300000, guid: 05321bc155a1e144f843d9e00566a35a, type: 3}
-  - {fileID: 21300000, guid: c5777ab2748de0e4cb92b3276d6acbe3, type: 3}
+  - {fileID: 21300000, guid: afe2b9e0c88dade45910d80ae8f2fcad, type: 3}
+  - {fileID: 21300000, guid: 13ec3b79f236517479931c511945cff5, type: 3}
+  - {fileID: 21300000, guid: a7179cfabe813894ca9757fbd51aa02a, type: 3}
+  - {fileID: 21300000, guid: c7dba936af1f97346905b11c871b6b41, type: 3}
+  - {fileID: 21300000, guid: 1c481ec9ea00180499e3df771c76f166, type: 3}
+  - {fileID: 21300000, guid: 729fbe90de0dd4c418bd83edb3fb6513, type: 3}
+  - {fileID: 21300000, guid: 4fab75ec9185d384eabe819b41bbcd25, type: 3}
+  - {fileID: 21300000, guid: e0cd32f77cc145b4cbc999ca8823f36c, type: 3}
+  - {fileID: 21300000, guid: a88b3d53910149f4ea639d533a3fb9a1, type: 3}
+  - {fileID: 21300000, guid: 2069f6c0025bd79408f0bbcf9b756cc4, type: 3}
   - {fileID: 21300000, guid: 8bf95c815b811ad4d904f464025ba091, type: 3}
-  - {fileID: 21300000, guid: 9b32322a9a8953847a31545a4f2763a0, type: 3}
-  - {fileID: 21300000, guid: 57b1d0b26c99e8f4e916e12b602b1306, type: 3}
-  poseSize:
-  - {x: 79, y: 249}
-  - {x: 112, y: 232}
-  - {x: 205, y: 230}
-  - {x: 92, y: 168}
-  - {x: 120, y: 186}
-  - {x: 260, y: 153}
-  - {x: 230, y: 135}
-  - {x: 280, y: 107}
+  poseSize: []
   poseOffset: []
   heavyHp: 30
   flashSpeed: 4
   damageLife: 0.25
-  lowerLife: 0.35
+  bloodLife: 0.28
+  outerLife: 0.38
+  poolSizeMin: 90
+  poolSizeMax: 400
+  outerSizeMin: 280
+  outerSizeMax: 680
+  shakeAmp: 6
+  bloodAnchor: {x: 0, y: 30}
+  bodyHeight: 300
+  colorSmooth: 0.8
+  poseHeightFactor: []
 --- !u!114 &688325673
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15021,7 +15026,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6767540feb1d005418d665adb3970ea2, type: 3}
+  m_Sprite: {fileID: 21300000, guid: afe2b9e0c88dade45910d80ae8f2fcad, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -16498,6 +16503,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   UI_gameObjcet: {fileID: 86375059}
   text: {fileID: 113085564}
+  bgImage: {fileID: 86375061}
 --- !u!114 &802451442
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -19698,6 +19704,7 @@ MonoBehaviour:
   shakeOffset: {x: 0, y: 0, z: 0}
   shakeDuration: 0.1
   shakeMagnitude: 0.05
+  hurtShakeScale: 0.6
   suppressRadius: 8
   suppressFullRadius: 2.5
   suppressPerHit: 0.35
@@ -19715,6 +19722,21 @@ MonoBehaviour:
   cameraPullInSpeed: 25
   cameraPushOutSpeed: 6
   modeSwitchSmoothTime: 0.15
+  breakTime: 0.12
+  holdTime: 0.2
+  recoverTime: 0.5
+  strongTime: 0.2
+  holdStrength: 0.8
+  recoverStrength: 0.85
+  outStrength: 0.5
+  noiseMax: 0.85
+  tearMax: 0.12
+  chromaMax: 6
+  greyMax: 0.7
+  brightMax: 0.18
+  blockMax: 0.6
+  rollPeriod: 1.6
+  seedRate: 12
 --- !u!65 &965637879
 BoxCollider:
   m_ObjectHideFlags: 0

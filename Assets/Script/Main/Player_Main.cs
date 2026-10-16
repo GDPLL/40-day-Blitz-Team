@@ -88,8 +88,9 @@ public class Player_Main : NetworkBehaviour
             {
                 float wait = oPlayer_Control.RespawnWait;
 
-                if (oPlayer_Control.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束");
-                else if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s");
+                // 花屏期间只留文字
+                if (oPlayer_Control.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束", false);
+                else if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s", false);
                 else uI_Curtain.UI_curtain_Hide();
             }
         }
@@ -251,7 +252,7 @@ public class Player_Main : NetworkBehaviour
             return;
         }
 
-        uI_Curtain.UI_curtain_Show($"游戏结束 胜利者：玩家{winnerIndex}");
+        uI_Curtain.UI_curtain_Show($"游戏结束 胜利者：玩家{winnerIndex}", true);
     }
 
     // 撤离点播报，playerNumber为玩家编号
