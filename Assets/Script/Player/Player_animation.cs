@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 // 玩家动画表现，状态位驱动
@@ -14,6 +13,7 @@ public class Player_animation : MonoBehaviour
     public const ushort BitDeath = 1 << 6;      //死亡
     public const ushort BitRoll = 1 << 7;       //翻滚
     public const ushort BitWeightLess = 1 << 12;    //失重
+    public const ushort BitReload = 1 << 13;    //换弹
 
     const int MoveXShift = 8;                   //方向X位偏移
     const int MoveYShift = 10;                  //方向Y位偏移
@@ -36,11 +36,11 @@ public class Player_animation : MonoBehaviour
         return new Vector2(x, y);
     }
 
-    // 按状态位同步动画参数
-    public void Player_animation_Show(ushort state)
+    // 按状态位同步动画参数，verticalSpeed为垂直速度
+    public void Player_animation_Show(ushort state, float verticalSpeed)
     {
-        string binary = Convert.ToString(state, 2);
         bool walk = (state & BitWalk) != 0;
+        bool reload = (state & BitReload) != 0;
 
         animation.SetBool("walk", walk);
         animation.SetBool("raiseGun", (state & BitGun) != 0);
@@ -49,13 +49,18 @@ public class Player_animation : MonoBehaviour
         animation.SetBool("IsDeath", (state & BitDeath) != 0);
         animation.SetBool("IsRoll", (state & BitRoll) != 0);
         animation.SetBool("IsWeightLess", (state & BitWeightLess) != 0);
+        animation.SetBool("IsReload", reload);
 
-        // 奔跑满速，走路半速，静止为零
-        animation.SetFloat("Speed", (state & BitRun) != 0 ? 1f : walk ? 0.5f : 0f);
+        // 奔跑满速，走路半速，静止为零，换弹只能走路
+        bool run = (state & BitRun) != 0 && !reload;
+        animation.SetFloat("Speed", run ? 1f : walk ? 0.5f : 0f);
 
-        // 未举枪一律朝前，举枪才启用四方向
-        Vector2 move = (state & BitGun) != 0 ? UnPack_Move(state) : new Vector2(0f, 1f);
+        // 换弹或未举枪一律朝前，举枪才启用四方向
+        Vector2 move = (state & BitGun) != 0 && !reload ? UnPack_Move(state) : new Vector2(0f, 1f);
         animation.SetFloat("MoveX", move.x);
         animation.SetFloat("MoveY", move.y);
+
+        // 垂直速度，正升负降
+        animation.SetFloat("VerticalSpeed", verticalSpeed);
     }
 }

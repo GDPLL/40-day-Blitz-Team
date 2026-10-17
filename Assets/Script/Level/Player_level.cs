@@ -14,6 +14,9 @@ public class Player_level : MonoBehaviour
     public int gasDamage = 5;               //毒气每秒伤害
     public float gameTime;    //关卡已进行时间
 
+    [Header("测试")]
+    public bool testStop;    //关闭关卡进程
+
     //时间节点事件
     public event Action Time30s_event;      //30秒
     public event Action Time3m_event;       //3分钟
@@ -30,7 +33,7 @@ public class Player_level : MonoBehaviour
     //节点时刻 30s 3m 3m10s 4m 5m 5m30s 9m
     readonly float[] nodeTime = { 30f, 180f, 190f, 240f, 300f, 330f, 540f };
     //节点毒气高度，0为不变
-    readonly float[] nodeGasY = { 0f, 45f, 0f, 95f, 120f, 165f, 0f };
+    readonly float[] nodeGasY = { -10f, 45f, 0f, 95f, 120f, 165f, 0f };
     //毒气粒子1-4
     public ParticleSystem[] gasParticle = new ParticleSystem[4];
     float gasHeight;                        //当前毒气高度
@@ -153,6 +156,7 @@ public class Player_level : MonoBehaviour
     public void Player_level_FixUpdate()
     {
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;   //只有主机
+        if (testStop) return;   //测试关闭进程，时间停在当前
 
         gameTime += Time.fixedDeltaTime;
 

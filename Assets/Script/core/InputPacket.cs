@@ -21,6 +21,7 @@ public struct InputPacket : INetworkSerializable
     public bool run;                // 奔跑
     public bool reload;             // 换弹
     public bool squat;              // 蹲下
+    public bool roll;               // 翻滚
 
     // 网络序列化
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -39,5 +40,6 @@ public struct InputPacket : INetworkSerializable
         serializer.SerializeValue(ref run);
         serializer.SerializeValue(ref reload);
         serializer.SerializeValue(ref squat);
+        serializer.SerializeValue(ref roll);
     }
 }

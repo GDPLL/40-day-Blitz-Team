@@ -16,6 +16,7 @@ public class HostNetWorkInputEvent : NetworkBehaviour
     public event Action<bool> Run_event;         // 奔跑
     public event Action ReloadHeld_event;        // 换弹
     public event Action<bool> Squat_event;       // 蹲下
+    public event Action<bool> Roll_event;        // 翻滚
 
     // 输入缓存
     public InputPacket Packet => packet;        // 最新输入包
@@ -68,5 +69,6 @@ public class HostNetWorkInputEvent : NetworkBehaviour
         Run_event?.Invoke(packet.run);
         if (packet.reload) ReloadHeld_event?.Invoke();
         Squat_event?.Invoke(packet.squat);
+        Roll_event?.Invoke(packet.roll);
     }
 }

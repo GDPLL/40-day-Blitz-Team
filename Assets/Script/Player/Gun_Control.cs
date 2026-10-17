@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Animations.Rigging;
 
 public class Gun_Control : MonoBehaviour
 {
@@ -20,12 +21,24 @@ public class Gun_Control : MonoBehaviour
     public float fireRate = 900f;   // 射速，发每分钟
     public float range = 100f;     // 射程
     public int damage = 34;        // 单发伤害
+    public float reloadTime = 3.06f;   // 换弹时长
+    public RigBuilder armRig;      // 手臂IK构建器
+    public int armRigLayer;        // 手臂IK所在的层序号
 
     // 两发之间的最小间隔
     public float FireInterval => 60f / fireRate;
 
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
+
+    [Header("命中爆浆")]
+    public int bloodCount = 26;             // 每次命中粒子数
+    public float bloodLife = 1.2f;          // 粒子存活时长，秒
+    public float bloodSpeed = 4.5f;         // 喷射速度，米每秒
+    public float bloodSize = 0.16f;         // 粒子尺寸，米
+    public float bloodSpread = 38f;         // 喷射锥角，度
+    public Color bloodColor = new Color(0.62f, 0.05f, 0.05f);   // 血色
+    ParticleSystem bloodTemplate;           // 爆浆模板
 
     [Header("举枪 / 收枪")]
     public float aimSmooth = 10f;            // 插值速度
@@ -34,7 +47,10 @@ public class Gun_Control : MonoBehaviour
     // 计时
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
+    float reloadTimer;             // 换弹计时
     bool isRaised;                 // 举枪中
+
+    public bool IsReloading => reloadTimer > 0f;   // 换弹中
 
     // 一种姿态对应的一组参数
     // 外圈、内圈、增长速度与距离衰减
@@ -47,9 +63,10 @@ public class Gun_Control : MonoBehaviour
         public float nearDistance = 5f;   // 最近参考距离
         public float farDistance = 40f;   // 最远参考距离
         public float farFactor = 0.15f;   // 远距离系数
+        public int stableShots = 16;      // 稳定弹药数
 
         public AimProfile(float outer, float inner, float speed,
-            float near, float far, float factor)
+            float near, float far, float factor, int stable)
         {
             outerAngle = outer;
             innerAngle = inner;
@@ -57,13 +74,18 @@ public class Gun_Control : MonoBehaviour
             nearDistance = near;
             farDistance = far;
             farFactor = factor;
+            stableShots = stable;
         }
     }
 
     [Header("精度：各姿态参数")]
-    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f);       // 腰射
-    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f);   // 据枪
-    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f);       // 开镜
+    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f, 16);       // 腰射
+    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f, 5);   // 据枪
+    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f, 2);       // 开镜
+
+    [Header("精度：开火消耗")]
+    public float stableCost = 0.30f;   // 稳定段总消耗比例
+    public float burstCost = 0.35f;    // 超出稳定段每发消耗比例
 
     [Header("精度：移动姿态系数")]
     public float moveFactorSquatStand = 1.3f;   // 蹲下
@@ -86,6 +108,7 @@ public class Gun_Control : MonoBehaviour
     Vector3 aimOrigin;       // 准星射线起点
 
     float currentAngle;                                       // 当前精度圈
+    int shotCount;                                            // 本次连发已射发数
     public float CurrentAngle => currentAngle;                // 对外读取
     public float OuterAngle => CurrentProfile().outerAngle;   // 当前姿态外圈
     public float InnerAngle => CurrentProfile().innerAngle;   // 当前姿态内圈
@@ -112,11 +135,14 @@ public class Gun_Control : MonoBehaviour
         aimOrigin = origin;
     }
 
-     // 朝向是否对准准星
-    bool AimAligned()
+     // 朝向是否对准指定方向
+    bool AimAligned(Vector3 dir)
     {
-        Vector3 aim = aimDirection;
+        Vector3 aim = dir;
         aim.y = 0f;
+
+        // 垂直瞄准无水平朝向
+        if (aim.sqrMagnitude <= 0.001f) return true;
 
         Vector3 body = transform.root.forward;
         body.y = 0f;
@@ -137,6 +163,7 @@ public class Gun_Control : MonoBehaviour
         aimingShoulder = shoulder;
         aimingAds = adsOn;
         currentAngle = CurrentProfile().outerAngle;   //立刻重置到新外圈
+        shotCount = 0;                                //换姿态重新计稳定
     }
 
     // 设置移动状态
@@ -169,10 +196,74 @@ public class Gun_Control : MonoBehaviour
         if (line != null) line.enabled = false;
 
         ownerId = id;
+        shotCount = 0;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
 
+        Blood_Template_Init();
+
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
+    }
+
+    // 建爆浆粒子模板，隐藏备用
+    void Blood_Template_Init()
+    {
+        Texture2D tex = Resources.Load<Texture2D>("爆浆/血点");
+        Shader shader = Resources.Load<Shader>("爆浆/Blood_Particle");
+        if (tex == null || shader == null)
+        {
+            Debug.LogError("Gun_Control|Blood_Template_Init|爆浆资源缺失");
+            return;
+        }
+
+        GameObject go = new GameObject("BloodTemplate");
+        go.transform.SetParent(transform, false);
+        go.SetActive(false);
+
+        bloodTemplate = go.AddComponent<ParticleSystem>();
+
+        ParticleSystem.MainModule main = bloodTemplate.main;
+        main.loop = false;
+        main.playOnAwake = true;
+        main.startLifetime = bloodLife;
+        main.startSpeed = bloodSpeed;
+        main.startSize = bloodSize;
+        main.startColor = bloodColor;
+        main.gravityModifier = 0.8f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        ParticleSystem.EmissionModule emission = bloodTemplate.emission;
+        emission.enabled = false;       // 手动发射，不自动播
+
+        ParticleSystem.ShapeModule shape = bloodTemplate.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle = bloodSpread;
+        shape.radius = 0.04f;
+
+        Material mat = new Material(shader);
+        mat.mainTexture = tex;
+
+        ParticleSystemRenderer psRenderer = go.GetComponent<ParticleSystemRenderer>();
+        psRenderer.material = mat;
+        psRenderer.renderMode = ParticleSystemRenderMode.Billboard;
+    }
+
+    // 命中敌人爆浆，dir 为弹道方向
+    public void Gun_Blood_Performance(Vector3 hitPoint, Vector3 dir)
+    {
+        if (bloodTemplate == null)
+        {
+            Debug.LogError("Gun_Control|Gun_Blood_Performance|爆浆模板为空");
+            return;
+        }
+
+        GameObject go = Instantiate(bloodTemplate.gameObject, hitPoint, Quaternion.LookRotation(-dir));
+        go.SetActive(true);
+
+        ParticleSystem ps = go.GetComponent<ParticleSystem>();
+        ps.Emit(bloodCount);
+
+        Destroy(go, bloodLife + 0.3f);
     }
 
     // 物理帧逻辑，射速计时与精度更新
@@ -180,7 +271,22 @@ public class Gun_Control : MonoBehaviour
     {
         fireTimer += Time.deltaTime;
 
+        // 换弹计时，走完才装填
+        if (reloadTimer > 0f)
+        {
+            Gun_Reload_Tick(Time.deltaTime);
+            if (reloadTimer <= 0f) ammo = maxAmmo;
+        }
+
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
+    }
+
+    // 换弹计时推进，客机本机预测用
+    public void Gun_Reload_Tick(float dt)
+    {
+        if (reloadTimer <= 0f) return;
+
+        reloadTimer -= dt;
     }
 
     // 物理帧表现，射线显示计时
@@ -203,7 +309,7 @@ public class Gun_Control : MonoBehaviour
             Vector3.Angle(aimDirection, toTarget) <= p.outerAngle * 0.5f);   //外圈按直径算
 
         // 离开范围或朝向没对准准星都不收圈
-        if (!targetInRing || !AimAligned())
+        if (!targetInRing || !AimAligned(aimDirection))
         {
             currentAngle = p.outerAngle;
             return;
@@ -211,6 +317,23 @@ public class Gun_Control : MonoBehaviour
 
         float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance, p);
         currentAngle = Mathf.MoveTowards(currentAngle, p.innerAngle, speed * dt);   // 收缩到内圈
+
+        // 精度收满即算重新稳定
+        if (currentAngle <= p.innerAngle) shotCount = 0;
+    }
+
+    // 开火消耗精度，超出稳定弹药数消耗更大
+    void Aim_Cost_Date()
+    {
+        AimProfile p = CurrentProfile();
+
+        // 基准取精度总量，稳定段内按上限分摊
+        float total = p.outerAngle - p.innerAngle;
+        float cost = p.stableShots > 0 && shotCount < p.stableShots
+            ? total * stableCost / p.stableShots : total * burstCost;
+
+        currentAngle = Mathf.Min(currentAngle + cost, p.outerAngle);
+        shotCount++;
     }
 
     // 移动姿态系数
@@ -230,9 +353,10 @@ public class Gun_Control : MonoBehaviour
     Vector2 GetSpreadOffset()
         => UnityEngine.Random.insideUnitCircle * Mathf.Tan(currentAngle * Mathf.Deg2Rad * 0.5f);
 
-    // 开火逻辑，返回是否成功
-    public bool Gun_Shoot_Date(Vector3 aimDir, out Vector3 origin, out Vector3 dir,
-        out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal)
+    // 开火逻辑，aimDir为弹道方向，alignDir为对准判定方向
+    public bool Gun_Shoot_Date(Vector3 aimDir, Vector3 alignDir, out Vector3 origin, out Vector3 dir,
+        out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
+        out int hitDamage, out bool killed, out Bounds hitBounds)
     {
         origin = MuzzlePosition;
         dir = transform.forward;
@@ -240,14 +364,17 @@ public class Gun_Control : MonoBehaviour
         hitTarget = false;
         hitPoint = Vector3.zero;
         hitNormal = Vector3.up;
+        hitDamage = 0;
+        killed = false;
+        hitBounds = new Bounds();
 
-        SetAimDirection(aimDir);      // 更新准星方向
-
-        if (!AimAligned()) return false;                                       // 朝向没对准准星不能开火
+        if (IsReloading) return false;                                         // 换弹中不能开火
+        if (!AimAligned(alignDir)) return false;                               // 朝向没对准准星不能开火
         if ((fireTimer >= FireInterval && ammo > 0) == false) return false;    // 射速与弹药判定
 
         ammo--;
         fireTimer = 0f;
+        Aim_Cost_Date();      // 开火消耗精度
 
         // 精度圈散布
         Vector2 offset = GetSpreadOffset();
@@ -272,7 +399,8 @@ public class Gun_Control : MonoBehaviour
                 if (damageable != null)
                 {
                     hitTarget = true;
-                    damageable.Takedamage(damage, ownerId, transform.root.position);
+                    hitDamage = damageable.Takedamage(damage, ownerId, transform.root.position, out killed);
+                    hitBounds = hit.collider.bounds;
                 }
             }
         }
@@ -325,13 +453,31 @@ public class Gun_Control : MonoBehaviour
         }
     }
 
-    // 换弹逻辑，弹匣补满
+    // 换弹，起换弹计时，装填在计时结束
     public void Gun_Reload_Date()
     {
-        if (ammo == maxAmmo) return;    //满弹不换，防重复触发
+        if (IsReloading) return;        //换弹中不重复触发
+        if (ammo == maxAmmo) return;    //满弹不换
 
-        ammo = maxAmmo;
+        reloadTimer = reloadTime;
         Reload_event?.Invoke();     //换弹音效
+    }
+
+    // 取消换弹
+    public void Gun_Reload_Cancel()
+    {
+        reloadTimer = 0f;
+    }
+
+    // 手臂IK开关，on为启用，按层序号取
+    public void Arm_Rig_Date(bool on)
+    {
+        if (armRig == null) return;
+        if (armRigLayer < 0 || armRigLayer >= armRig.layers.Count) return;
+        if (armRig.layers[armRigLayer].active == on) return;    //状态没变
+
+        armRig.layers[armRigLayer].active = on;
+        armRig.Build();     //改层开关后重建图
     }
 
     // 是否有弹药

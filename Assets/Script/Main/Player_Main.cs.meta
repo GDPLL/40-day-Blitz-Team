@@ -1,9 +1,19 @@
 fileFormatVersion: 2
-guid: 3b72aed413eefc6439881b8358f24b01
+guid: DCgYt3v4B399MMsdZPZU80RvQekTybaxLsJ8HPrOC836EASbXo8ynRs=
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - oCamera: {instanceID: 0}
+  - oPlayer_Camera: {instanceID: 0}
+  - oPlayer_Control: {instanceID: 0}
+  - oUI_RectTransform: {instanceID: 0}
+  - uI_Debug: {instanceID: 0}
+  - uI_Player: {instanceID: 0}
+  - uI_Curtain: {instanceID: 0}
+  - uI_Time: {instanceID: 0}
+  - uI_Rank: {fileID: 7799203412513982725, guid: cd5e221ebd66365448d680d85ecb3bd7, type: 3}
+  - playerPrefab: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

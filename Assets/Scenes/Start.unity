@@ -166,6 +166,8 @@ MonoBehaviour:
   RunHeld: 0
   ReloadHeld: 0
   SquatHeld: 0
+  ShoulderHeld: 0
+  AdsHeld: 0
   DebugKey: 0
 --- !u!4 &7224402
 Transform:

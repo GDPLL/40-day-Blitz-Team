@@ -15,9 +15,19 @@ public class Input_Manage : NetworkBehaviour
     public float sendRate = 60f;    // 发送频率
     float sendTimer;                // 发送计时
 
+    // 翻滚双击检测
+    readonly KeyCode[] rollKeys = { KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D };
+    readonly Vector2[] rollDirs = { Vector2.up, Vector2.left, Vector2.down, Vector2.right };
+    float[] rollPressTime = new float[4];   // 各键上次按下时刻
+    float rollTime = -999f;                 // 翻滚请求时刻
+
     [Header("举枪瞄准")]
     public float focusDistance = 10f;   // 未命中时的瞄点距离
     public Vector3 AimPoint;            // 当前瞄准落点
+
+    [Header("翻滚")]
+    public float doubleClickTime = 0.25f;   // 双击判定间隔
+    public float rollHold = 0.1f;           // 翻滚请求保持秒数
 
     // 输入事件
     public event Action<InputPacket> Input_event;   // 收到输入包
@@ -97,6 +107,7 @@ public class Input_Manage : NetworkBehaviour
         packet.run = RunHeld;
         packet.reload = ReloadHeld;
         packet.squat = SquatHeld;
+        packet.roll = RollDown;
         return packet;
     }
 
@@ -152,6 +163,8 @@ public class Input_Manage : NetworkBehaviour
     public bool SquatHeld;          //蹲下输入
     public bool ShoulderHeld;       //肩射输入
     public bool AdsHeld;            //开镜输入
+    public bool RollDown;           //翻滚请求
+    public Vector2 RollDir;         //翻滚方向
     public bool DebugKey;           // 调试输入
 
     // 读取输入状态
@@ -170,6 +183,28 @@ public class Input_Manage : NetworkBehaviour
         DebugKey = Input.GetKey(KeyCode.BackQuote);         //调试输入按钮
 
         GetAimPoint();      // 瞄准落点
+        Roll_Double_Date(); // 翻滚双击
+    }
+
+    // 双击方向键检测
+    void Roll_Double_Date()
+    {
+        for (int i = 0; i < rollKeys.Length; i++)
+        {
+            if (!Input.GetKeyDown(rollKeys[i])) continue;
+
+            // 间隔够短算双击
+            if (Time.time - rollPressTime[i] <= doubleClickTime)
+            {
+                rollTime = Time.time;
+                RollDir = rollDirs[i];
+            }
+
+            rollPressTime[i] = Time.time;
+        }
+
+        // 保持一小段，避免发送帧漏采
+        RollDown = Time.time - rollTime < rollHold;
     }
 
 

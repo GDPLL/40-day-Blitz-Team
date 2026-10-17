@@ -21,7 +21,8 @@ public class Object_System : MonoBehaviour , Idamage
     //坠落伤害
     public float fallAccel = 400f;          //触发加速度,米每二次方秒
     public float fallDamageRate = 0.05f;    //超出部分的伤害比例
-    float lastVelocityY;                    //上一物理帧垂直速度
+    float fallSpeed;                        //空中最大下落速度
+    float physicsDelta = 0.02f;             //物理帧间隔，算致死速度用
 
     // 死亡事件，血量归零触发
     public event Action HealthEnd;
@@ -29,12 +30,14 @@ public class Object_System : MonoBehaviour , Idamage
     // 受击事件，携带攻击者位置
     public event Action<Vector3> Damage_event;
 
-    // 扣血
-    public void Takedamage(int hit, ulong killerId, Vector3 fromPos)
+    // 扣血并返回实际伤害与击杀
+    public int Takedamage(int hit, ulong killerId, Vector3 fromPos, out bool killed)
     {
+        int before = HP;
         HP = Mathf.Clamp(HP - hit, 0, MaxHp);
         KillerId = killerId;
         healTimer = 0f;     // 受击打断回血
+        killed = before > 0 && HP <= 0;     // 已死亡不算击杀
 
         // 编辑器下打印受击
 #if UNITY_EDITOR
@@ -42,31 +45,44 @@ public class Object_System : MonoBehaviour , Idamage
 #endif
 
         Damage_event?.Invoke(fromPos);
+        return before - HP;     //实际扣血,残血不溢出
     }
 
     // 重置血量
     public void ResetHealth()
     {
         HP = MaxHp;
-        lastVelocityY = 0f;     //复活一并清坠落基准
+        fallSpeed = 0f;     //复活一并清坠落基准
     }
 
-    // 坠落伤害，velocityY为当前垂直速度，deltaTime为物理帧间隔
-    public void Fall_Damage_Date(float velocityY, float deltaTime)
+    // 坠落伤害，velocityY为当前垂直速度，grounded为是否在地面
+    public void Fall_Damage_Date(float velocityY, bool grounded, float deltaTime)
     {
         if (deltaTime <= 0f) return;    //防除零
 
-        float accel = (velocityY - lastVelocityY) / deltaTime;
+        physicsDelta = deltaTime;
 
-        // 下落被地面刹住才算，上升与起跳不算
-        if (lastVelocityY < 0f && velocityY <= 0f && accel > fallAccel)
+        // 空中只记录最大下落速度
+        if (!grounded)
         {
-            int damage = (int)((accel - fallAccel) * fallDamageRate);
-            if (damage > 0) Takedamage(damage, 999, new Vector3());
+            if (-velocityY > fallSpeed) fallSpeed = -velocityY;
+            return;
         }
 
-        lastVelocityY = velocityY;
+        // 落地按空中峰值结算一次，换算成加速度
+        float accel = fallSpeed / deltaTime;
+        int damage = (int)((accel - fallAccel) * fallDamageRate);
+        if (damage > 0) Takedamage(damage, 999, new Vector3(), out _);
+
+        fallSpeed = 0f;
     }
+
+    // 致死坠落速度，满血一次摔死的下落速度
+    public float Fatal_Fall_Speed => (MaxHp / fallDamageRate + fallAccel) * physicsDelta;
+
+    // 失重判断，speed为速度大小，不在空中不算
+    public bool WeightLess_Date(float speed, bool grounded) =>
+        !grounded && speed >= Fatal_Fall_Speed;
 
     // 生命系统更新，主机每帧驱动
     public void Object_System_Update()

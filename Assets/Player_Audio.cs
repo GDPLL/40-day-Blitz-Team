@@ -34,6 +34,7 @@ public class Player_Audio : MonoBehaviour
         Wind,           //高速风声
         Jump,           //起跳
         Land,           //坠地
+        Roll,           //翻滚
     }
 
     public AudioClip[] audioClips;      // 音效片段，按编号取
@@ -260,6 +261,12 @@ public class Player_Audio : MonoBehaviour
     public void Jump_Show()
     {
         Play_Body(AudioNumKV.Jump);
+    }
+
+    // 翻滚
+    public void Roll_Show()
+    {
+        Play_Body(AudioNumKV.Roll);
     }
 
     // 落地检测，vy为垂直速度，onGround为是否在地面

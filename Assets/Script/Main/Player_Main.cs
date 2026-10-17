@@ -21,11 +21,16 @@ public class Player_Main : NetworkBehaviour
     public UI_Player uI_Player;                     //本机弹药血量UI
     public UI_curtain uI_Curtain;                   //UI幕布
     public UI_Time uI_Time;                         //关卡时间UI
+    public UI_Rank uI_Rank;                         //本机积分排行榜
     public UI_CallATime_Text uI_CallATime;           //通讯设备UI
+    public UI_Body uI_Body;                         //本机人形状态图
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
     bool gameOver;                      // 游戏已结束
+    //排行榜排序缓存
+    int[] rankNumbers = new int[4];     //玩家编号
+    int[] rankScores = new int[4];      //积分
     public GameObject playerPrefab;     // 角色预制体    
     public Vector3 startPos;            // 出生起点
     public Transform[] Num1respawnPoints;   // 复活点，按玩家编号
@@ -67,6 +72,9 @@ public class Player_Main : NetworkBehaviour
         if (uI_CallATime != null && Player_level.Instance != null)
             uI_CallATime.UI_CallATime_Update(Level_Time);
 
+        // 结算积分榜
+        Rank_Show();
+
 
         // 本机表现层驱动
         if (oPlayer_Control != null)
@@ -78,13 +86,18 @@ public class Player_Main : NetworkBehaviour
                 uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
                     oPlayer_Control.HP, oPlayer_Control.MaxHp);
 
+            // 本机人形状态图
+            if (uI_Body != null)
+                uI_Body.UI_Body_Show(oPlayer_Control.HP, oPlayer_Control.MaxHp, oPlayer_Control.Show_State);
+
             // 死亡等待幕布，淘汰后常驻
             if (uI_Curtain != null && !gameOver)
             {
                 float wait = oPlayer_Control.RespawnWait;
 
-                if (oPlayer_Control.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束");
-                else if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s");
+                // 花屏期间只留文字
+                if (oPlayer_Control.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束", false);
+                else if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s", false);
                 else uI_Curtain.UI_curtain_Hide();
             }
         }
@@ -246,7 +259,7 @@ public class Player_Main : NetworkBehaviour
             return;
         }
 
-        uI_Curtain.UI_curtain_Show($"游戏结束 胜利者：玩家{winnerIndex}");
+        uI_Curtain.UI_curtain_Show($"游戏结束 胜利者：玩家{winnerIndex}", true);
     }
 
     // 撤离点播报，playerNumber为玩家编号
@@ -479,6 +492,40 @@ public class Player_Main : NetworkBehaviour
         return null;
     }
 
+    // 结算积分榜，游戏结束才显示
+    void Rank_Show()
+    {
+        if (uI_Rank == null) return;
+
+        if (!gameOver)
+        {
+            uI_Rank.UI_Rank_Hide();
+            return;
+        }
+
+        if (rankNumbers.Length < oplayer_Controls.Count)
+        {
+            rankNumbers = new int[oplayer_Controls.Count];
+            rankScores = new int[oplayer_Controls.Count];
+        }
+
+        int rankCount = 0;
+
+        // 取各玩家编号与积分
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null) continue;      //退出的玩家
+
+            rankNumbers[rankCount] = control.Player_Number;
+            rankScores[rankCount] = control.Score;
+            rankCount++;
+        }
+
+        Score_Rank.Score_Rank_Sort_Date(rankNumbers, rankScores, rankCount);
+        uI_Rank.UI_Rank_Show(rankNumbers, rankScores, rankCount);
+    }
+
     // 近处落点触发本机压制
     public void Suppress_Check_Local(Vector3 hitPoint)
     {
@@ -575,6 +622,20 @@ public class Player_Main : NetworkBehaviour
             Debug.LogError("Player_Main|InitScenceClientRpc|UI_CallATime 为空");
         }
         else uI_CallATime.UI_CallATime_Init();
+
+        // 积分排行榜
+        if (uI_Rank == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Rank 为空");
+        }
+        else uI_Rank.UI_Rank_Init();
+
+        // 人形状态图
+        if (uI_Body == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Body 为空");
+        }
+        else uI_Body.UI_Body_Init();
 
         isInit = true;
 
