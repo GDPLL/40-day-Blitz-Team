@@ -5,6 +5,7 @@ using Unity.Netcode;
 // 主机侧输入分发，一个玩家一份
 public class HostNetWorkInputEvent : NetworkBehaviour
 {
+    Player_Control Own_Control; //父级
     // 输入事件
     public event Action<Vector2> Move_event;     // 移动
     public event Action<bool> JumpDown_event;    // 跳跃

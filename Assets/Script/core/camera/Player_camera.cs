@@ -176,6 +176,14 @@ public class Player_camera : MonoBehaviour
 
         if (pNet != null && !pNet.IsOwner) return;      // 非本地玩家不更新
 
+        // 本机据枪与开镜输入，自行判断
+        Input_Manage im = Input_Manage.Instance;
+        if (im != null)
+        {
+            isShoulderAim = im.ShoulderHeld;
+            isAds = im.AdsHeld;
+        }
+
         // 引用为空或已销毁
         if (PlayerHeadTransform == null || Target_Object == null || Camera_Object == null)
         {
@@ -323,13 +331,6 @@ public class Player_camera : MonoBehaviour
         cameraDistance = Mathf.MoveTowards(cameraDistance, limit, speed * Time.deltaTime);
 
         return pivot + dir * cameraDistance;
-    }
-
-    // 切换肩射与开镜
-    public void Camera_Aim_Performance_Local(bool shoulder, bool ads)
-    {
-        isShoulderAim = shoulder;
-        isAds = ads;
     }
 
     // 信号花屏，hp 为血量 isOut 为淘汰

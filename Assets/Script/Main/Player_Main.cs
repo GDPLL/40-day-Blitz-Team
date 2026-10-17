@@ -60,6 +60,7 @@ public class Player_Main : NetworkBehaviour
                 oplayer_Controls.RemoveAt(i);
                 continue;
             }
+            oplayer_Controls[i].Player_Control_Date_Update();
             oplayer_Controls[i].Player_Control_Date_HostUpdate();
             oplayer_Controls[i].Player_Control_Show_ClientUpdate();
         }
@@ -83,20 +84,21 @@ public class Player_Main : NetworkBehaviour
 
             // 本机弹药血量
             if (uI_Player != null)
-                uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
-                    oPlayer_Control.HP, oPlayer_Control.MaxHp);
+                uI_Player.UI_Player_Show(oPlayer_Control.Con_gun_Control.ammo, oPlayer_Control.Con_gun_Control.maxAmmo,
+                    oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp);
 
             // 本机人形状态图
             if (uI_Body != null)
-                uI_Body.UI_Body_Show(oPlayer_Control.HP, oPlayer_Control.MaxHp, oPlayer_Control.Show_State);
+                uI_Body.UI_Body_Show(oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp,
+                    oPlayer_Control.Con_net_State.Show_State);
 
             // 死亡等待幕布，淘汰后常驻
             if (uI_Curtain != null && !gameOver)
             {
-                float wait = oPlayer_Control.RespawnWait;
+                float wait = oPlayer_Control.Con_net_State.RespawnWait;
 
                 // 花屏期间只留文字
-                if (oPlayer_Control.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束", false);
+                if (oPlayer_Control.Con_net_State.Is_Out) uI_Curtain.UI_curtain_Show("已淘汰，等待本局结束", false);
                 else if (wait > 0f) uI_Curtain.UI_curtain_Show($"等待复活 {wait:0.0}s", false);
                 else uI_Curtain.UI_curtain_Hide();
             }
@@ -205,9 +207,10 @@ public class Player_Main : NetworkBehaviour
         {
             Player_Control control = oplayer_Controls[i];
             if (control == null || control.OwnerClientId != killerId) continue;
+            if (control.Con_ObjectSystem == null) continue;
 
-            control.Player_Death_Reset();
-            control.Player_Kill_Date();     //击杀提示
+            control.Con_ObjectSystem.Death_Reset();
+            if (control.Con_combat != null) control.Con_combat.Player_Kill_Date();     //击杀提示
             return;
         }
     }
@@ -307,7 +310,7 @@ public class Player_Main : NetworkBehaviour
         for (int i = 0; i < oplayer_Controls.Count; i++)
         {
             Player_Control control = oplayer_Controls[i];
-            if (control == null || control.Is_Out) continue;
+            if (control == null || control.Con_net_State.Is_Out) continue;
 
             if (last != null) return;   //还有两人以上
             last = control;
@@ -433,7 +436,14 @@ public class Player_Main : NetworkBehaviour
                 continue;
             }
 
-            go_control.respawnIndex = index;    //分配复活点
+            Object_System go_object = go.GetComponent<Object_System>();
+            if (go_object == null)
+            {
+                Debug.LogError("Player_Main|SpawnPlayers|未找到 Object_System");
+                continue;
+            }
+
+            go_object.respawnIndex = index;    //分配复活点
             oplayer_Controls.Add(go_control);
 
             NetworkObject go_netObj = go.GetComponent<NetworkObject>();
@@ -518,7 +528,7 @@ public class Player_Main : NetworkBehaviour
             if (control == null) continue;      //退出的玩家
 
             rankNumbers[rankCount] = control.Player_Number;
-            rankScores[rankCount] = control.Score;
+            rankScores[rankCount] = control.Con_net_State.Score;
             rankCount++;
         }
 

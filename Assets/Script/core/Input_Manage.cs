@@ -9,6 +9,8 @@ using UnityEngine.Events;
 // 负责本地事件分发
 public class Input_Manage : NetworkBehaviour
 {
+    Player_Control Own_Control; //父级
+    
     public static Input_Manage Instance { get; private set; }   // 全局实例
 
     [Header("网络输入")]
@@ -65,7 +67,7 @@ public class Input_Manage : NetworkBehaviour
     void SendPacket()
     {
         if (!IsSpawned) return;                     // 未接入网络不发
-        
+
 
         sendTimer += Time.deltaTime;
         if (sendTimer < 1f / sendRate) return;

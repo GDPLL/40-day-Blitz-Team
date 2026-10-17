@@ -1261,7 +1261,6 @@ GameObject:
   m_Component:
   - component: {fileID: 6553109800352880347}
   - component: {fileID: 7007783146935101260}
-  - component: {fileID: 6970771348950972825}
   - component: {fileID: 1457072460933560610}
   m_Layer: 8
   m_HasEditorInfo: 1
@@ -1302,62 +1301,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48948dfe9d76b07488dacd46a7955fa1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &6970771348950972825
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6399387033578157638}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc69861ea9fbf0046ba3133ba404a0f7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  shootPoint: {fileID: 2146788701391162973}
-  line: {fileID: 1457072460933560610}
-  ammo: 30
-  maxAmmo: 30
-  fireRate: 900
-  range: 1000
-  damage: 34
-  reloadTime: 3.06
-  armRig: {fileID: 7373796111577540768}
-  armRigLayer: 0
-  hitEffect: {fileID: 4015259995318076048, guid: 5ba040b8213866147a03bf9330ad54ae, type: 3}
-  fireEffect: {fileID: 2654986424484326109, guid: 1dc1100dd1826c749a3d423464c7488f, type: 3}
-  aimSmooth: 10
-  hipAim:
-    outerAngle: 30
-    innerAngle: 4
-    growSpeed: 60
-    nearDistance: 2
-    farDistance: 15
-    farFactor: 1
-    stableShots: 16
-  shoulderAim:
-    outerAngle: 16
-    innerAngle: 2
-    growSpeed: 15
-    nearDistance: 6
-    farDistance: 35
-    farFactor: 1
-    stableShots: 5
-  adsAim:
-    outerAngle: 10
-    innerAngle: 0.2
-    growSpeed: 5
-    nearDistance: 60
-    farDistance: 500
-    farFactor: 1
-    stableShots: 4
-  stableCost: 0.3
-  burstCost: 0.35
-  moveFactorSquatStand: 1.3
-  moveFactorStand: 1
-  moveFactorSquatWalk: 0.7
-  moveFactorWalk: 0.5
-  moveFactorRun: 0.25
 --- !u!120 &1457072460933560610
 LineRenderer:
   serializedVersion: 2
@@ -1487,6 +1430,13 @@ GameObject:
   - component: {fileID: 8262661752330729875}
   - component: {fileID: 1223612852435951202}
   - component: {fileID: 2898697812567271210}
+  - component: {fileID: 1510269724543673231}
+  - component: {fileID: 8554169175301194515}
+  - component: {fileID: 2681956100395725194}
+  - component: {fileID: 6443805574781243278}
+  - component: {fileID: 7914971046313913987}
+  - component: {fileID: 1326813372226240841}
+  - component: {fileID: 622760688168328977}
   m_Layer: 8
   m_HasEditorInfo: 1
   m_Name: Player
@@ -1554,6 +1504,8 @@ MonoBehaviour:
   healSpeed: 10
   fallAccel: 400
   fallDamageRate: 0.1
+  respawnIndex: 0
+  isDead: 0
 --- !u!114 &-8760748900487357536
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1592,40 +1544,29 @@ MonoBehaviour:
   runSpeed: 6
   squatSpeed: 1
   Con_netObj: {fileID: -8760748900487357536}
-  Con_gun_Control: {fileID: 6970771348950972825}
+  Con_gun_Control: {fileID: 1510269724543673231}
   Con_body: {fileID: -12797140595565352}
   Con_input_Manage: {fileID: 0}
   Con_player_Animation: {fileID: 581025581722992385}
   Con_player_HostNetworkEvent: {fileID: 2084833044355557849}
-  Con_localInputEvent: {fileID: 954743277171575806}
   Con_ObjectSystem: {fileID: 3882853619959400029}
   Con_aimRing_UI: {fileID: 8262661752330729875}
   Con_hitFeedback_UI: {fileID: 1223612852435951202}
   Con_lockOn_UI: {fileID: 0}
-  Con_player_Audio: {fileID: 0}
-  Con_xRay: {fileID: 0}
+  Con_player_Audio: {fileID: 2898697812567271210}
+  Con_xRay: {fileID: 8554169175301194515}
+  Con_net_State: {fileID: 2681956100395725194}
+  Con_move: {fileID: 622760688168328977}
+  Con_lock: {fileID: 1326813372226240841}
+  Con_combat: {fileID: 7914971046313913987}
+  Con_reconcile: {fileID: 6443805574781243278}
   Head: {fileID: 3271485873501248877}
   Con_camera: {fileID: 0}
   Con_player_camera: {fileID: 0}
   rigidbody: {fileID: 6445952189836789830}
-  groundCheckDistance: 0.2
   enemyMask:
     serializedVersion: 2
     m_Bits: 256
-  respawnIndex: 0
-  respawnSquatTime: 1.5
-  isOnGround: 0
-  isJumpDown: 0
-  isMouse1Down: 0
-  isMouse2Down: 0
-  isShoulderDown: 0
-  isAdsDown: 0
-  isWASDDowm: 0
-  isRuning: 0
-  isReload: 0
-  isSquat: 0
-  isRollDown: 0
-  deathCount: 0
 --- !u!114 &581025581722992385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1828,6 +1769,13 @@ MonoBehaviour:
   arcSpread: 35
   arcLife: 0.8
   arcAlpha: 0.5
+  healPeak: 0.2
+  healBreath: 0.25
+  healLife: 0.35
+  healFade: 1.2
+  healStart: 0.78
+  healRise: 5
+  healColor: {r: 0.3, g: 1, b: 0.48, a: 1}
 --- !u!114 &2898697812567271210
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1887,6 +1835,178 @@ MonoBehaviour:
   windMinSpeed: 8
   windMaxSpeed: 20
   landSpeed: 6
+--- !u!114 &1510269724543673231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc69861ea9fbf0046ba3133ba404a0f7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  shootPoint: {fileID: 2146788701391162973}
+  line: {fileID: 1457072460933560610}
+  gunRoot: {fileID: 6553109800352880347}
+  bodyRoot: {fileID: 4678201328113845342}
+  ammo: 30
+  maxAmmo: 30
+  fireRate: 900
+  range: 1000
+  damage: 34
+  reloadTime: 3.06
+  armRig: {fileID: 7373796111577540768}
+  armRigLayer: 0
+  hitEffect: {fileID: 4015259995318076048, guid: 5ba040b8213866147a03bf9330ad54ae, type: 3}
+  fireEffect: {fileID: 2654986424484326109, guid: 1dc1100dd1826c749a3d423464c7488f, type: 3}
+  bloodCount: 26
+  bloodLife: 1.2
+  bloodSpeed: 4.5
+  bloodSize: 0.16
+  bloodSpread: 38
+  bloodColor: {r: 0.62, g: 0.05, b: 0.05, a: 1}
+  aimSmooth: 10
+  hipAim:
+    outerAngle: 30
+    innerAngle: 4
+    growSpeed: 60
+    nearDistance: 2
+    farDistance: 15
+    farFactor: 1
+    stableShots: 16
+  shoulderAim:
+    outerAngle: 16
+    innerAngle: 2
+    growSpeed: 15
+    nearDistance: 6
+    farDistance: 35
+    farFactor: 1
+    stableShots: 5
+  adsAim:
+    outerAngle: 10
+    innerAngle: 0.2
+    growSpeed: 5
+    nearDistance: 60
+    farDistance: 500
+    farFactor: 1
+    stableShots: 4
+  stableCost: 0.3
+  burstCost: 0.35
+  moveFactorSquatStand: 1.3
+  moveFactorStand: 1
+  moveFactorSquatWalk: 0.7
+  moveFactorWalk: 0.5
+  moveFactorRun: 0.25
+--- !u!114 &8554169175301194515
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c92cef9c3f88624a800ebcd3e6ce3f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableXRay: 1
+  ghostLayer: 9
+  fogColor: {r: 1, g: 0.05, b: 0.05, a: 1}
+  intensity: 1.2
+  rimPower: 1.6
+  rimStrength: 0.7
+  fillAlpha: 0.7
+  maxDistance: 0
+  checkRadius: 0.35
+  refDistance: 50
+  pingCurve: 1.5
+  showTime: 0.25
+  nearDensity: 0.4
+  growStep: 1
+  growMax: 3.5
+  cardDistance: 40
+  cardScale: 0.12
+  cardMax: 18
+  minPartSize: 1
+  heightFade: 0.15
+  noiseScale: 3.5
+  noiseSpeed: 0.35
+  cardSoft: 1.5
+--- !u!114 &2681956100395725194
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21526b2c484a60247a8bee208153adea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &6443805574781243278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b37545591f613047b3c3458964af20a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  radius: 0.5
+  snap: 5
+--- !u!114 &7914971046313913987
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0136da1cbb80224ca2701033c24ed67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1326813372226240841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0a64ff32be29ba4c90c1a60a6743d2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &622760688168328977
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f73acdf0ebedc294cac6c4f4ceb2b8e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  groundCheckDistance: 0.2
+  respawnSquatTime: 0.23
+  reconcileSpeed: 5
+  isOnGround: 0
+  isWeightLess: 0
+  isWASDDowm: 0
+  isRuning: 0
+  isSquat: 0
+  isJumpDown: 0
+  isRollDown: 0
+  rollTimer: 0
 --- !u!1 &7746808583437207710
 GameObject:
   m_ObjectHideFlags: 0
@@ -4216,7 +4336,15 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
-  m_WarningMessage: 
+  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
+    are already bound by a Humanoid avatar. These transforms can only be changed
+    by Humanoid clips.\n\tTransform 'mixamorig:Hips'\n\tTransform 'mixamorig:RightFoot'\n\tTransform
+    'mixamorig:LeftLeg'\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:LeftToeBase'\n\tTransform
+    'mixamorig:Spine1'\n\tTransform 'mixamorig:Spine2'\n\tTransform 'mixamorig:LeftHandPinky3'\n\tTransform
+    'mixamorig:LeftHandThumb1'\n\tTransform 'mixamorig:RightHandPinky3'\n\tand more
+    ...\n\tFrom animation clip 'squat foeword'\n\tFrom animation clip 'squat to the
+    right'\n\tFrom animation clip 'squat back'\n\tFrom animation clip 'squat to the
+    left'\n\tFrom animation clip 'Probe back'\n\tFrom animation clip 'Probe out'"
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0

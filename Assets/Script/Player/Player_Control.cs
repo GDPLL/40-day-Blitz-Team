@@ -8,6 +8,7 @@ using Unity.VisualScripting;
 using System;
 
 // 玩家行为控制，持有各组件引用
+
 public class Player_Control : Character_Move
 {
 
@@ -18,13 +19,17 @@ public class Player_Control : Character_Move
     public Input_Manage Con_input_Manage;           // 本地全局输入引用,网络固定时段发送
     public Player_animation Con_player_Animation;       // 本地动画引用
     public HostNetWorkInputEvent Con_player_HostNetworkEvent;   // 网络同步事件触发器
-    public Local_InputEvent Con_localInputEvent;        // 本机表现层输入事件
     public Object_System Con_ObjectSystem;          // 生命系统
     public Aim_Ring_UI Con_aimRing_UI;              // 本机瞄准圈显示
     public Hit_Feedback_UI Con_hitFeedback_UI;      // 本机命中反馈
     public Lock_On_UI Con_lockOn_UI;                // 本机锁定提示
     public Player_Audio Con_player_Audio;           // 玩家音效表现
     public Player_XRay Con_xRay;                    // 本机透视
+    public Player_Net_State Con_net_State;          // 网络数据仓库
+    public Player_Move_Date Con_move;               // 移动驱动
+    public Player_Lock_Date Con_lock;               // 锁定机制
+    public Player_Combat_Date Con_combat;           // 战斗结果
+    public Player_Reconcile_Date Con_reconcile;     // 位置纠偏
 
     // 本地对外变量
     [Header("头部位置")]
@@ -34,16 +39,11 @@ public class Player_Control : Character_Move
     public Player_camera Con_player_camera;         // 玩家相机控制组件
     [Header("本地刚体")]
     public new Rigidbody rigidbody;                 // 刚体
-    [Header("落地检测")]
-    public float groundCheckDistance = 0.2f;  // 落地检测距离
     [Header("目标检测")]
     public LayerMask enemyMask;      // 敌人层
-    [Header("复活点")]
-    public int respawnIndex;         // 复活点编号
-    public float respawnSquatTime = 0.23f;   // 复活倒地碰撞体保持秒
 
     //复活点编号，各端一致
-    public int RespawnIndex => IsServer ? respawnIndex : netRespawnIndex.Value;
+    public int RespawnIndex => IsServer ? Con_ObjectSystem.respawnIndex : Con_net_State.RespawnIndex;
 
     //玩家编号，按加入编号，界面显示用
     public int Player_Number => (int)OwnerClientId + 1;
@@ -53,84 +53,6 @@ public class Player_Control : Character_Move
     private bool isStarted;             //是否已初始化
     private bool isLocalStarted;        //本机表现层是否已初始化
     public bool IsActive => IsServer && IsComplete; //主机合法运行判断
-
-    //对外读取弹药血量与积分
-    public int Ammo => Con_gun_Control != null ? Con_gun_Control.ammo : 0;       //剩余弹药
-    public int MaxAmmo => Con_gun_Control != null ? Con_gun_Control.maxAmmo : 0; //弹匣容量
-    public int HP => Con_ObjectSystem != null ? Con_ObjectSystem.HP : 0;         //当前血量
-    public int MaxHp => Con_ObjectSystem != null ? Con_ObjectSystem.MaxHp : 0;   //血量上限
-    public int Score => netScore.Value;                                          //当前积分
-    public bool Is_Reload => Con_gun_Control != null && Con_gun_Control.IsReloading;   //换弹中
-
-    //对外读取表现状态位
-    public ushort Show_State => netShowState.Value;
-
-    //本地状态中转
-    public bool isOnGround;  //在地面
-    bool isWeightLess;       //失重中
-    float bodyScale = 1f;    //碰撞体当前比例
-    float respawnSquatTimer; //复活倒地保持计时
-    public bool isJumpDown;    //跳跃空格
-    bool jumpRequest;          //本物理帧请求起跳
-    public bool isMouse1Down;   //左键输入
-    public bool isMouse2Down;   //右键输入
-    public bool isMouseDown => isMouse1Down || isMouse2Down;
-    public bool isShoulderDown;   //肩射输入
-    public bool isAdsDown;        //开镜输入
-    public bool isAimDown => isMouse1Down || isMouse2Down || isShoulderDown || isAdsDown;   //举枪中
-    public bool isWASDDowm;    //移动输入
-    public bool isRuning;      //奔跑输入
-    public bool isReload;       //换弹输入
-    public bool isSquat;        //蹲下输入
-    public bool isRollDown;     //翻滚输入
-    bool rollRequest;           //本物理帧请求翻滚
-    float rollTimer;            //翻滚剩余时间
-    float rollDelay;            //翻滚施力延迟
-    Vector2 rollDir;            //翻滚方向
-
-    //同步表现状态
-    NetworkVariable<ushort> netShowState = new NetworkVariable<ushort>();    //表现状态位
-    NetworkVariable<Vector3> netAimPoint = new NetworkVariable<Vector3>();  //瞄准落点
-    NetworkVariable<Vector3> netTargetPos = new NetworkVariable<Vector3>(); //锁定点
-    NetworkVariable<bool> netHasTarget = new NetworkVariable<bool>();       //是否锁定
-    NetworkVariable<float> netAimAngle = new NetworkVariable<float>();     //精度圈角度
-    NetworkVariable<float> netVerticalSpeed = new NetworkVariable<float>(); //垂直速度
-    NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
-    NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
-    NetworkVariable<int> netRespawnIndex = new NetworkVariable<int>();      //复活点编号
-    NetworkVariable<int> netScore = new NetworkVariable<int>();             //玩家积分
-    NetworkVariable<float> netRespawnWait = new NetworkVariable<float>();   //等待剩余
-    NetworkVariable<bool> netOut = new NetworkVariable<bool>();             //已淘汰，不再复活
-    //本机表现状态
-    float localFireTime;    //本机开火计时
-
-    //锁定提示
-    Player_Control lockTarget;      //本帧锁定目标
-    Player_Control lockSentTarget;  //已通知目标
-    bool lockDone;                  //已发完成提示
-    readonly HashSet<ulong> lockSources = new HashSet<ulong>();      //锁定我的来源
-    readonly HashSet<ulong> lockDoneSources = new HashSet<ulong>();  //完成锁定的来源
-    int lockSentStage;              //已下发阶段
-
-    //毒气
-    float gasTimer;         //扣血计时
-
-    //死亡与复活
-    public int deathCount;                          //死亡次数
-    bool isDead;                                    //等待复活中
-    float respawnDelay;                             //本次等待秒数
-    float respawnTimer;                             //等待计时
-
-    public float RespawnWait => netRespawnWait.Value;                       //对外读取
-
-    public bool Is_Out => netOut.Value;                                     //对外读取
-
-    //本机预测纠偏
-    float reconcileRadius = 0.5f;    //误差阈值,米
-    float reconcileSpeed = 5f;       //拉回速度,米每秒
-    float reconcileSnap = 5f;        //超过此偏差直接归位,米
-    Vector3 authPos;                        //主机权威位置
-    int reconcileFrame;                     //回传计时
 
     // 初始化组件与输入，服务器与客户端通用
     public void Player_Control_Start(Input_Manage inputManage)
@@ -187,20 +109,62 @@ public class Player_Control : Character_Move
         if (Con_player_Audio == null) Con_player_Audio = GetComponent<Player_Audio>();
         if (Con_player_Audio == null) Debug.LogError("Player_Control|Start|未找到 Player_Audio");
 
+        if (Con_net_State == null) Con_net_State = GetComponent<Player_Net_State>();
+        if (Con_net_State == null)
+        {
+            Debug.LogError("Player_Control|Start|未找到 Player_Net_State");
+            IsComplete = false;
+        }
+
+        if (Con_move == null) Con_move = GetComponent<Player_Move_Date>();
+        if (Con_move == null)
+        {
+            Debug.LogError("Player_Control|Start|未找到 Player_Move_Date");
+            IsComplete = false;
+        }
+
+        if (Con_lock == null) Con_lock = GetComponent<Player_Lock_Date>();
+        if (Con_lock == null)
+        {
+            Debug.LogError("Player_Control|Start|未找到 Player_Lock_Date");
+            IsComplete = false;
+        }
+
+        if (Con_combat == null) Con_combat = GetComponent<Player_Combat_Date>();
+        if (Con_combat == null)
+        {
+            Debug.LogError("Player_Control|Start|未找到 Player_Combat_Date");
+            IsComplete = false;
+        }
+
+        if (Con_reconcile == null) Con_reconcile = GetComponent<Player_Reconcile_Date>();
+        if (Con_reconcile == null)
+        {
+            Debug.LogError("Player_Control|Start|未找到 Player_Reconcile_Date");
+            IsComplete = false;
+        }
+
+        // 注入上层控制，供各组件自行读取状态
+        if (Con_body != null) Con_body.Owner_Init(this);
+        if (Con_gun_Control != null) Con_gun_Control.Owner_Init(this);
+        if (Con_player_Animation != null) Con_player_Animation.Owner_Init(this);
+        if (Con_ObjectSystem != null) Con_ObjectSystem.Owner_Init(this);
+        if (Con_player_Audio != null) Con_player_Audio.Owner_Init(this);
+        if (Con_net_State != null) Con_net_State.Owner_Init(this);
+        if (Con_move != null) Con_move.Owner_Init(this);
+        if (Con_lock != null) Con_lock.Owner_Init(this);
+        if (Con_combat != null) Con_combat.Owner_Init(this);
+        if (Con_reconcile != null) Con_reconcile.Owner_Init(this);
+
         // 注册输入包接收
         if (Con_player_HostNetworkEvent != null) Con_player_HostNetworkEvent.Host_Input_Init(Con_input_Manage);
 
-        // 注册输入事件
-        RegisterInputEvents();
-
         // 注册生命事件
-        if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd += OnHealthEnd;
-        if (Con_ObjectSystem != null) Con_ObjectSystem.Damage_event += OnDamaged;
+        if (Con_combat != null) Con_combat.Combat_Init(Con_ObjectSystem);
 
         // 初始化同步
-        if (IsServer && Con_ObjectSystem != null) netHealth.Value = Con_ObjectSystem.HP;
-        if (IsServer && Con_gun_Control != null) netAmmo.Value = Con_gun_Control.ammo;
-        if (IsServer) netRespawnIndex.Value = respawnIndex;     //复活点各端一致
+        if (IsServer && Con_net_State != null && Con_ObjectSystem != null && Con_gun_Control != null && Con_move != null)
+            Con_net_State.Init_Push(Con_ObjectSystem.HP, Con_gun_Control.ammo, Con_ObjectSystem.respawnIndex);
 
         if (Con_body != null) Con_body.Body_Init(rigidbody);
         if (Con_gun_Control != null)
@@ -235,14 +199,6 @@ public class Player_Control : Character_Move
             return;
         }
 
-        // 本机表现层事件分发
-        if (Con_localInputEvent == null) Con_localInputEvent = gameObject.AddComponent<Local_InputEvent>();
-        Con_localInputEvent.Local_Input_Init(Con_input_Manage);
-        Con_localInputEvent.AimPose_event += OnLocalAimPose;
-
-        // 本机预测事件
-        RegisterPredictEvents();
-
         Con_player_camera.Player_camera_Start(Head);    //相机跟随头部
 
         // 本机瞄准圈
@@ -268,13 +224,7 @@ public class Player_Control : Character_Move
         Con_xRay.Player_XRay_Init(Con_camera, enemyMask);
 
         // 客机本地预测，位置自己算
-        if (!IsServer && rigidbody != null)
-        {
-            NetworkTransform netTrans = GetComponent<NetworkTransform>();
-            if (netTrans != null) netTrans.enabled = false;
-
-            rigidbody.isKinematic = false;    // 本地非运动学控制
-        }
+        if (Con_reconcile != null) Con_reconcile.Reconcile_Init();
 
         // 锁定并隐藏鼠标
         Cursor.lockState = CursorLockMode.Locked;
@@ -284,167 +234,24 @@ public class Player_Control : Character_Move
     }
 
 
-    // 打包表现状态位
-    ushort PackShowState()
-    {
-        ushort state = 0;
-        if (isWASDDowm) state |= Player_animation.BitWalk;
-        if (isRuning) state |= Player_animation.BitRun;
-        if (isSquat) state |= Player_animation.BitSquat;
-        if (isAimDown) state |= Player_animation.BitGun;
-        if (isJumpDown) state |= Player_animation.BitJump;
-        if (isOnGround) state |= Player_animation.BitGround;
-        if (isDead || Is_Out) state |= Player_animation.BitDeath;
-        if (rollTimer > 0f) state |= Player_animation.BitRoll;
-        if (Is_Reload) state |= Player_animation.BitReload;    //换弹
-        if (isWeightLess) state |= Player_animation.BitWeightLess;    //失重
-
-        // 移动方向取输入包，各端一致
-        state |= Player_animation.Pack_Move(Con_player_HostNetworkEvent.Packet.move);
-        return state;
-    }
-
-    // 打包本机表现状态位
-    ushort PackLocalShowState()
-    {
-        if (Con_input_Manage == null) return netShowState.Value;
-
-        ushort state = 0;
-        if (Con_input_Manage.WASDHeld) state |= Player_animation.BitWalk;
-        if (Con_input_Manage.RunHeld) state |= Player_animation.BitRun;
-        if (Con_input_Manage.SquatHeld) state |= Player_animation.BitSquat;
-        if (Con_input_Manage.MouseHeld || Con_input_Manage.ShoulderHeld || Con_input_Manage.AdsHeld) state |= Player_animation.BitGun;
-        if (Con_input_Manage.JumpDownHeld) state |= Player_animation.BitJump;
-        if (RespawnWait > 0f || Is_Out) state |= Player_animation.BitDeath;
-        if (rollTimer > 0f) state |= Player_animation.BitRoll;
-        if (Is_Reload) state |= Player_animation.BitReload;    //换弹
-        if (isWeightLess) state |= Player_animation.BitWeightLess;    //失重
-
-        // 落地与方向取本机数据
-        if (isOnGround) state |= Player_animation.BitGround;
-        state |= Player_animation.Pack_Move(Con_input_Manage.LastPacket.move);
-        return state;
-    }
-
-    // 瞬移，刚体一起搬，防物理回写
-    public void Player_Teleport_Date(Vector3 position, Quaternion rotation)
-    {
-        transform.position = position;
-        transform.rotation = rotation;
-
-        if (rigidbody == null) return;
-
-        rigidbody.position = position;      //非运动学刚体归物理管
-        rigidbody.rotation = rotation;
-        rigidbody.velocity = Vector3.zero;
-        rigidbody.angularVelocity = Vector3.zero;
-    }
-
-    // 重置位置与速度
+    // 重置方法
     public void Player_Respawn_Date(Vector3 position, Quaternion rotation)
     {
-        Player_Teleport_Date(position, rotation);
-
-        // 复活重置翻滚，碰撞体保持倒地
-        rollTimer = 0f;
-        rollDelay = 0f;
-        respawnSquatTimer = respawnSquatTime;
-        if (Con_body != null)
-        {
-            bodyScale = Con_body.deadSquatScale;
-            Con_body.Body_Size_Date(bodyScale);
-        }
+        Con_move.Reset_State(position, rotation);
 
         // 复活取消换弹
         if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Cancel();
 
-        if (!IsServer) return;      //只有主机下发
-
         // 客机强制瞬移
-        ClientRpcParams ps = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
-        };
-        Player_TeleportClientRpc(position, rotation, ps);
+        if (Con_reconcile != null) Con_reconcile.Teleport_Push(position, rotation);
     }
 
 
-    // 死亡事件，主机开始等待复活
-    void OnHealthEnd()
+    // 各端每帧数据采集，各端各玩家都跑
+    public void Player_Control_Date_Update()
     {
-        if (!IsServer) return;      //主机处理
-        if (isDead) return;         //已在等待
-
-        Lock_On_Reset();            //死亡清空锁定提示
-        if (netOut.Value) return;   //已淘汰
-
-        if (Player_Main.player_Main == null)
-        {
-            Debug.LogError("Player_Control|OnHealthEnd|Player_Main 为空");
-            return;
-        }
-
-        // 击杀者死亡计数归零
-        Player_Main.player_Main.Player_Kill(Con_ObjectSystem.KillerId);
-
-        // 等待时长随死亡次数翻倍，上限8秒
-        deathCount++;
-        respawnDelay = deathCount <= 1 ? 0f : Mathf.Min(Mathf.Pow(2f, deathCount - 1), 8f);
-        respawnTimer = 0f;
-        isDead = true;
-        netRespawnWait.Value = respawnDelay;
-
-        // 各端提示阵亡
-        Player_Main.player_Main.Player_Death_Date(this);
-    }
-
-    // 击杀敌人，清空死亡计数
-    public void Player_Death_Reset()
-    {
-        deathCount = 0;
-    }
-
-    // 击杀提示，主机下发
-    public void Player_Kill_Date()
-    {
-        if (!IsServer) return;      //只有主机下发
-
-        // 主机自己直接播
-        if (IsOwner && Con_player_Audio != null) Con_player_Audio.Kill_Show();
-
-        ClientRpcParams ps = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
-        };
-        Player_KillClientRpc(ps);
-    }
-
-    // 击杀者提示
-    [ClientRpc]
-    void Player_KillClientRpc(ClientRpcParams ps = default)
-    {
-        if (IsServer) return;       //主机已播
-        if (!IsOwner) return;       //只击杀者
-
-        if (Con_player_Audio != null) Con_player_Audio.Kill_Show();
-    }
-
-    // 淘汰，9分钟后死亡不再复活
-    void Player_Out_Date()
-    {
-        if (netOut.Value) return;   //已淘汰
-
-        if (Player_Main.player_Main == null)
-        {
-            Debug.LogError("Player_Control|Player_Out_Date|Player_Main 为空");
-            return;
-        }
-
-        isDead = false;
-        netRespawnWait.Value = 0f;
-        netOut.Value = true;
-
-        Player_Main.player_Main.Player_Out_Date(this);   //各端提示并判定胜负
+        if (Con_move != null) Con_move.Move_Update();
+        if (Con_gun_Control != null) Con_gun_Control.Gun_Update();
     }
 
     // 主机每帧各端逻辑更新
@@ -459,59 +266,27 @@ public class Player_Control : Character_Move
         }
 
         // 表现状态先下发，死亡期间也要同步
-        netShowState.Value = PackShowState();
+        Con_net_State.Show_State_Push();
 
-        // 死亡等待复活，9分钟后不再复活
-        if (isDead)
-        {
-            if (Player_level.Instance != null && Player_level.Instance.Respawn_Off)
-            {
-                Player_Out_Date();      //9分钟后死亡即淘汰
-                return;
-            }
-
-            respawnTimer += Time.deltaTime;
-            netRespawnWait.Value = Mathf.Max(respawnDelay - respawnTimer, 0f);
-            if (respawnTimer < respawnDelay) return;
-
-            isDead = false;
-            netRespawnWait.Value = 0f;
-            Player_Main.player_Main.Player_Respawn(this);
-            Con_ObjectSystem.ResetHealth();
-
-            return;
-        }
-
-        if (netOut.Value) return;   //已淘汰不再参与
-
-        // 毒气，低于毒气高度每秒扣血
-        if (Player_level.Instance != null && transform.position.y < Player_level.Instance.Gas_Height)
-        {
-            gasTimer += Time.deltaTime;
-            if (gasTimer >= 1f)
-            {
-                gasTimer = 0f;
-                Con_ObjectSystem.Takedamage(Player_level.Instance.gasDamage, 999, new Vector3(), out _);
-            }
-        }
-        else gasTimer = 0f;
+        // 死亡与毒气，返回true跳过后续
+        if (Con_ObjectSystem.Objcet_System_Update()) return;
 
         InputPacket packet = Con_player_HostNetworkEvent.Packet;   //纯数据来源
 
         // 落地检测
-        isOnGround = IsGrounded();
+        Con_move.Ground_Date();
 
         // 空中超致死速度算失重
-        isWeightLess = rigidbody != null &&
-            Con_ObjectSystem.WeightLess_Date(rigidbody.velocity.magnitude, isOnGround);
+        Con_move.isWeightLess = rigidbody != null &&
+            Con_ObjectSystem.WeightLess_Date(rigidbody.velocity.magnitude, Con_move.isOnGround);
 
         // 本机坠地音效
         if (IsOwner && Con_player_Audio != null && rigidbody != null)
-            Con_player_Audio.Land_Check(rigidbody.velocity.y, isOnGround);
+            Con_player_Audio.Land_Check(rigidbody.velocity.y, Con_move.isOnGround);
 
         // 传递枪械状态
-        Con_gun_Control.SetAimState(isShoulderDown, isAdsDown);
-        Con_gun_Control.SetMoveState(isSquat, isWASDDowm, isRuning && !Is_Reload);   //换弹按走路算精度
+        Con_gun_Control.SetAimState(packet.shoulder, packet.ads);
+        Con_gun_Control.SetMoveState(Con_move.isSquat, Con_move.isWASDDowm, Con_move.isRuning && !Con_gun_Control.IsReloading);   //换弹按走路算精度
 
         // 锁定基准取相机
         Vector3 origin = packet.viewPos != Vector3.zero ? packet.viewPos : Con_gun_Control.MuzzlePosition;
@@ -526,29 +301,29 @@ public class Player_Control : Character_Move
         // 复活点随楼层上移，进度可提前
         if (Player_level.Instance != null)
         {
-            int floor = Mathf.Max(respawnIndex / 10, Player_level.Instance.Respawn_Floor);
-            respawnIndex = respawnIndex % 10 + floor * 10;
-            if (netRespawnIndex.Value < respawnIndex) netRespawnIndex.Value = respawnIndex;
+            int idx = Con_ObjectSystem.respawnIndex;
+            int floor = Mathf.Max(idx / 10, Player_level.Instance.Respawn_Floor);
+            Con_ObjectSystem.respawnIndex = idx % 10 + floor * 10;
+            Con_net_State.Respawn_Index_Push(Con_ObjectSystem.respawnIndex);
         }
 
         // 生命系统状态
-        netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
-        netAmmo.Value = Con_gun_Control.ammo;       //获取主机上各端玩家弹药
-        netVerticalSpeed.Value = rigidbody != null ? rigidbody.velocity.y : 0f;   //获取垂直速度
         Con_ObjectSystem.Object_System_Update();
 
-        // 锁敌
-        UpdateAimTarget(origin, aimDir);
-        Lock_On_Date(isAimDown, Con_gun_Control.CurrentAngle, Con_gun_Control.InnerAngle);
-
-        // 同步瞄准表现数据
-        netHasTarget.Value = isAimDown && Con_gun_Control.HasTarget;   //举枪才显示锁圈
-        netAimAngle.Value = Con_gun_Control.CurrentAngle;
-        if (isAimDown)
+        // 锁敌，结果由Control推给枪械
+        if (Con_lock != null)
         {
-            netAimPoint.Value = packet.aimPoint;
-            netTargetPos.Value = Con_gun_Control.TargetPos;
+            bool aimDown = packet.mouse1 || packet.mouse2 || packet.shoulder || packet.ads;
+
+            Con_lock.Target_Date(origin, aimDir, packet.aimPoint, Con_gun_Control.range, Con_gun_Control.OuterAngle,
+                out bool hasTarget, out Vector3 targetPos);
+
+            Con_gun_Control.Target_Push(hasTarget, targetPos);
+            Con_lock.Lock_On_Date(aimDown, Con_gun_Control.CurrentAngle, Con_gun_Control.InnerAngle);
         }
+
+        // 数据更新末尾统一写入同步
+        Con_net_State.Host_State_Push();
     }
 
     // 主机每物理帧各端逻辑更新
@@ -559,98 +334,26 @@ public class Player_Control : Character_Move
             Player_Control_Date_ClientFixedUpdate_Own(Con_input_Manage.LastPacket);
 
         // 翻滚死亡失重共用碰撞体缩放
-        Body_Size_Date();
+        Con_move.Body_Size_Date(Con_ObjectSystem.isDead);
 
         if (!IsActive) return;
-        if (isDead) return;     //等待复活不驱动
+        if (Con_ObjectSystem.isDead) return;     //等待复活不驱动
 
         // 回传权威位置，10Hz
-        if (++reconcileFrame >= 5)
-        {
-            reconcileFrame = 0;
-
-            ClientRpcParams ps = new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
-            };
-            Player_ReconcileClientRpc(transform.position, ps);
-        }
+        if (Con_reconcile != null) Con_reconcile.Reconcile_Host_Fixed();
 
         InputPacket packet = Con_player_HostNetworkEvent.Packet;   //纯数据来源
-        // 计算移动数据
-        Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !Is_Reload, isSquat);   //换弹只能走路
-
-        Con_body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速，含落地检测
-
-        // 坠落伤害，按空中最大下落速度算
-        if (rigidbody != null)
-            Con_ObjectSystem.Fall_Damage_Date(rigidbody.velocity.y, Con_body.IsGrounded, Time.fixedDeltaTime);
 
         Con_gun_Control.Gun_Fixed_Date();
 
-        // 起跳，每物理帧最多一次
-        if (jumpRequest)
-        {
-            jumpRequest = false;
-            Con_body.Body_Jump_Date();
-            if (IsOwner && Con_player_Audio != null) Con_player_Audio.Jump_Show();
-        }
+        // 帧内仲裁并执行瞬移申请
+        Con_move.Teleport_Resolve();
 
-        // 翻滚，每物理帧最多一次，翻滚中不重复
-        if (rollRequest)
-        {
-            rollRequest = false;
-
-            if (rollTimer <= 0f)
-            {
-                rollDir = packet.move;                      //记下方向，延迟后用
-                rollDelay = Con_body.rollDelay;             //第二段延迟
-                rollTimer = Con_body.rollTime + rollDelay;
-
-                Con_body.Body_Roll_Date(rollDir, packet.viewDir);   //第一段立即施力
-
-                if (IsOwner && Con_player_Audio != null) Con_player_Audio.Roll_Show();
-            }
-        }
-
-        // 延迟到点再施一次力
-        if (rollDelay > 0f)
-        {
-            rollDelay -= Time.fixedDeltaTime;
-            if (rollDelay <= 0f) Con_body.Body_Roll_Date(rollDir, packet.viewDir);
-        }
-
-        // 翻滚计时
-        if (rollTimer > 0f) rollTimer -= Time.fixedDeltaTime;
-
-
-
-        // 输入施推力
-        if (isWASDDowm && rollTimer <= 0f) Con_body.Body_Move();   //翻滚中不给移动力
+        // 移动驱动，含坠落伤害
+        Con_move.Move_Host_Fixed(packet, Con_gun_Control.IsReloading);
 
         // 场景交互检测
         Player_Scene_Interaction_Date(GetComponent<Collider>());
-    }
-
-    // 翻滚死亡失重共用碰撞体缩放
-    void Body_Size_Date()   //主机调用
-    {
-        Body_Size_Date(isDead);
-    }
-
-    void Body_Size_Date(bool _isdead)   //客机本地调用
-    {
-        // 翻滚用翻滚比例，死亡失重倒地取更小比例
-        float scale = rollTimer > 0f ? Con_body.rollSquatScale : 1f;
-        if (_isdead || isWeightLess || respawnSquatTimer > 0f) scale = Con_body.deadSquatScale;
-
-        // 复活倒地保持计时
-        if (respawnSquatTimer > 0f) respawnSquatTimer -= Time.fixedDeltaTime;
-
-        if (bodyScale == scale) return;    //比例没变
-
-        bodyScale = scale;
-        Con_body.Body_Size_Date(scale);
     }
 
     // 场景交互检测，col为玩家碰撞体
@@ -681,7 +384,7 @@ public class Player_Control : Character_Move
 
         // 本机信号花屏
         if (Con_player_camera != null && Con_ObjectSystem != null)
-            Con_player_camera.Camera_Signal_Performance_Local(Con_ObjectSystem.HP, Is_Out);
+            Con_player_camera.Camera_Signal_Performance_Local(Con_ObjectSystem.HP, Con_net_State.Is_Out);
 
         // 姿态本地预测，避免按键延迟
         if (Con_gun_Control != null && Con_input_Manage != null)
@@ -695,7 +398,7 @@ public class Player_Control : Character_Move
             Con_hitFeedback_UI.Heal_Edge_Performance_Local(Con_ObjectSystem.HP, Con_ObjectSystem.healCap);
 
         // 命中与受击反馈
-        if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show(Score);
+        if (Con_hitFeedback_UI != null) Con_hitFeedback_UI.Hit_Feedback_UI_Show(Con_net_State.Score);
 
         // 呼吸与咳嗽，血量与毒气驱动
         if (Con_player_Audio != null && Con_ObjectSystem != null)
@@ -722,10 +425,10 @@ public class Player_Control : Character_Move
     // 客户端每帧各端表现层更新
     public void Player_Control_Show_ClientUpdate()
     {
-        ushort state = IsOwner ? PackLocalShowState() : netShowState.Value;   //本机用本地输入预测
+        ushort state = IsOwner ? Con_net_State.Show_State_Local() : Con_net_State.Show_State;   //本机用本地输入预测
 
         // 本机用本地垂直速度，其余读下发值
-        float verticalSpeed = IsOwner && rigidbody != null ? rigidbody.velocity.y : netVerticalSpeed.Value;
+        float verticalSpeed = IsOwner && rigidbody != null ? rigidbody.velocity.y : Con_net_State.VerticalSpeed;
 
         // 动画，垂直速度驱动失重与坠落
         if (Con_player_Animation != null)
@@ -735,7 +438,7 @@ public class Player_Control : Character_Move
         if (Con_player_Audio != null) Con_player_Audio.Player_Audio_Show(state);
 
         // 血量同步到本地
-        if (!IsServer && Con_ObjectSystem != null) Con_ObjectSystem.HP = netHealth.Value;
+        if (!IsServer && Con_ObjectSystem != null) Con_ObjectSystem.HP = Con_net_State.Health;
 
         if (Con_gun_Control == null) return;
 
@@ -745,14 +448,14 @@ public class Player_Control : Character_Move
         // 弹药与瞄准数据同步到本地
         if (!IsServer)
         {
-            Con_gun_Control.ammo = netAmmo.Value;
-            Con_gun_Control.SetAimShow(netHasTarget.Value, netTargetPos.Value, netAimAngle.Value);
+            Con_gun_Control.ammo = Con_net_State.Ammo;
+            Con_gun_Control.SetAimShow(Con_net_State.HasTarget, Con_net_State.TargetPos, Con_net_State.AimAngle);
         }
 
         // 举枪，锁定时指锁定点
         if ((state & Player_animation.BitGun) != 0)
         {
-            Vector3 aimPoint = IsOwner ? Con_input_Manage.AimPoint : netAimPoint.Value;
+            Vector3 aimPoint = IsOwner ? Con_input_Manage.AimPoint : Con_net_State.AimPoint;
 
             // 锁定点须在枪前方
             Vector3 muzzle = Con_gun_Control.MuzzlePosition;
@@ -761,7 +464,7 @@ public class Player_Control : Character_Move
                 aimPoint = Con_gun_Control.TargetPos;
 
             // 换弹时不跟准星，枪指身体正前方
-            if (Is_Reload) aimPoint = muzzle + transform.forward * 10f;
+            if (Con_gun_Control.IsReloading) aimPoint = muzzle + transform.forward * 10f;
 
             Con_gun_Control.Gun_Aim_Performance(aimPoint);
         }
@@ -779,714 +482,39 @@ public class Player_Control : Character_Move
             return;
         }
         // 翻滚死亡失重共用碰撞体缩放
-        Body_Size_Date(netRespawnWait.Value > 0f);
+        Con_move.Body_Size_Date(Con_net_State.RespawnWait > 0f);
 
-        if (netRespawnWait.Value > 0f) return;    //等待复活不驱动
-
-        // 移动，与主机同一套逻辑
-        Con_body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !Is_Reload, isSquat);   //换弹只能走路
-        Con_body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速
-        isOnGround = Con_body.IsGrounded;
+        if (Con_net_State.RespawnWait > 0f) return;    //等待复活不驱动
 
         // 本机换弹计时
         if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Tick(Time.fixedDeltaTime);
 
-        // 空中超致死速度算失重
-        isWeightLess = rigidbody != null &&
-            Con_ObjectSystem.WeightLess_Date(rigidbody.velocity.magnitude, isOnGround);
-
-        // 本机坠地音效
-        if (Con_player_Audio != null && rigidbody != null)
-            Con_player_Audio.Land_Check(rigidbody.velocity.y, isOnGround);
-
-        if (isWASDDowm && rollTimer <= 0f) Con_body.Body_Move();   //翻滚中不给移动力
-
-        // 起跳
-        if (jumpRequest)
-        {
-            jumpRequest = false;
-            Con_body.Body_Jump_Date();
-            if (Con_player_Audio != null) Con_player_Audio.Jump_Show();
-        }
-
-        // 翻滚，翻滚中不重复
-        if (rollRequest)
-        {
-            rollRequest = false;
-
-            if (rollTimer <= 0f)
-            {
-                rollDir = packet.move;                      //记下方向，延迟后用
-                rollDelay = Con_body.rollDelay;             //第二段延迟
-                rollTimer = Con_body.rollTime + rollDelay;
-
-                Con_body.Body_Roll_Date(rollDir, packet.viewDir);   //第一段立即施力
-
-                if (Con_player_Audio != null) Con_player_Audio.Roll_Show();
-            }
-        }
-
-        // 延迟到点再施一次力
-        if (rollDelay > 0f)
-        {
-            rollDelay -= Time.fixedDeltaTime;
-            if (rollDelay <= 0f) Con_body.Body_Roll_Date(rollDir, packet.viewDir);
-        }
-
-        // 翻滚计时
-        if (rollTimer > 0f) rollTimer -= Time.fixedDeltaTime;
-
-
+        // 移动，与主机同一套逻辑，含落地失重与坠地音效
+        Con_move.Move_ClientOwn_Fixed_Predict(packet, Con_gun_Control.IsReloading);
 
         // 场景交互，索道等本机自己走
         Player_Scene_Interaction_Date(GetComponent<Collider>());
 
-        // 向权威位置收敛
-        Player_Reconcile_Date();
-    }
+        if (Con_reconcile == null || Con_move == null) return;
 
-    // 客机纠偏，只纠真正的漂移
-    void Player_Reconcile_Date()
-    {
-        if (authPos == Vector3.zero) return;    //还没收到过
-
-        Vector3 offset = authPos - transform.position;
-        if (offset.magnitude < reconcileRadius) return;
-
-        // 偏差过大直接归位，不拖拽
-        if (offset.magnitude > reconcileSnap)
+        // 计算纠偏，超阈值转为瞬移申请
+        if (Con_reconcile.Reconcile_ClientOwn_Date(transform.position, out Vector3 target, out bool hard))
         {
-            Player_Teleport_Date(authPos, transform.rotation);
-            return;
+            if (hard) Con_move.Teleport_Request(target, transform.rotation, Player_Move_Date.Priority_Reconcile);
+            else Con_move.Reconcile_Move_Date(target);
         }
 
-        // 平滑回正，走物理接口避免硬拉
-        Vector3 next = transform.position + offset.normalized
-            * Mathf.Min(reconcileSpeed * Time.fixedDeltaTime, offset.magnitude);
-
-        if (rigidbody != null) rigidbody.MovePosition(next);
-        else transform.position = next;
-    }
-
-    // 客机同步瞬移，复活与传送用
-    [ClientRpc]
-    void Player_TeleportClientRpc(Vector3 position, Quaternion rotation, ClientRpcParams ps = default)
-    {
-        if (IsServer) return;
-
-        Player_Teleport_Date(position, rotation);
-
-        authPos = position;    //同步纠偏基准，防止被拉回
-    }
-
-    // 回传权威位置
-    [ClientRpc]
-    void Player_ReconcileClientRpc(Vector3 position, ClientRpcParams ps = default)
-    {
-        if (IsServer) return;
-
-        authPos = position;
-    }
-
-    // 本机肩射与开镜开关
-    void OnLocalAimPose(bool shoulder, bool ads)
-    {
-        if (Con_player_camera != null) Con_player_camera.Camera_Aim_Performance_Local(shoulder, ads);
-    }
-
-    // 本机开火预测，按射速节流
-    void OnLocalFire()
-    {
-        if (IsServer) return;               //主机已播放
-        if (Con_gun_Control == null || Con_input_Manage == null) return;
-        if (Con_gun_Control.IsReloading) return;   //换弹中不能开火
-        if (!Con_gun_Control.HasAmmo()) return;
-        if (Time.time - localFireTime < Con_gun_Control.FireInterval) return;   //未到射速
-
-        localFireTime = Time.time;
-
-        Con_gun_Control.Gun_Shoot_Local_Performance(Con_gun_Control.MuzzlePosition, Con_gun_Control.transform.forward);
-
-        if (Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
-    }
-
-    // 开火，拼接逻辑与表现
-    void Player_Fire()
-    {
-        if (Con_gun_Control == null || Con_player_HostNetworkEvent == null)
-        {
-            Debug.LogError("Player_Control|Player_Fire|gun 为空");
-            return;
-        }
-
-        // 枪口瞄准方向由落点推算,落点-开火点
-        Vector3 aimDir = Con_player_HostNetworkEvent.Packet.aimPoint - Con_gun_Control.MuzzlePosition;
-
-        Vector3 flatAim = new Vector3(aimDir.x, 0f, aimDir.z);
-        Vector3 flatView = new Vector3(
-            Con_player_HostNetworkEvent.Packet.viewDir.x, 0f,
-            Con_player_HostNetworkEvent.Packet.viewDir.z);
-
-        if (flatAim.sqrMagnitude <= 0.001f || Vector3.Dot(flatAim, flatView) <= 0f)
-            aimDir = Con_player_HostNetworkEvent.Packet.viewDir;
-
-        // 对准判定取准星朝向，只用于本次判定
-        Vector3 alignDir = Con_player_HostNetworkEvent.Packet.viewDir;
-
-        if (!Con_gun_Control.Gun_Shoot_Date(aimDir, alignDir, out Vector3 origin, out Vector3 dir,
-            out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
-            out int hitDamage, out bool killed, out Bounds hitBounds)) return;
-
-        Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
-
-        // 命中敌人的爆浆
-        if (hitTarget) Con_gun_Control.Gun_Blood_Performance(hitPoint, aimDir);
-
-        // 本机受近处落点压制
-        if (isHit && !IsOwner)
-        {
-            if (Player_Main.player_Main == null) Debug.LogError("Player_Control|Player_Fire|Player_Main 为空");
-            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
-        }
-
-        // 本机开火震屏
-        if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Shoot_Performance_Local();
-
-        // 命中积分，击杀分单独计算
-        int killScore = killed ? KillScore : 0;
-        if (hitTarget) Score_Add(hitDamage + killScore);
-
-        // 本机命中反馈
-        if (IsOwner && hitTarget && Con_hitFeedback_UI != null)
-            Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint, hitBounds.center, hitBounds.size);
-
-        // 本机命中音效
-        if (IsOwner && hitTarget && Con_player_Audio != null) Con_player_Audio.Hit_Show();
-
-        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal, hitDamage, killScore,
-            hitBounds.center, hitBounds.size);
-    }
-
-    const int KillScore = 100;      //击杀加分
-
-    // 累加积分，主机处理
-    void Score_Add(int add)
-    {
-        if (!IsServer) return;
-
-        netScore.Value += add;
-    }
-
-    // 客户端开火表现
-    [ClientRpc]
-    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal,
-        int hitDamage, int killScore, Vector3 hitCenter, Vector3 hitSize)
-    {
-        if (IsServer) return;   //主机已播放
-
-        // 本机受近处落点压制
-        if (isHit && !IsOwner)
-        {
-            if (Player_Main.player_Main == null) Debug.LogError("Player_Control|Gun_Shoot_ClientRpc|Player_Main 为空");
-            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
-        }
-
-        if (Con_gun_Control == null) return;
-
-        // 命中敌人的爆浆
-        if (hitTarget) Con_gun_Control.Gun_Blood_Performance(hitPoint, dir);
-
-        // 本机已预测枪口与震屏，只补弹道
-        if (IsOwner)
-        {
-            Con_gun_Control.Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
-
-            // 本机命中反馈与音效
-            if (hitTarget && Con_hitFeedback_UI != null)
-                Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint, hitCenter, hitSize);
-            if (hitTarget && Con_player_Audio != null) Con_player_Audio.Hit_Show();
-            return;
-        }
-
-        Con_gun_Control.Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
-    }
-
-    // 主机受击，转发攻击者位置
-    void OnDamaged(Vector3 fromPos)
-    {
-        if (!IsServer) return;   //主机处理
-
-        // 主机自己直接显示
-        if (IsOwner && Con_hitFeedback_UI != null) Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
-
-        // 受击震动
-        if (IsOwner && Con_player_camera != null) Con_player_camera.Camera_Hurt_Performance_Local();
-
-        // 被射中提示，环境伤害位置为零不播
-        if (IsOwner && Con_player_Audio != null && fromPos != Vector3.zero) Con_player_Audio.Hurt_Show();
-
-        Damage_Dir_ClientRpc(fromPos);
-    }
-
-    // 客户端受击方向表现
-    [ClientRpc]
-    void Damage_Dir_ClientRpc(Vector3 fromPos)
-    {
-        if (IsServer) return;   //主机已显示
-        if (!IsOwner) return;   //只本机显示
-
-        if (Con_hitFeedback_UI == null)
-        {
-            Debug.LogError("Player_Control|Damage_Dir_ClientRpc|命中反馈UI 为空");
-            return;
-        }
-
-        Con_hitFeedback_UI.Damage_Dir_Performance_Local(fromPos);
-
-        // 受击震动
-        if (Con_player_camera != null) Con_player_camera.Camera_Hurt_Performance_Local();
-
-        // 被射中提示，环境伤害位置为零不播
-        if (Con_player_Audio != null && fromPos != Vector3.zero) Con_player_Audio.Hurt_Show();
-    }
-
-
-    // 注册输入事件
-    void RegisterInputEvents()
-    {
-        if (Con_player_HostNetworkEvent == null)
-        {
-            Debug.LogError("Player_Control|RegisterInputEvents|HostNetWorkInputEvent 为空");
-            return;
-        }
-
-        Con_player_HostNetworkEvent.Move_event += OnMove;                 //移动
-        Con_player_HostNetworkEvent.JumpDown_event += OnJumpDown;         //跳跃
-        Con_player_HostNetworkEvent.Mouse1_event += OnMouse1;             //左键
-        Con_player_HostNetworkEvent.Mouse2_event += OnMouse2;             //右键
-        Con_player_HostNetworkEvent.MouseHeld_event += OnMouseHeld;       //鼠标按住
-        Con_player_HostNetworkEvent.Shoulder_event += OnShoulder;         //肩射
-        Con_player_HostNetworkEvent.Ads_event += OnAds;                   //开镜
-        Con_player_HostNetworkEvent.Run_event += OnRun;                   //奔跑
-        Con_player_HostNetworkEvent.ReloadHeld_event += OnReloadHeld;     //换弹
-        Con_player_HostNetworkEvent.Squat_event += OnSquat;               //蹲下
-        Con_player_HostNetworkEvent.Roll_event += OnRoll;                 //翻滚
-    }
-
-    // 反注册输入事件
-    void UnregisterInputEvents()
-    {
-        if (Con_player_HostNetworkEvent == null) return;
-
-        Con_player_HostNetworkEvent.Move_event -= OnMove;
-        Con_player_HostNetworkEvent.JumpDown_event -= OnJumpDown;
-        Con_player_HostNetworkEvent.Mouse1_event -= OnMouse1;
-        Con_player_HostNetworkEvent.Mouse2_event -= OnMouse2;
-        Con_player_HostNetworkEvent.MouseHeld_event -= OnMouseHeld;
-        Con_player_HostNetworkEvent.Shoulder_event -= OnShoulder;
-        Con_player_HostNetworkEvent.Ads_event -= OnAds;
-        Con_player_HostNetworkEvent.Run_event -= OnRun;
-        Con_player_HostNetworkEvent.ReloadHeld_event -= OnReloadHeld;
-        Con_player_HostNetworkEvent.Squat_event -= OnSquat;
-        Con_player_HostNetworkEvent.Roll_event -= OnRoll;
-    }
-
-    // 注册本机预测事件
-    void RegisterPredictEvents()
-    {
-        if (IsServer || !IsLocalPlayer) return;     //只有客机本机走预测
-        if (Con_localInputEvent == null)
-        {
-            Debug.LogError("Player_Control|RegisterPredictEvents|Local_InputEvent 为空");
-            return;
-        }
-
-        Con_localInputEvent.Move_event += OnMove;              //移动
-        Con_localInputEvent.JumpDown_event += OnJumpDown;      //跳跃
-        Con_localInputEvent.Mouse1_event += OnMouse1;          //左键
-        Con_localInputEvent.Mouse2_event += OnMouse2;          //右键
-        Con_localInputEvent.MouseHeld_event += OnMouseHeld;    //鼠标按住
-        Con_localInputEvent.Shoulder_event += OnShoulder;      //肩射
-        Con_localInputEvent.Ads_event += OnAds;                //开镜
-        Con_localInputEvent.Run_event += OnRun;                //奔跑
-        Con_localInputEvent.ReloadHeld_event += OnReloadHeld;  //换弹
-        Con_localInputEvent.Squat_event += OnSquat;            //蹲下
-        Con_localInputEvent.Roll_event += OnRoll;              //翻滚
-    }
-
-    // 反注册本机预测事件
-    void UnregisterPredictEvents()
-    {
-        if (Con_localInputEvent == null) return;
-
-        Con_localInputEvent.Move_event -= OnMove;
-        Con_localInputEvent.JumpDown_event -= OnJumpDown;
-        Con_localInputEvent.Mouse1_event -= OnMouse1;
-        Con_localInputEvent.Mouse2_event -= OnMouse2;
-        Con_localInputEvent.MouseHeld_event -= OnMouseHeld;
-        Con_localInputEvent.Shoulder_event -= OnShoulder;
-        Con_localInputEvent.Ads_event -= OnAds;
-        Con_localInputEvent.Run_event -= OnRun;
-        Con_localInputEvent.ReloadHeld_event -= OnReloadHeld;
-        Con_localInputEvent.Squat_event -= OnSquat;
-        Con_localInputEvent.Roll_event -= OnRoll;
+        // 帧内仲裁并执行瞬移申请
+        Con_move.Teleport_Resolve();
     }
 
     public override void OnDestroy()
     {
         base.OnDestroy();
 
-        Lock_On_Release();      //退出解除锁定
-
-        UnregisterInputEvents();
-        UnregisterPredictEvents();
-
-        // 反注册本机表现事件
-        if (Con_localInputEvent != null)
-        {
-            Con_localInputEvent.AimPose_event -= OnLocalAimPose;
-        }
-
-        // 反注册生命事件
-        if (Con_ObjectSystem != null) Con_ObjectSystem.HealthEnd -= OnHealthEnd;
-        if (Con_ObjectSystem != null) Con_ObjectSystem.Damage_event -= OnDamaged;
+        if (Con_lock != null) Con_lock.Lock_On_Release();     //退出解除锁定
 
         // 关闭本机透视
         if (Con_xRay != null) Con_xRay.Player_XRay_Clear();
-    }
-
-
-
-    // 输入事件包装-唯一行为方法
-
-    // 移动，axis为输入轴
-    void OnMove(Vector2 axis)
-    {
-        isWASDDowm = axis.sqrMagnitude >= 0.01f;
-
-        if (Con_body == null)
-        {
-            Debug.LogError("Player_Control|OnMove|body 为空");
-            return;
-        }
-        if (!isOnGround) return;
-
-        // 无输入不转向
-        if (!isWASDDowm) return;
-
-        if (!isAimDown) Con_body.Body_Rotation_Performance();
-    }
-
-    // 跳跃，只记按下边沿
-    void OnJumpDown(bool on)
-    {
-        if (on && !isJumpDown) jumpRequest = true;   //按下那一帧
-        isJumpDown = on;
-    }
-
-    // 左键开火
-    void OnMouse1(bool on)
-    {
-        bool isPress = on && !isMouse1Down;     //按下那一帧
-
-        isMouse1Down = on;
-
-        if (Con_gun_Control == null)
-        {
-            Debug.LogError("Player_Control|OnMouse1|gun_Control 为空");
-            return;
-        }
-        if (!on) return;
-
-        // 没子弹扣扳机，空仓提示一次
-        if (isPress && !Con_gun_Control.HasAmmo()) Con_gun_Control.Gun_Empty_Date();
-
-        if (IsServer) Player_Fire();    //主机算伤害
-        else OnLocalFire();             //客机只本机表现
-    }
-
-    // 右键只朝向
-    void OnMouse2(bool on)
-    {
-        isMouse2Down = on;
-    }
-
-    // 肩射
-    void OnShoulder(bool on)
-    {
-        isShoulderDown = on;
-    }
-
-    // 开镜
-    void OnAds(bool on)
-    {
-        isAdsDown = on;
-    }
-
-    // 举枪瞄准
-    void OnMouseHeld(bool on)
-    {
-        if (Con_body == null || Con_input_Manage == null || Con_player_HostNetworkEvent == null) return;
-        if (!isAimDown) return;
-
-        // 举枪就朝视角转，主机取网络包，客机取本机包
-        Vector3 viewDir = IsServer ? Con_player_HostNetworkEvent.Packet.viewDir : Con_input_Manage.LastPacket.viewDir;
-        Con_body.Body_Aim_Performance(viewDir);
-    }
-
-    // 奔跑
-    void OnRun(bool on)
-    {
-        isRuning = on;
-    }
-
-    // 换弹
-    void OnReloadHeld()
-    {
-        isReload = true;
-        if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Date();
-    }
-
-    // 蹲下
-    void OnSquat(bool on)
-    {
-        isSquat = on;
-    }
-
-    // 翻滚，只记按下边沿
-    void OnRoll(bool on)
-    {
-        if (on && !isRollDown) rollRequest = true;   //按下那一帧
-        isRollDown = on;
-    }
-
-    // 落地检测
-    bool IsGrounded()
-    {
-        Collider col = GetComponent<Collider>();
-        if (col == null) col = GetComponentInChildren<Collider>();
-        if (col == null)
-        {
-            Debug.LogError("Player_Control|IsGrounded|未找到 Collider");
-            return false;
-        }
-
-        Vector3 origin = col.bounds.center;
-        float rayDistance = col.bounds.extents.y + groundCheckDistance;
-        return Physics.Raycast(origin, Vector3.down, rayDistance);
-    }
-
-    // 找可瞄准的敌人
-    void UpdateAimTarget(Vector3 origin, Vector3 fwd)
-    {
-        fwd = fwd.normalized;
-
-        // 准星落点在敌人身上锁落点
-        Vector3 aimPoint = Con_player_HostNetworkEvent.Packet.aimPoint;
-        Collider[] atAim = Physics.OverlapSphere(aimPoint, 0.2f, enemyMask);
-
-        foreach (Collider col in atAim)
-        {
-            if (col.transform.IsChildOf(transform)) continue;
-
-            Con_gun_Control.SetTarget(true, col.ClosestPoint(aimPoint));
-            SetLockTarget(true, col.GetComponentInParent<Player_Control>());
-            return;
-        }
-
-        Ray ray = new Ray(origin, fwd);
-
-        // 准星射线上最近的命中
-        RaycastHit[] hits = Physics.RaycastAll(ray, Con_gun_Control.range);
-
-        float nearest = float.MaxValue;
-        RaycastHit closest = default;
-
-        foreach (RaycastHit h in hits)
-        {
-            if (h.collider.transform.IsChildOf(transform)) continue;
-            if (h.distance >= nearest) continue;
-
-            nearest = h.distance;
-            closest = h;
-        }
-
-        // 最近命中的是敌人则锁定命中点
-        if (nearest < float.MaxValue &&
-            (enemyMask.value & (1 << closest.collider.gameObject.layer)) != 0)
-        {
-            Con_gun_Control.SetTarget(true, closest.point);
-            SetLockTarget(true, closest.collider.GetComponentInParent<Player_Control>());
-            return;
-        }
-
-        // 取外圈内可见敌人的最近点
-        float outer = Con_gun_Control.OuterAngle * 0.5f;   //外圈按直径算
-
-        Collider[] cols = Physics.OverlapSphere(origin, Con_gun_Control.range, enemyMask);
-
-        float bestAngle = float.MaxValue;
-        Vector3 bestPoint = Vector3.zero;
-        Player_Control bestTarget = null;   //外圈内最近目标玩家
-
-        foreach (Collider col in cols)
-        {
-            if (col.transform.IsChildOf(transform)) continue;
-
-            // 准星射线上敌人所在深度处的点
-            float depth = Vector3.Dot(col.bounds.center - origin, fwd);
-            if (depth <= 0f) continue;
-
-            // 敌人表面离准星最近的点
-            Vector3 point = col.ClosestPoint(origin + fwd * depth);
-
-            float angle = Vector3.Angle(fwd, point - origin);
-            if (angle > outer || angle >= bestAngle) continue;
-            if (!Visible(origin, point, col)) continue;
-
-            bestAngle = angle;
-            bestPoint = point;
-            bestTarget = col.GetComponentInParent<Player_Control>();
-        }
-
-        bool has = bestAngle < float.MaxValue;   //外圈内有目标
-        Con_gun_Control.SetTarget(has, bestPoint);
-        SetLockTarget(has, bestTarget);
-    }
-
-    // 记录锁定目标，has是否锁定
-    void SetLockTarget(bool has, Player_Control target)
-    {
-        if (has && target == null) Debug.LogError("Player_Control|SetLockTarget|锁定目标无玩家组件");
-
-        lockTarget = has ? target : null;
-    }
-
-    // 汇总锁定目标下发提示
-    void Lock_On_Date(bool aimDown, float aimAngle, float innerAngle)
-    {
-        Player_Control now = aimDown ? lockTarget : null;   //举枪才算锁定
-
-        // 目标变化先解除旧目标
-        if (lockSentTarget != now)
-        {
-            Lock_On_Release();
-            if (now == null) return;
-
-            lockSentTarget = now;
-            lockSentTarget.Lock_On_Source_Date(OwnerClientId, 1);
-            return;
-        }
-
-        if (lockSentTarget == null) return;
-
-        // 精度圈到内圈算完成
-        if (!lockDone && aimAngle <= innerAngle)
-        {
-            lockDone = true;
-            lockSentTarget.Lock_On_Source_Date(OwnerClientId, 2);
-        }
-    }
-
-    // 解除本机已发的锁定
-    void Lock_On_Release()
-    {
-        if (lockSentTarget != null) lockSentTarget.Lock_On_Source_Date(OwnerClientId, 0);
-
-        lockSentTarget = null;
-        lockDone = false;
-    }
-
-    // 合并锁定来源阶段
-    public void Lock_On_Source_Date(ulong shooterId, int stage)
-    {
-        if (!IsServer) return;   //主机处理
-
-        if (stage == 1) lockSources.Add(shooterId);
-        else if (stage == 2) lockDoneSources.Add(shooterId);
-        else if (stage == 0)
-        {
-            lockSources.Remove(shooterId);
-            lockDoneSources.Remove(shooterId);
-        }
-        else
-        {
-            Debug.LogError("Player_Control|Lock_On_Source_Date|阶段参数非法");
-            return;
-        }
-
-        int stageNow = lockSources.Count == 0 ? 0 : (lockDoneSources.Count > 0 ? 2 : 1);
-
-        if (stageNow == lockSentStage) return;   //阶段没变不下发
-
-        lockSentStage = stageNow;
-        Lock_On_Send(stageNow);
-    }
-
-    // 本机显示并下发提示
-    void Lock_On_Send(int stage)
-    {
-        if (IsOwner)
-        {
-            if (Con_lockOn_UI == null) Debug.LogError("Player_Control|Lock_On_Send|锁定提示UI 为空");
-            else Con_lockOn_UI.Lock_On_Performance_Local(stage);
-        }
-
-        ClientRpcParams ps = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
-        };
-        Lock_On_ClientRpc(stage, ps);
-    }
-
-    // 锁定提示通知受害者本机
-    [ClientRpc]
-    void Lock_On_ClientRpc(int stage, ClientRpcParams ps = default)
-    {
-        if (IsServer) return;   //主机已显示
-        if (!IsOwner) return;   //只本机显示
-
-        if (Con_lockOn_UI == null)
-        {
-            Debug.LogError("Player_Control|Lock_On_ClientRpc|锁定提示UI 为空");
-            return;
-        }
-
-        Con_lockOn_UI.Lock_On_Performance_Local(stage);
-    }
-
-    // 死亡清空锁定状态
-    void Lock_On_Reset()
-    {
-        Lock_On_Release();      //解除自己发出的锁定
-
-        lockSources.Clear();
-        lockDoneSources.Clear();
-
-        if (lockSentStage == 0) return;
-
-        lockSentStage = 0;
-        Lock_On_Send(0);
-    }
-
-    readonly RaycastHit[] hitBuffer = new RaycastHit[16];   //遮挡检测缓存
-
-    // 判断目标点是否被挡
-    bool Visible(Vector3 origin, Vector3 point, Collider target)
-    {
-        Vector3 dir = point - origin;
-        if (dir.sqrMagnitude <= 0.001f) return true;
-
-        int count = Physics.RaycastNonAlloc(origin, dir.normalized, hitBuffer, dir.magnitude);
-
-        for (int i = 0; i < count; i++)
-        {
-            if (hitBuffer[i].collider == target) continue;
-            if (hitBuffer[i].collider.transform.IsChildOf(transform)) continue;   // 忽略自身
-
-            return false;
-        }
-
-        return true;
     }
 }

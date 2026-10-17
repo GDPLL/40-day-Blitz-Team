@@ -3,6 +3,10 @@ using UnityEngine;
 // 玩家音效表现，各端本地播放
 public class Player_Audio : MonoBehaviour
 {
+    // 上层注入
+    Player_Control Own_Control; //父级
+    public void Owner_Init(Player_Control control) { Own_Control = control; }
+
     // 音效编号，与 audioClips 顺序一致
     enum AudioNumKV
     {

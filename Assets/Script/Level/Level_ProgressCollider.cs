@@ -9,7 +9,8 @@ public class Level_ProgressCollider : MonoBehaviour, IScene_Interaction
     //主机FixUpdate驱动
     public void Scene_Interaction(Player_Control player_Control)
     {
-        if (player_Control.respawnIndex < Level_Num) player_Control.respawnIndex = Level_Num;
+        if (player_Control == null || player_Control.Con_ObjectSystem == null) return;
+        if (player_Control.Con_ObjectSystem.respawnIndex < Level_Num) player_Control.Con_ObjectSystem.respawnIndex = Level_Num;
 
     }
 }

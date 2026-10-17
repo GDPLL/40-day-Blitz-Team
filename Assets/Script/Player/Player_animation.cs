@@ -3,6 +3,9 @@ using UnityEngine;
 // 玩家动画表现，状态位驱动
 public class Player_animation : MonoBehaviour
 {
+    Player_Control Own_Control; //父级
+    public void Owner_Init(Player_Control control) { Own_Control = control; }
+
     // 状态位取值定义
     public const ushort BitWalk = 1 << 0;       //移动
     public const ushort BitRun = 1 << 1;        //奔跑
