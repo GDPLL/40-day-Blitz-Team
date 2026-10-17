@@ -5,17 +5,25 @@ using UnityEngine.UI;
 public class UI_Magazine : MonoBehaviour
 {
     const int Magazine_Max = 6;     // 弹夹显示上限
+    const int Stack_Max = 30;       // 弹夹内显示的子弹堆上限
     const int Bullet_Max = 32;      // 子弹动画池大小
 
     [Header("弹夹")]
-    public float magazineHeight = 72f;      // 弹夹显示高度，像素
+    public float magazineHeight = 190f;     // 当前弹夹展开高度，像素
+    public float reserveHeight = 100f;      // 备用弹夹高度，像素
     public float magazineGap = 5f;          // 弹夹间距，像素
-    public Vector2 panelOffset = new Vector2(22f, 112f);    // 面板左下位置
-    public float activeAlpha = 1f;          // 在用弹夹透明度
+    public Vector2 panelOffset = new Vector2(50f, 112f);    // 面板左下位置
+    public float activeAlpha = 0.45f;       // 在用弹夹外壳透明度
     public float idleAlpha = 0.28f;         // 备用弹夹透明度
     public float moveSmooth = 14f;          // 顶替移动速度
     public float fadeTime = 0.18f;          // 透明度过渡时长，秒
     public Color activeColor = new Color(0.93f, 0.97f, 0.90f, 1f);  // 弹夹剪影色
+    public Color outlineColor = new Color(0.10f, 0.11f, 0.08f, 0.55f); // 子弹轮廓色
+    public float bulletOutline = 1.0f;      // 子弹轮廓厚度，像素
+    public float stackTilt = 0f;            // 内胆倾斜角度，度（直弹夹为0）
+    public float stackOffsetX = 0f;         // 内胆底部水平偏移，像素
+    public float stackKickDistance = 5f;    // 弹堆上顶距离，像素
+    public float stackKickTime = 0.09f;     // 弹堆回弹时长，秒
 
     [Header("换弹")]
     public float discardLife = 0.45f;       // 丢弃弹夹时长，秒
@@ -25,10 +33,13 @@ public class UI_Magazine : MonoBehaviour
 
     [Header("射击")]
     public float bulletLife = 1.6f;         // 子弹最长存活，秒
-    public Vector2 bulletVelocity = new Vector2(55f, 230f);     // 子弹初速度
+    public float bulletUpSpeed = 240f;      // 子弹向上初速度
+    public float bulletSideSpeed = 90f;     // 子弹左右散开速度
     public float bulletGravity = -700f;     // 子弹重力
-    public float bulletSpin = -360f;        // 子弹自转速度，度每秒
-    public float bulletWidth = 46f;         // 子弹显示宽度，像素
+    public float bulletSpin = 360f;         // 子弹自转速度，方向随机
+    public float bulletPressTime = 0.08f;   // 弹出前上顶时长，秒
+    public float bulletPressDistance = 24f; // 弹出前上顶距离，像素
+    public float bulletWidth = 40f;         // 子弹显示宽度，像素
     public float bulletOffscreenMargin = 24f;   // 掉出屏幕后的额外余量，像素
     public Color bulletColor = new Color(0.98f, 0.82f, 0.25f, 1f);  // 子弹剪影色
 
@@ -36,9 +47,15 @@ public class UI_Magazine : MonoBehaviour
     class Magazine_View
     {
         public Image baseImage;         // 半透明底图
-        public Image fillImage;         // 剩余子弹的实心层
         public RectTransform rect;      // 弹夹容器
+        public RectTransform stackWindow;   // 内胆窗口
+        public Vector2 stackBasePos;    // 内胆初始位置
+        public Image[] stackBullets;    // 内胆子弹
+        public Image[] stackOutlines;   // 内胆子弹轮廓
+        public CanvasGroup group;       // 丢弃整体淡出
+        public float stackKick;         // 上顶强度
         public Vector2 targetPos;       // 目标位置
+        public float targetScale;       // 目标缩放
         public float targetAlpha;       // 目标透明度
         public float alpha;             // 当前透明度
         public bool discarding;         // 正在丢弃
@@ -52,10 +69,15 @@ public class UI_Magazine : MonoBehaviour
     class Bullet_View
     {
         public Image image;             // 子弹图
+        public Image outline;           // 子弹轮廓
         public RectTransform rect;      // 子弹位置
         public Vector2 pos;             // 当前位置
         public Vector2 vel;             // 当前速度
+        public Vector2 pressStart;      // 上顶起点
+        public float pressTimer;        // 上顶剩余时长
+        public float startAngle;        // 起始角度
         public float angle;             // 当前角度
+        public float spin;              // 当前自转速度
         public float timer;             // 剩余时长
     }
 
@@ -68,6 +90,10 @@ public class UI_Magazine : MonoBehaviour
     Sprite magazineSprite;          // 弹夹图
     Sprite bulletSprite;            // 子弹图
     float magazineWidth;            // 弹夹显示宽度
+    float reserveScale;             // 备用弹夹缩放
+    float stackInset;               // 内胆距弹夹底部
+    float innerHeight;              // 内胆子弹高度
+    float innerSpacing;             // 内胆子弹间距
     int activeCount;                // 未丢弃弹夹数
     int lastAmmo = -1;              // 上次弹药数
     int lastMagazine = -1;          // 上次弹夹数
@@ -98,15 +124,14 @@ public class UI_Magazine : MonoBehaviour
         magazineSprite = Sprite_From(magazineTex);
         bulletSprite = Sprite_From(bulletTex);
         magazineWidth = magazineHeight * magazineTex.width / magazineTex.height;
+        reserveScale = Mathf.Clamp01(reserveHeight / Mathf.Max(1f, magazineHeight));
 
         root = New_Rect("弹夹", transform);
         root.anchorMin = new Vector2(0f, 0f);
         root.anchorMax = new Vector2(0f, 0f);
         root.pivot = new Vector2(0f, 0f);
         root.anchoredPosition = panelOffset;
-        root.sizeDelta = new Vector2(
-            magazineWidth * Magazine_Max + magazineGap * (Magazine_Max - 1),
-            magazineHeight);
+        root.sizeDelta = new Vector2(magazineWidth, magazineHeight);
 
         // 子弹单独一层，避免下坠时被弹药与血量条挡住
         bulletRoot = New_Rect("子弹层", transform);
@@ -116,7 +141,21 @@ public class UI_Magazine : MonoBehaviour
         bulletRoot.anchoredPosition = panelOffset;
         bulletRoot.sizeDelta = root.sizeDelta;
 
-        // 弹夹图，每个弹夹由半透明底图和实心填充层组成
+        // 弹夹外壳与内胆共用同一张子弹图，内胆用矩形遮罩裁切
+        Material bulletMaterial = new Material(shader);
+        bulletMaterial.SetColor("_Color", bulletColor);
+        Material outlineMaterial = new Material(shader);
+        outlineMaterial.SetColor("_Color", outlineColor);
+
+        float stackWidth = magazineWidth * 0.78f;
+        float stackHeight = magazineHeight * 0.86f;
+        stackInset = magazineHeight * 0.07f;
+        float innerWidth = stackWidth * 0.86f;
+        innerHeight = innerWidth * bulletTex.height / bulletTex.width;
+        float stackPad = bulletOutline + 0.5f;
+        innerSpacing = (stackHeight - innerHeight - stackPad * 2f) / (Stack_Max - 1);
+
+        // 弹夹图，每个弹夹由半透明外壳和内胆子弹组成
         for (int i = 0; i < Magazine_Max; i++)
         {
             RectTransform slot = New_Rect($"弹夹{i + 1}", root);
@@ -124,7 +163,8 @@ public class UI_Magazine : MonoBehaviour
             slot.anchorMax = new Vector2(0f, 0f);
             slot.pivot = new Vector2(0.5f, 0f);
             slot.sizeDelta = new Vector2(magazineWidth, magazineHeight);
-            slot.anchoredPosition = Slot_Pos(i);
+            slot.anchoredPosition = Layout_Pos(i);
+            slot.localScale = Vector3.one * (i == 0 ? 1f : reserveScale);
 
             Image baseImage = New_Image("底图", magazineSprite,
                 new Vector2(magazineWidth, magazineHeight), new Vector2(0.5f, 0f), slot);
@@ -134,44 +174,92 @@ public class UI_Magazine : MonoBehaviour
             baseImage.material = new Material(shader);
             baseImage.enabled = false;
 
-            Image fillImage = New_Image("实心", magazineSprite,
-                new Vector2(magazineWidth, magazineHeight), new Vector2(0.5f, 0f), slot);
-            fillImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
-            fillImage.rectTransform.anchorMax = new Vector2(0.5f, 0f);
-            fillImage.rectTransform.anchoredPosition = Vector2.zero;
-            fillImage.material = new Material(shader);
-            fillImage.type = Image.Type.Filled;
-            fillImage.fillMethod = Image.FillMethod.Vertical;
-            fillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
-            fillImage.fillAmount = 1f;
-            fillImage.enabled = false;
+            CanvasGroup group = slot.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 1f;
+            group.blocksRaycasts = false;
+            group.interactable = false;
+
+            RectTransform stackWindow = New_Rect("内胆", slot);
+            stackWindow.anchorMin = new Vector2(0.5f, 0f);
+            stackWindow.anchorMax = new Vector2(0.5f, 0f);
+            stackWindow.pivot = new Vector2(0.5f, 0f);
+            stackWindow.sizeDelta = new Vector2(stackWidth, stackHeight);
+            float stackOffset = stackOffsetX * magazineHeight / 300f;
+            stackWindow.anchoredPosition = new Vector2(stackOffset, stackInset);
+            stackWindow.localRotation = Quaternion.Euler(0f, 0f, stackTilt);
+            stackWindow.gameObject.AddComponent<RectMask2D>();
+
+            Image[] stackBullets = new Image[Stack_Max];
+            Image[] stackOutlines = new Image[Stack_Max];
+            for (int j = 0; j < Stack_Max; j++)
+            {
+                Vector2 stackPos = new Vector2(
+                    0f, stackPad + innerHeight * 0.5f + j * innerSpacing);
+
+                Image stackOutline = New_Image($"内弹轮廓{j + 1}", bulletSprite,
+                    new Vector2(innerWidth + bulletOutline * 2f, innerHeight + bulletOutline * 2f),
+                    new Vector2(0.5f, 0.5f), stackWindow);
+                stackOutline.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+                stackOutline.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+                stackOutline.rectTransform.anchoredPosition = stackPos;
+                stackOutline.material = outlineMaterial;
+                stackOutline.enabled = false;
+                stackOutlines[j] = stackOutline;
+
+                Image stackBullet = New_Image($"内弹{j + 1}", bulletSprite,
+                    new Vector2(innerWidth, innerHeight), new Vector2(0.5f, 0.5f), stackWindow);
+                stackBullet.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+                stackBullet.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+                stackBullet.rectTransform.anchoredPosition = stackPos;
+                stackBullet.material = bulletMaterial;
+                stackBullet.enabled = false;
+                stackBullets[j] = stackBullet;
+            }
+
+            stackWindow.gameObject.SetActive(false);
 
             magazineViews[i] = new Magazine_View
             {
                 baseImage = baseImage,
-                fillImage = fillImage,
                 rect = slot,
+                stackWindow = stackWindow,
+                stackBasePos = new Vector2(stackOffset, stackInset),
+                stackBullets = stackBullets,
+                stackOutlines = stackOutlines,
+                group = group,
                 alpha = idleAlpha
             };
             Set_Color(baseImage, activeColor, idleAlpha);
-            Set_Color(fillImage, activeColor, idleAlpha);
         }
 
         // 子弹图池
         float bulletHeight = bulletWidth * bulletTex.height / bulletTex.width;
+        Image[] bulletOutlines = new Image[Bullet_Max];
+
+        // 先建所有轮廓，保证轮廓都在弹头下层
+        for (int i = 0; i < Bullet_Max; i++)
+        {
+            Image outline = New_Image($"子弹轮廓{i + 1}", bulletSprite,
+                new Vector2(bulletWidth + bulletOutline * 2f, bulletHeight + bulletOutline * 2f),
+                new Vector2(0.5f, 0.5f), bulletRoot);
+            outline.material = outlineMaterial;
+            outline.enabled = false;
+            bulletOutlines[i] = outline;
+        }
+
         for (int i = 0; i < Bullet_Max; i++)
         {
             Image image = New_Image($"子弹{i + 1}", bulletSprite,
                 new Vector2(bulletWidth, bulletHeight), new Vector2(0.5f, 0.5f), bulletRoot);
-            image.material = new Material(shader);
+            image.material = bulletMaterial;
             image.enabled = false;
 
             bulletViews[i] = new Bullet_View
             {
                 image = image,
+                outline = bulletOutlines[i],
                 rect = image.rectTransform
             };
-            Set_Color(image, bulletColor, 0f);
         }
 
         // 弹夹在状态条之后，子弹层在状态条之前、幕布之后
@@ -210,23 +298,34 @@ public class UI_Magazine : MonoBehaviour
             }
         }
 
+        Layout_Root_Update();
+
         // 刷新目标位置与透明度
         for (int i = 0; i < activeCount; i++)
         {
-            activeViews[i].targetPos = Slot_Pos(i);
+            activeViews[i].targetPos = Layout_Pos(i);
+            activeViews[i].targetScale = Layout_Scale(i);
             activeViews[i].targetAlpha = i == 0 ? activeAlpha : idleAlpha;
-            activeViews[i].fillImage.enabled = i == 0;
-        }
 
-        // 当前弹夹从底部往上保留实心，打掉的部分露出半透明底图
-        Magazine_Fill_Update(ammo, maxAmmo, isReload);
+            bool showStack = true;
+            if (activeViews[i].stackWindow.gameObject.activeSelf != showStack)
+            {
+                activeViews[i].stackWindow.gameObject.SetActive(showStack);
+                if (showStack)
+                    activeViews[i].stackWindow.anchoredPosition = activeViews[i].stackBasePos;
+            }
+        }
 
         // 弹药下降时弹出子弹，一帧最多补两发
         if (lastAmmo >= 0 && ammo < lastAmmo)
         {
             int shotCount = Mathf.Min(lastAmmo - ammo, 2);
             for (int i = 0; i < shotCount; i++) Bullet_Spawn();
+            if (activeCount > 0) activeViews[0].stackKick = 1f;
         }
+
+        // 当前弹夹内胆按剩余子弹数量从底部往上显示
+        Magazine_Stack_Update(ammo, maxAmmo, isReload);
 
         lastAmmo = ammo;
         lastMagazine = magazineCount;
@@ -236,43 +335,64 @@ public class UI_Magazine : MonoBehaviour
         Bullet_Update(dt);
     }
 
-    // 更新当前弹夹的实心填充比例
-    void Magazine_Fill_Update(int ammo, int maxAmmo, bool isReload)
+    // 更新当前弹夹内胆的子弹数量
+    void Magazine_Stack_Update(int ammo, int maxAmmo, bool isReload)
     {
         if (activeCount <= 0) return;
 
-        // 换弹期间新弹夹按满弹显示，换弹取消后回到原弹药比例
-        float fill = isReload
+        // 换弹期间新弹夹按满弹显示，换弹取消后回到原弹药数量
+        float ratio = isReload
             ? 1f
             : (maxAmmo > 0 ? Mathf.Clamp01((float)ammo / maxAmmo) : 0f);
 
-        Magazine_View active = activeViews[0];
-        active.fillImage.fillAmount = fill;
-        active.fillImage.enabled = fill > 0.001f;
-        if (active.fillImage.enabled)
-            Set_Color(active.fillImage, activeColor, active.alpha);
+        int currentCount = Mathf.Clamp(Mathf.CeilToInt(ratio * Stack_Max), 0, Stack_Max);
+
+        for (int viewIndex = 0; viewIndex < activeCount; viewIndex++)
+        {
+            // 当前弹夹按剩余弹药，备用弹夹显示满弹堆
+            int count = viewIndex == 0 ? currentCount : Stack_Max;
+            int start = Stack_Max - count;
+            Magazine_View view = activeViews[viewIndex];
+
+            for (int i = 0; i < Stack_Max; i++)
+            {
+                bool show = i >= start;
+                view.stackBullets[i].enabled = show;
+                view.stackOutlines[i].enabled = show;
+            }
+        }
     }
 
     // 按数量重建弹夹显示，用于首次显示与数量回升
     void Rebuild_Active(int count)
     {
         activeCount = count;
+        Layout_Root_Update();
 
         for (int i = 0; i < Magazine_Max; i++)
         {
             Magazine_View view = magazineViews[i];
             view.discarding = false;
-            view.targetPos = Slot_Pos(i);
+            view.targetPos = Layout_Pos(i);
+            view.targetScale = Layout_Scale(i);
             view.targetAlpha = i < count
                 ? (i == 0 ? activeAlpha : idleAlpha)
                 : idleAlpha;
             view.alpha = view.targetAlpha;
             view.rect.anchoredPosition = view.targetPos;
+            view.rect.localScale = Vector3.one * view.targetScale;
             view.rect.localRotation = Quaternion.identity;
             view.baseImage.enabled = i < count;
-            view.fillImage.enabled = i == 0 && count > 0;
-            Set_Color(view.baseImage, activeColor, idleAlpha);
-            Set_Color(view.fillImage, activeColor, view.alpha);
+            view.group.alpha = 1f;
+            view.stackKick = 0f;
+            view.stackWindow.anchoredPosition = view.stackBasePos;
+            view.stackWindow.gameObject.SetActive(i < count);
+            for (int j = 0; j < Stack_Max; j++)
+            {
+                view.stackBullets[j].enabled = i < count;
+                view.stackOutlines[j].enabled = i < count;
+            }
+            Set_Color(view.baseImage, activeColor, view.alpha);
 
             activeViews[i] = i < count ? view : null;
         }
@@ -289,9 +409,23 @@ public class UI_Magazine : MonoBehaviour
             Magazine_View view = activeViews[i];
             view.rect.anchoredPosition = Vector2.Lerp(
                 view.rect.anchoredPosition, view.targetPos, move);
+            view.rect.localScale = Vector3.Lerp(
+                view.rect.localScale, Vector3.one * view.targetScale, move);
             view.alpha = Mathf.Lerp(view.alpha, view.targetAlpha, fade);
-            Set_Color(view.baseImage, activeColor, idleAlpha);
-            if (i == 0) Set_Color(view.fillImage, activeColor, view.alpha);
+            Set_Color(view.baseImage, activeColor, view.alpha);
+
+            // 弹堆先向上顶，再回弹
+            if (i == 0)
+            {
+                if (view.stackKick > 0f)
+                {
+                    view.stackKick = Mathf.MoveTowards(
+                        view.stackKick, 0f, dt / Mathf.Max(0.01f, stackKickTime));
+                    view.stackWindow.anchoredPosition = view.stackBasePos
+                        + Vector2.up * (stackKickDistance * view.stackKick);
+                }
+                else view.stackWindow.anchoredPosition = view.stackBasePos;
+            }
         }
 
         for (int i = 0; i < Magazine_Max; i++)
@@ -310,10 +444,12 @@ public class UI_Magazine : MonoBehaviour
         view.discardVel = discardVelocity;
         view.discardAngle = 0f;
         view.baseImage.enabled = true;
-        view.fillImage.enabled = view.fillImage.fillAmount > 0.001f;
+        view.stackWindow.gameObject.SetActive(true);
+        view.stackWindow.anchoredPosition = view.stackBasePos;
+        view.stackKick = 0f;
+        view.group.alpha = 1f;
         view.rect.localRotation = Quaternion.identity;
-        Set_Color(view.baseImage, activeColor, idleAlpha);
-        Set_Color(view.fillImage, activeColor, activeAlpha);
+        Set_Color(view.baseImage, activeColor, view.alpha);
     }
 
     // 丢弃弹夹旋转下落并淡出
@@ -328,15 +464,14 @@ public class UI_Magazine : MonoBehaviour
         view.rect.localRotation = Quaternion.Euler(0f, 0f, view.discardAngle);
 
         float progress = 1f - Mathf.Clamp01(view.discardTimer / discardLife);
-        float fade = 1f - progress;
-        Set_Color(view.baseImage, activeColor, idleAlpha * fade);
-        Set_Color(view.fillImage, activeColor, activeAlpha * fade);
+        view.group.alpha = 1f - progress;
 
         if (view.discardTimer <= 0f)
         {
             view.discarding = false;
             view.baseImage.enabled = false;
-            view.fillImage.enabled = false;
+            view.stackWindow.gameObject.SetActive(false);
+            view.group.alpha = 1f;
         }
     }
 
@@ -362,17 +497,38 @@ public class UI_Magazine : MonoBehaviour
             bulletCursor = (bulletCursor + 1) % Bullet_Max;
         }
 
-        Vector2 start = activeViews[0].rect.anchoredPosition
-            + new Vector2(magazineWidth * 0.15f, magazineHeight * 0.92f);
+        // 从当前最上方那发内胆子弹的位置向上顶出
+        Magazine_View active = activeViews[0];
+        int topIndex = 0;
+        for (int i = Stack_Max - 1; i >= 0; i--)
+        {
+            if (!active.stackBullets[i].enabled) continue;
+            topIndex = i;
+            break;
+        }
+
+        Vector3 topWorld = active.stackBullets[topIndex].rectTransform.TransformPoint(Vector3.zero);
+        Vector3 topLocal = bulletRoot.InverseTransformPoint(topWorld);
+        Vector2 start = new Vector2(topLocal.x, topLocal.y);
 
         view.timer = bulletLife;
+        view.pressTimer = bulletPressTime;
+        view.pressStart = start;
         view.pos = start;
-        view.vel = bulletVelocity;
-        view.angle = Mathf.Atan2(bulletVelocity.y, bulletVelocity.x) * Mathf.Rad2Deg;
+        view.startAngle = Mathf.DeltaAngle(0f, active.stackWindow.localEulerAngles.z);
+
+        float side = Random.Range(bulletSideSpeed * 0.35f, bulletSideSpeed);
+        if (Random.value < 0.5f) side = -side;
+        view.vel = new Vector2(side, bulletUpSpeed);
+        view.angle = Mathf.Atan2(view.vel.y, view.vel.x) * Mathf.Rad2Deg;
+        view.spin = bulletSpin * Random.Range(0.75f, 1.25f)
+            * (Random.value < 0.5f ? -1f : 1f);
         view.rect.anchoredPosition = view.pos;
-        view.rect.localRotation = Quaternion.Euler(0f, 0f, view.angle);
+        view.rect.localRotation = Quaternion.Euler(0f, 0f, view.startAngle);
+        view.outline.rectTransform.anchoredPosition = view.pos;
+        view.outline.rectTransform.localRotation = Quaternion.Euler(0f, 0f, view.startAngle);
         view.image.enabled = true;
-        Set_Color(view.image, bulletColor, 1f);
+        view.outline.enabled = true;
     }
 
     // 子弹上抛、旋转，持续下坠到屏幕外
@@ -383,29 +539,77 @@ public class UI_Magazine : MonoBehaviour
             Bullet_View view = bulletViews[i];
             if (view.timer <= 0f) continue;
 
+            // 先向上顶起，再随机向左或向右弹出
+            if (view.pressTimer > 0f)
+            {
+                view.pressTimer -= dt;
+                float t = 1f - Mathf.Clamp01(
+                    view.pressTimer / Mathf.Max(0.001f, bulletPressTime));
+                float press = 1f - (1f - t) * (1f - t);
+                view.pos = view.pressStart + Vector2.up * (bulletPressDistance * press);
+                view.rect.anchoredPosition = view.pos;
+                view.rect.localRotation = Quaternion.Euler(
+                    0f, 0f, Mathf.Lerp(view.startAngle, view.angle, press));
+                view.outline.rectTransform.anchoredPosition = view.pos;
+                view.outline.rectTransform.localRotation = view.rect.localRotation;
+
+                continue;
+            }
+
             view.timer -= dt;
             view.vel.y += bulletGravity * dt;
             view.pos += view.vel * dt;
-            view.angle += bulletSpin * dt;
+            view.angle += view.spin * dt;
 
             view.rect.anchoredPosition = view.pos;
             view.rect.localRotation = Quaternion.Euler(0f, 0f, view.angle);
+            view.outline.rectTransform.anchoredPosition = view.pos;
+            view.outline.rectTransform.localRotation = view.rect.localRotation;
 
             // 子弹一路保持实色，掉出屏幕底部后再回收
             float offscreenY = -panelOffset.y - bulletOffscreenMargin;
-            Set_Color(view.image, bulletColor, 1f);
 
             if (view.pos.y < offscreenY || view.timer <= 0f)
             {
                 view.timer = 0f;
                 view.image.enabled = false;
+                view.outline.enabled = false;
             }
         }
     }
 
-    // 第几个弹夹的位置
-    Vector2 Slot_Pos(int index)
-        => new Vector2(magazineWidth * 0.5f + index * (magazineWidth + magazineGap), 0f);
+    // 当前弹夹保持展开，备用弹夹缩成短图标
+    Vector2 Layout_Pos(int index)
+    {
+        if (index <= 0) return new Vector2(magazineWidth * 0.5f, 0f);
+
+        float reserveWidth = magazineWidth * reserveScale;
+        return new Vector2(
+            magazineWidth + magazineGap
+            + (index - 1) * (reserveWidth + magazineGap)
+            + reserveWidth * 0.5f,
+            0f);
+    }
+
+    // 第几个弹夹的缩放
+    float Layout_Scale(int index)
+        => index == 0 ? 1f : reserveScale;
+
+    // 当前弹夹与其后备弹夹的总宽度
+    float Layout_Width(int count)
+    {
+        if (count <= 0) return magazineWidth;
+
+        float reserveWidth = magazineWidth * reserveScale;
+        return magazineWidth + (count - 1) * (reserveWidth + magazineGap);
+    }
+
+    // 同步根节点宽度，子弹层使用同一坐标系
+    void Layout_Root_Update()
+    {
+        root.sizeDelta = new Vector2(Layout_Width(activeCount), magazineHeight);
+        bulletRoot.sizeDelta = root.sizeDelta;
+    }
 
     // 由贴图建 Sprite
     Sprite Sprite_From(Texture2D tex)
