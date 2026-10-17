@@ -299,6 +299,7 @@ public class Gun_Control : MonoBehaviour
         if (reloadTimer <= 0f) return;
 
         reloadTimer -= dt;
+        if (reloadTimer <= 0f) reloadMagazineSpent = false;
     }
 
     // 物理帧表现，射线显示计时
