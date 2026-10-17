@@ -40215,7 +40215,7 @@ MonoBehaviour:
   time3mObject: {fileID: 1942598111}
   gasDamage: 5
   gameTime: 0
-  testStop: 1
+  testStop: 0
   gasParticle:
   - {fileID: 1187338207}
   - {fileID: 1856617250}

@@ -119,12 +119,23 @@ public class UI_Debug : MonoBehaviour
         }
 
         builder.Append("位置: ").AppendLine(player.transform.position.ToString("F1"));
-        builder.Append("在地面: ").AppendLine(player.isOnGround ? "是" : "否");
-        builder.Append("移动: ").Append(player.isWASDDowm ? "是" : "否")
-               .Append("  奔跑: ").Append(player.isRuning ? "是" : "否")
-               .Append("  蹲下: ").AppendLine(player.isSquat ? "是" : "否");
-        builder.Append("举枪: ").Append(player.isAimDown ? "是" : "否")
-               .Append("  换弹: ").AppendLine(player.isReload ? "是" : "否");
+
+        Player_Move_Date move = player.Con_move;
+        if (move == null)
+        {
+            builder.AppendLine("移动模块: 未就绪");
+            return;
+        }
+
+        builder.Append("在地面: ").AppendLine(move.isOnGround ? "是" : "否");
+        builder.Append("移动: ").Append(move.isWASDDowm ? "是" : "否")
+               .Append("  奔跑: ").Append(move.isRuning ? "是" : "否")
+               .Append("  蹲下: ").AppendLine(move.isSquat ? "是" : "否");
+        InputPacket packet = player.Con_player_HostNetworkEvent != null ? player.Con_player_HostNetworkEvent.Packet : default;
+        bool aimDown = packet.mouse1 || packet.mouse2 || packet.shoulder || packet.ads;
+
+        builder.Append("举枪: ").Append(aimDown ? "是" : "否")
+               .Append("  换弹: ").AppendLine(player.Con_gun_Control != null && player.Con_gun_Control.IsReloading ? "是" : "否");
 
         if (player.Con_ObjectSystem != null)
         {

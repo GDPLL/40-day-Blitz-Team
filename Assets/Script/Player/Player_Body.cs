@@ -5,6 +5,9 @@ using UnityEngine;
 // 玩家本体控制，数据由 Player_Control 注入
 public class Player_Body : Character_Move
 {
+    Player_Control Own_Control; //父级
+    public void Owner_Init(Player_Control control) { Own_Control = control; }
+
     // 移动数据
     Vector3 direction = new Vector3(0, 0, 0);       // 目标移动方向
     Vector3 currentMoveDirection = Vector3.zero;    // 实际移动方向

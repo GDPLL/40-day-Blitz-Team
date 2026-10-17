@@ -1,11 +1,19 @@
 using System;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
+using Unity.Netcode;
 
-public class Gun_Control : MonoBehaviour
+public class Gun_Control : NetworkBehaviour
 {
+    Player_Control Own_Control; //父级
+    public void Owner_Init(Player_Control control) { Own_Control = control; }
+
     public Transform shootPoint;   // 枪口
     public LineRenderer line;      // 射线显示
+
+    [Header("位置绑定")]
+    public Transform gunRoot;      // 枪体节点，朝向与散布基准
+    public Transform bodyRoot;     // 身体节点，朝向判定与伤害来源
 
     // 表现层事件，音效等外部注册
     public event Action Shoot_event;    //开火一次
@@ -115,13 +123,49 @@ public class Gun_Control : MonoBehaviour
     public bool HasTarget => hasTarget;                       // 是否锁定
     public Vector3 TargetPos => targetPos;                    // 锁定点
 
+    // 位置绑定兜底，未拖拽时取自身
+    Transform Gun_Root => gunRoot != null ? gunRoot : transform;
+    Transform Body_Root => bodyRoot != null ? bodyRoot : transform.root;
+
     // 枪口位置
     public Vector3 MuzzlePosition =>
-    shootPoint != null ? shootPoint.position : transform.position + Vector3.up * 1f;
+        shootPoint != null ? shootPoint.position : Gun_Root.position + Vector3.up * 1f;
 
     // 按当前姿态取参数组
     AimProfile CurrentProfile()
         => aimingAds ? adsAim : (aimingShoulder ? shoulderAim : hipAim);
+
+
+
+    // 输入驱动，由Control每帧调用
+    public void Gun_Update()
+    {
+        Player_Control c = Own_Control;
+        if (c == null) return;
+        if (!c.IsServer && !c.IsOwner) return;      //客机只看别人表现
+        if (c.Con_player_HostNetworkEvent == null) return;
+
+        // 主机取网络包，客机本机取本地包
+        InputPacket packet = c.IsServer
+            ? c.Con_player_HostNetworkEvent.Packet
+            : (c.Con_input_Manage != null ? c.Con_input_Manage.LastPacket : default);
+
+        // 换弹输入，重复触发由内部过滤
+        if (packet.reload) Gun_Reload_Date();
+
+        // 左键开火，按住连发由射速节流
+        if (packet.mouse1)
+        {
+            bool isPress = !fireHeld;    //按下那一帧
+
+            if (isPress && !HasAmmo()) Gun_Empty_Date();
+
+            if (c.IsServer) Gun_Fire_Date(packet);
+            else Gun_Fire_Local();
+        }
+
+        fireHeld = packet.mouse1;
+    }
 
     // 注入准星方向
     public void SetAimDirection(Vector3 dir)
@@ -135,7 +179,7 @@ public class Gun_Control : MonoBehaviour
         aimOrigin = origin;
     }
 
-     // 朝向是否对准指定方向
+    // 朝向是否对准指定方向
     bool AimAligned(Vector3 dir)
     {
         Vector3 aim = dir;
@@ -144,7 +188,7 @@ public class Gun_Control : MonoBehaviour
         // 垂直瞄准无水平朝向
         if (aim.sqrMagnitude <= 0.001f) return true;
 
-        Vector3 body = transform.root.forward;
+        Vector3 body = Body_Root.forward;
         body.y = 0f;
 
         // 允许偏差取当前外圈
@@ -174,8 +218,8 @@ public class Gun_Control : MonoBehaviour
         stateRunning = isRunning;
     }
 
-    // 设置目标，has为是否有目标
-    public void SetTarget(bool has, Vector3 worldPosition)
+    // 注入锁定目标，由锁定模块推送
+    public void Target_Push(bool has, Vector3 worldPosition)
     {
         hasTarget = has;
         targetPos = worldPosition;
@@ -192,13 +236,13 @@ public class Gun_Control : MonoBehaviour
     // 注入完成
     public void Gun_Control_Init(ulong id)
     {
-        if (line == null) line = GetComponent<LineRenderer>();
+        if (line == null) line = Gun_Root.GetComponent<LineRenderer>();
         if (line != null) line.enabled = false;
 
         ownerId = id;
         shotCount = 0;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
-        originalLocalRot = transform.localRotation;     // 记录初始旋转
+        originalLocalRot = Gun_Root.localRotation;      // 记录初始旋转
 
         Blood_Template_Init();
 
@@ -217,7 +261,7 @@ public class Gun_Control : MonoBehaviour
         }
 
         GameObject go = new GameObject("BloodTemplate");
-        go.transform.SetParent(transform, false);
+        go.transform.SetParent(Gun_Root, false);
         go.SetActive(false);
 
         bloodTemplate = go.AddComponent<ParticleSystem>();
@@ -359,7 +403,7 @@ public class Gun_Control : MonoBehaviour
         out int hitDamage, out bool killed, out Bounds hitBounds)
     {
         origin = MuzzlePosition;
-        dir = transform.forward;
+        dir = Gun_Root.forward;
         isHit = false;
         hitTarget = false;
         hitPoint = Vector3.zero;
@@ -382,7 +426,7 @@ public class Gun_Control : MonoBehaviour
         // 锁定直指目标，反向用准星
         Vector3 toTarget = targetPos - origin;
         dir = (targetInRing && Vector3.Dot(toTarget, aimDir) > 0f) ? toTarget.normalized : aimDir.normalized;
-        dir += transform.right * offset.x + transform.up * offset.y;
+        dir += Gun_Root.right * offset.x + Gun_Root.up * offset.y;
         dir.Normalize();
 
         // 射线检测与伤害结算
@@ -393,13 +437,13 @@ public class Gun_Control : MonoBehaviour
             hitNormal = hit.normal;
 
             // 不打自己
-            if (!hit.collider.transform.IsChildOf(transform.root))
+            if (!hit.collider.transform.IsChildOf(Body_Root))
             {
                 Idamage damageable = hit.collider.GetComponent<Idamage>();
                 if (damageable != null)
                 {
                     hitTarget = true;
-                    hitDamage = damageable.Takedamage(damage, ownerId, transform.root.position, out killed);
+                    hitDamage = damageable.Takedamage(damage, ownerId, Body_Root.position, out killed);
                     hitBounds = hit.collider.bounds;
                 }
             }
@@ -488,7 +532,7 @@ public class Gun_Control : MonoBehaviour
 
     // 目标是否在射程内
     public bool InRange(Transform target) =>
-        target != null && Vector3.Distance(transform.position, target.position) <= range;
+        target != null && Vector3.Distance(Gun_Root.position, target.position) <= range;
 
     // 举枪朝向瞄准落点
     public void Gun_Aim_Performance(Vector3 aimPoint)
@@ -501,15 +545,15 @@ public class Gun_Control : MonoBehaviour
 
         if (aimPoint == Vector3.zero) return;   //无落点不转向
 
-        Vector3 dir = aimPoint - transform.position;
+        Vector3 dir = aimPoint - Gun_Root.position;
         if (dir.sqrMagnitude <= 0.001f) return;   // 落点与枪重叠
 
         Quaternion worldLook = Quaternion.LookRotation(dir, Vector3.up);
-        Quaternion targetRot = transform.parent != null
-            ? Quaternion.Inverse(transform.parent.rotation) * worldLook
+        Quaternion targetRot = Gun_Root.parent != null
+            ? Quaternion.Inverse(Gun_Root.parent.rotation) * worldLook
             : worldLook;
 
-        transform.localRotation = Quaternion.Slerp(transform.localRotation, targetRot, Time.deltaTime * aimSmooth);
+        Gun_Root.localRotation = Quaternion.Slerp(Gun_Root.localRotation, targetRot, Time.deltaTime * aimSmooth);
     }
 
     // 收枪
@@ -521,6 +565,112 @@ public class Gun_Control : MonoBehaviour
             Lower_event?.Invoke();      //放枪
         }
 
-        transform.localRotation = Quaternion.Slerp(transform.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
+        Gun_Root.localRotation = Quaternion.Slerp(Gun_Root.localRotation, originalLocalRot, Time.deltaTime * aimSmooth);
+    }
+
+    const int KillScore = 100;      //击杀加分
+    float fireTime;                 //本机开火计时
+    bool fireHeld;                  //左键按住
+
+
+    // 客机本机开火预测，按射速节流
+    void Gun_Fire_Local()
+    {
+        if (IsReloading) return;                    //换弹中不能开火
+        if (!HasAmmo()) return;
+        if (Time.time - fireTime < FireInterval) return;   //未到射速
+
+        fireTime = Time.time;
+
+        Gun_Shoot_Local_Performance(MuzzlePosition, Gun_Root.forward);
+
+        if (Own_Control.Con_player_camera != null)
+            Own_Control.Con_player_camera.Camera_Shoot_Performance_Local();
+    }
+
+    // 主机开火，算伤害并下发表现
+    void Gun_Fire_Date(InputPacket packet)
+    {
+        // 枪口瞄准方向由落点推算,落点-开火点
+        Vector3 aimDir = packet.aimPoint - MuzzlePosition;
+
+        Vector3 flatAim = new Vector3(aimDir.x, 0f, aimDir.z);
+        Vector3 flatView = new Vector3(packet.viewDir.x, 0f, packet.viewDir.z);
+
+        if (flatAim.sqrMagnitude <= 0.001f || Vector3.Dot(flatAim, flatView) <= 0f)
+            aimDir = packet.viewDir;
+
+        // 对准判定取准星朝向，只用于本次判定
+        Vector3 alignDir = packet.viewDir;
+
+        if (!Gun_Shoot_Date(aimDir, alignDir, out Vector3 origin, out Vector3 dir,
+            out bool isHit, out bool hitTarget, out Vector3 hitPoint, out Vector3 hitNormal,
+            out int hitDamage, out bool killed, out Bounds hitBounds)) return;
+
+        Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
+
+        // 命中敌人的爆浆
+        if (hitTarget) Gun_Blood_Performance(hitPoint, aimDir);
+
+        Player_Control c = Own_Control;
+
+        // 本机受近处落点压制
+        if (isHit && !c.IsOwner)
+        {
+            if (Player_Main.player_Main == null) Debug.LogError("Gun_Control|Gun_Fire_Date|Player_Main 为空");
+            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
+        }
+
+        // 本机开火震屏
+        if (c.IsOwner && c.Con_player_camera != null)
+            c.Con_player_camera.Camera_Shoot_Performance_Local();
+
+        // 命中积分，击杀分单独计算
+        int killScore = killed ? KillScore : 0;
+        if (hitTarget && c.Con_combat != null) c.Con_combat.Score_Add(hitDamage + killScore);
+
+        // 本机命中反馈
+        if (c.IsOwner && hitTarget && c.Con_hitFeedback_UI != null)
+            c.Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint, hitBounds.center, hitBounds.size);
+
+        // 本机命中音效
+        if (c.IsOwner && hitTarget && c.Con_player_Audio != null) c.Con_player_Audio.Hit_Show();
+
+        Gun_Shoot_ClientRpc(origin, dir, isHit, hitTarget, hitPoint, hitNormal, hitDamage, killScore,
+            hitBounds.center, hitBounds.size);
+    }
+
+    // 客户端开火表现
+    [ClientRpc]
+    void Gun_Shoot_ClientRpc(Vector3 origin, Vector3 dir, bool isHit, bool hitTarget, Vector3 hitPoint, Vector3 hitNormal,
+        int hitDamage, int killScore, Vector3 hitCenter, Vector3 hitSize)
+    {
+        if (IsServer) return;   //主机已播放
+
+        Player_Control c = Own_Control;
+
+        // 本机受近处落点压制
+        if (isHit && !c.IsOwner)
+        {
+            if (Player_Main.player_Main == null) Debug.LogError("Gun_Control|Gun_Shoot_ClientRpc|Player_Main 为空");
+            else Player_Main.player_Main.Suppress_Check_Local(hitPoint);
+        }
+
+        // 命中敌人的爆浆
+        if (hitTarget) Gun_Blood_Performance(hitPoint, dir);
+
+        // 本机已预测枪口与震屏，只补弹道
+        if (c.IsOwner)
+        {
+            Gun_Shoot_Line_Performance(origin, dir, isHit, hitPoint, hitNormal);
+
+            // 本机命中反馈与音效
+            if (hitTarget && c.Con_hitFeedback_UI != null)
+                c.Con_hitFeedback_UI.Hit_Result_Performance_Local(hitDamage, killScore, hitPoint, hitCenter, hitSize);
+            if (hitTarget && c.Con_player_Audio != null) c.Con_player_Audio.Hit_Show();
+            return;
+        }
+
+        Gun_Shoot_Performance(origin, dir, isHit, hitPoint, hitNormal);
     }
 }
