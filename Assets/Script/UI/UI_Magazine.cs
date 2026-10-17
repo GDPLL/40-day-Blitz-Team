@@ -35,8 +35,9 @@ public class UI_Magazine : MonoBehaviour
     // 一个弹夹的显示状态
     class Magazine_View
     {
-        public Image image;             // 弹夹图
-        public RectTransform rect;      // 弹夹位置
+        public Image baseImage;         // 半透明底图
+        public Image fillImage;         // 剩余子弹的实心层
+        public RectTransform rect;      // 弹夹容器
         public Vector2 targetPos;       // 目标位置
         public float targetAlpha;       // 目标透明度
         public float alpha;             // 当前透明度
@@ -115,22 +116,45 @@ public class UI_Magazine : MonoBehaviour
         bulletRoot.anchoredPosition = panelOffset;
         bulletRoot.sizeDelta = root.sizeDelta;
 
-        // 弹夹图
+        // 弹夹图，每个弹夹由半透明底图和实心填充层组成
         for (int i = 0; i < Magazine_Max; i++)
         {
-            Image image = New_Image($"弹夹{i + 1}", magazineSprite,
-                new Vector2(magazineWidth, magazineHeight), new Vector2(0.5f, 0f), root);
-            image.rectTransform.anchoredPosition = Slot_Pos(i);
-            image.material = new Material(shader);
-            image.enabled = false;
+            RectTransform slot = New_Rect($"弹夹{i + 1}", root);
+            slot.anchorMin = new Vector2(0f, 0f);
+            slot.anchorMax = new Vector2(0f, 0f);
+            slot.pivot = new Vector2(0.5f, 0f);
+            slot.sizeDelta = new Vector2(magazineWidth, magazineHeight);
+            slot.anchoredPosition = Slot_Pos(i);
+
+            Image baseImage = New_Image("底图", magazineSprite,
+                new Vector2(magazineWidth, magazineHeight), new Vector2(0.5f, 0f), slot);
+            baseImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            baseImage.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+            baseImage.rectTransform.anchoredPosition = Vector2.zero;
+            baseImage.material = new Material(shader);
+            baseImage.enabled = false;
+
+            Image fillImage = New_Image("实心", magazineSprite,
+                new Vector2(magazineWidth, magazineHeight), new Vector2(0.5f, 0f), slot);
+            fillImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            fillImage.rectTransform.anchorMax = new Vector2(0.5f, 0f);
+            fillImage.rectTransform.anchoredPosition = Vector2.zero;
+            fillImage.material = new Material(shader);
+            fillImage.type = Image.Type.Filled;
+            fillImage.fillMethod = Image.FillMethod.Vertical;
+            fillImage.fillOrigin = (int)Image.OriginVertical.Bottom;
+            fillImage.fillAmount = 1f;
+            fillImage.enabled = false;
 
             magazineViews[i] = new Magazine_View
             {
-                image = image,
-                rect = image.rectTransform,
+                baseImage = baseImage,
+                fillImage = fillImage,
+                rect = slot,
                 alpha = idleAlpha
             };
-            Set_Color(image, activeColor, idleAlpha);
+            Set_Color(baseImage, activeColor, idleAlpha);
+            Set_Color(fillImage, activeColor, idleAlpha);
         }
 
         // 子弹图池
@@ -158,8 +182,8 @@ public class UI_Magazine : MonoBehaviour
         Debug.Log("UI_Magazine|UI_Magazine_Init|完成初始化");
     }
 
-    // 按弹药与剩余弹夹刷新，弹夹减少时播丢弃与顶替
-    public void UI_Magazine_Show(int ammo, int magazineCount)
+    // 按弹药、弹夹数与换弹状态刷新
+    public void UI_Magazine_Show(int ammo, int maxAmmo, int magazineCount, bool isReload)
     {
         if (!isReady) return;
 
@@ -191,7 +215,11 @@ public class UI_Magazine : MonoBehaviour
         {
             activeViews[i].targetPos = Slot_Pos(i);
             activeViews[i].targetAlpha = i == 0 ? activeAlpha : idleAlpha;
+            activeViews[i].fillImage.enabled = i == 0;
         }
+
+        // 当前弹夹从底部往上保留实心，打掉的部分露出半透明底图
+        Magazine_Fill_Update(ammo, maxAmmo, isReload);
 
         // 弹药下降时弹出子弹，一帧最多补两发
         if (lastAmmo >= 0 && ammo < lastAmmo)
@@ -206,6 +234,23 @@ public class UI_Magazine : MonoBehaviour
         float dt = Time.deltaTime;
         Magazine_Update(dt);
         Bullet_Update(dt);
+    }
+
+    // 更新当前弹夹的实心填充比例
+    void Magazine_Fill_Update(int ammo, int maxAmmo, bool isReload)
+    {
+        if (activeCount <= 0) return;
+
+        // 换弹期间新弹夹按满弹显示，换弹取消后回到原弹药比例
+        float fill = isReload
+            ? 1f
+            : (maxAmmo > 0 ? Mathf.Clamp01((float)ammo / maxAmmo) : 0f);
+
+        Magazine_View active = activeViews[0];
+        active.fillImage.fillAmount = fill;
+        active.fillImage.enabled = fill > 0.001f;
+        if (active.fillImage.enabled)
+            Set_Color(active.fillImage, activeColor, active.alpha);
     }
 
     // 按数量重建弹夹显示，用于首次显示与数量回升
@@ -224,8 +269,10 @@ public class UI_Magazine : MonoBehaviour
             view.alpha = view.targetAlpha;
             view.rect.anchoredPosition = view.targetPos;
             view.rect.localRotation = Quaternion.identity;
-            view.image.enabled = i < count;
-            Set_Color(view.image, activeColor, view.alpha);
+            view.baseImage.enabled = i < count;
+            view.fillImage.enabled = i == 0 && count > 0;
+            Set_Color(view.baseImage, activeColor, idleAlpha);
+            Set_Color(view.fillImage, activeColor, view.alpha);
 
             activeViews[i] = i < count ? view : null;
         }
@@ -243,7 +290,8 @@ public class UI_Magazine : MonoBehaviour
             view.rect.anchoredPosition = Vector2.Lerp(
                 view.rect.anchoredPosition, view.targetPos, move);
             view.alpha = Mathf.Lerp(view.alpha, view.targetAlpha, fade);
-            Set_Color(view.image, activeColor, view.alpha);
+            Set_Color(view.baseImage, activeColor, idleAlpha);
+            if (i == 0) Set_Color(view.fillImage, activeColor, view.alpha);
         }
 
         for (int i = 0; i < Magazine_Max; i++)
@@ -261,9 +309,11 @@ public class UI_Magazine : MonoBehaviour
         view.discardPos = view.rect.anchoredPosition;
         view.discardVel = discardVelocity;
         view.discardAngle = 0f;
-        view.image.enabled = true;
+        view.baseImage.enabled = true;
+        view.fillImage.enabled = view.fillImage.fillAmount > 0.001f;
         view.rect.localRotation = Quaternion.identity;
-        Set_Color(view.image, activeColor, activeAlpha);
+        Set_Color(view.baseImage, activeColor, idleAlpha);
+        Set_Color(view.fillImage, activeColor, activeAlpha);
     }
 
     // 丢弃弹夹旋转下落并淡出
@@ -278,12 +328,15 @@ public class UI_Magazine : MonoBehaviour
         view.rect.localRotation = Quaternion.Euler(0f, 0f, view.discardAngle);
 
         float progress = 1f - Mathf.Clamp01(view.discardTimer / discardLife);
-        Set_Color(view.image, activeColor, activeAlpha * (1f - progress));
+        float fade = 1f - progress;
+        Set_Color(view.baseImage, activeColor, idleAlpha * fade);
+        Set_Color(view.fillImage, activeColor, activeAlpha * fade);
 
         if (view.discardTimer <= 0f)
         {
             view.discarding = false;
-            view.image.enabled = false;
+            view.baseImage.enabled = false;
+            view.fillImage.enabled = false;
         }
     }
 

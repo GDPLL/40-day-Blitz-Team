@@ -30,14 +30,16 @@ public class UI_Player : MonoBehaviour
         Debug.Log("UI_Player|UI_Player_Init|完成初始化");
     }
 
-    // 按剩余弹药、血量与弹夹数刷新
-    public void UI_Player_Show(int ammo, int maxAmmo, int hp, int maxHp, int magazineCount)
+    // 按剩余弹药、血量、弹夹数与换弹状态刷新
+    public void UI_Player_Show(int ammo, int maxAmmo, int hp, int maxHp,
+        int magazineCount, bool isReload)
     {
         if (ammoImage == null || healthImage == null) return;
 
         ammoImage.fillAmount = maxAmmo > 0 ? (float)ammo / maxAmmo : 0f;
         healthImage.fillAmount = maxHp > 0 ? (float)hp / maxHp : 0f;
 
-        if (magazineUI != null) magazineUI.UI_Magazine_Show(ammo, magazineCount);
+        if (magazineUI != null)
+            magazineUI.UI_Magazine_Show(ammo, maxAmmo, magazineCount, isReload);
     }
 }
