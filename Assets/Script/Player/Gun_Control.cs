@@ -17,6 +17,8 @@ public class Gun_Control : MonoBehaviour
 
     public int ammo = 30;          // 弹药
     public int maxAmmo = 30;       // 弹匣容量
+    public int magazineCount = 6;      // 剩余弹夹数，含当前弹夹
+    public int maxMagazineCount = 6;   // 弹夹总数
     public float fireRate = 900f;   // 射速，发每分钟
     public float range = 100f;     // 射程
     public int damage = 34;        // 单发伤害
@@ -181,6 +183,10 @@ public class Gun_Control : MonoBehaviour
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = transform.localRotation;     // 记录初始旋转
 
+        // 旧实例缺字段时补默认弹夹数
+        if (maxMagazineCount <= 0) maxMagazineCount = 6;
+        if (magazineCount <= 0) magazineCount = maxMagazineCount;
+        magazineCount = Mathf.Clamp(magazineCount, 1, maxMagazineCount);
         Blood_Template_Init();
 
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
@@ -397,11 +403,13 @@ public class Gun_Control : MonoBehaviour
         }
     }
 
-    // 换弹逻辑，弹匣补满
+    // 换弹逻辑，丢弃当前弹夹并换下一个
     public void Gun_Reload_Date()
     {
         if (ammo == maxAmmo) return;    //满弹不换，防重复触发
+        if (magazineCount <= 1) return; //没有备用弹夹
 
+        magazineCount--;
         ammo = maxAmmo;
         Reload_event?.Invoke();     //换弹音效
     }

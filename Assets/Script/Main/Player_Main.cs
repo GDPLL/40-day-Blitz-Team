@@ -77,7 +77,7 @@ public class Player_Main : NetworkBehaviour
             // 本机弹药血量
             if (uI_Player != null)
                 uI_Player.UI_Player_Show(oPlayer_Control.Ammo, oPlayer_Control.MaxAmmo,
-                    oPlayer_Control.HP, oPlayer_Control.MaxHp);
+                    oPlayer_Control.HP, oPlayer_Control.MaxHp, oPlayer_Control.MagazineCount);
 
             // 本机人形状态图
             if (uI_Body != null)

@@ -55,6 +55,9 @@ public class Player_Control : Character_Move
     //对外读取弹药与血量
     public int Ammo => Con_gun_Control != null ? Con_gun_Control.ammo : 0;       //剩余弹药
     public int MaxAmmo => Con_gun_Control != null ? Con_gun_Control.maxAmmo : 0; //弹匣容量
+    public int MagazineCount => Con_gun_Control != null
+        ? (IsServer ? Con_gun_Control.magazineCount : netMagazine.Value) : 0; //剩余弹夹
+    public int MaxMagazineCount => Con_gun_Control != null ? Con_gun_Control.maxMagazineCount : 0; //弹夹总数
     public int HP => Con_ObjectSystem != null ? Con_ObjectSystem.HP : 0;         //当前血量
     public int MaxHp => Con_ObjectSystem != null ? Con_ObjectSystem.MaxHp : 0;   //血量上限
 
@@ -84,6 +87,7 @@ public class Player_Control : Character_Move
     NetworkVariable<float> netAimAngle = new NetworkVariable<float>();     //精度圈角度
     NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
     NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
+    NetworkVariable<int> netMagazine = new NetworkVariable<int>(6);         //剩余弹夹
     NetworkVariable<int> netRespawnIndex = new NetworkVariable<int>();      //复活点编号
 
     //本机表现状态
@@ -177,6 +181,7 @@ public class Player_Control : Character_Move
         // 初始化同步
         if (IsServer && Con_ObjectSystem != null) netHealth.Value = Con_ObjectSystem.HP;
         if (IsServer && Con_gun_Control != null) netAmmo.Value = Con_gun_Control.ammo;
+        if (IsServer && Con_gun_Control != null) netMagazine.Value = Con_gun_Control.magazineCount;
         if (IsServer) netRespawnIndex.Value = respawnIndex;     //复活点各端一致
 
         if (Con_body != null) Con_body.Body_Init(rigidbody);
@@ -483,6 +488,7 @@ public class Player_Control : Character_Move
         // 生命系统状态
         netHealth.Value = Con_ObjectSystem.HP;      //获取主机上各端玩家生命值
         netAmmo.Value = Con_gun_Control.ammo;       //获取主机上各端玩家弹药
+        netMagazine.Value = Con_gun_Control.magazineCount;  //获取主机上各端玩家弹夹
         Con_ObjectSystem.Object_System_Update();
 
         // 锁敌
@@ -631,6 +637,7 @@ public class Player_Control : Character_Move
         if (!IsServer)
         {
             Con_gun_Control.ammo = netAmmo.Value;
+            Con_gun_Control.magazineCount = netMagazine.Value;
             Con_gun_Control.SetAimShow(netHasTarget.Value, netTargetPos.Value, netAimAngle.Value);
         }
 
@@ -1055,6 +1062,8 @@ public class Player_Control : Character_Move
     // 换弹
     void OnReloadHeld()
     {
+        if (isDead || RespawnWait > 0f || Is_Out) return;   //死亡等待中不消耗弹夹
+
         isReload = true;
         if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Date();
     }

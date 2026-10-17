@@ -49,7 +49,7 @@ public class UI_Body : MonoBehaviour
         0.80f,      //冲刺举枪
         0.70f,      //蹲姿举枪
         0.70f,      //蹲走举枪
-        0.480f      //死亡
+        0.40f      //死亡
     };
 
     Material mat;                       //人形材质
