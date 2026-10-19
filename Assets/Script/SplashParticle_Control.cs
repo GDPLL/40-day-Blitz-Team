@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SplashParticle_Control : MonoBehaviour
+public class SplashParticle_Control : MonoBehaviour, IPooled_Effect
 {
     public ParticleSystem[] particles;   // 粒子系统
     public AudioSource audioSource;   // 音源
@@ -17,17 +17,47 @@ public class SplashParticle_Control : MonoBehaviour
 
     public bool IsAudio;
 
+    public float Pool_Lifetime => time > 0f ? time : 2f;
+
+    // 非池化实例保留自销毁，池化实例由管理器统一回收
     void Start()
     {
-        foreach (var particle in particles)
+        if (Object_Pool_Manager.Is_Pooled(gameObject)) return;
+
+        Play_Performance();
+        Destroy(gameObject, Pool_Lifetime);
+    }
+
+    // 每次从池里取出时重播粒子和音效
+    public void On_Pool_Spawn()
+    {
+        Play_Performance();
+    }
+
+    // 回收时停止残留粒子和声音
+    public void On_Pool_Despawn()
+    {
+        foreach (ParticleSystem particle in particles)
         {
             if (particle == null) continue;
-            if (particle != null) particle.Play();
+            particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
-        Play_Sound();       //生成时播撞击音
+        if (audioSource != null) audioSource.Stop();
+        if (ricochetSource != null) ricochetSource.Stop();
+    }
 
-        Destroy(gameObject, time);      // 到时间销毁
+    // 播放全部粒子和命中音效
+    void Play_Performance()
+    {
+        foreach (ParticleSystem particle in particles)
+        {
+            if (particle == null) continue;
+            particle.Clear(true);
+            particle.Play(true);
+        }
+
+        Play_Sound();
     }
 
     // 生成时播撞击音，按概率叠跳弹音

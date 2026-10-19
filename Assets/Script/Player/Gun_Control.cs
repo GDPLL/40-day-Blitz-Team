@@ -41,6 +41,10 @@ public class Gun_Control : NetworkBehaviour
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
 
+    [Header("枪口特效对象池")]
+    public int fireEffectPrewarm = 12;      // 预热数量
+    public float fireEffectLife = 2f;       // 存活时长
+
     [Header("命中爆浆")]
     public int bloodCount = 26;             // 每次命中粒子数
     public float bloodLife = 1.2f;          // 粒子存活时长，秒
@@ -257,6 +261,9 @@ public class Gun_Control : NetworkBehaviour
         reloadMagazineSpent = false;
 
         Blood_Template_Init();
+
+        // 提前建好枪口特效，避免第一次开火集中实例化
+        if (fireEffect != null) Object_Pool_Manager.Prewarm(fireEffect, fireEffectPrewarm);
 
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
@@ -482,8 +489,9 @@ public class Gun_Control : NetworkBehaviour
         // 通知外部播放表现，音效等
         Shoot_event?.Invoke();
 
-        // 在开火点生成对象
-        if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
+        // 枪口特效走对象池
+        if (fireEffect != null)
+            Object_Pool_Manager.Spawn(fireEffect, origin, Quaternion.LookRotation(dir), fireEffectLife);
     }
 
     // 弹道与命中表现
