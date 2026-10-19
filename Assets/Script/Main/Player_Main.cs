@@ -85,7 +85,8 @@ public class Player_Main : NetworkBehaviour
             // 本机弹药血量
             if (uI_Player != null)
                 uI_Player.UI_Player_Show(oPlayer_Control.Con_gun_Control.ammo, oPlayer_Control.Con_gun_Control.maxAmmo,
-                    oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp);
+                    oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp,
+                    oPlayer_Control.MagazineCount, oPlayer_Control.Con_gun_Control.IsReloading);
 
             // 本机人形状态图
             if (uI_Body != null)

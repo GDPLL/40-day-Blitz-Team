@@ -16,6 +16,7 @@ public class Player_Net_State : NetworkBehaviour
     NetworkVariable<float> netVerticalSpeed = new NetworkVariable<float>(); //垂直速度
     NetworkVariable<int> netHealth = new NetworkVariable<int>();            //玩家血量
     NetworkVariable<int> netAmmo = new NetworkVariable<int>();              //剩余弹药
+    NetworkVariable<int> netMagazine = new NetworkVariable<int>(6);         //剩余弹夹
     NetworkVariable<int> netRespawnIndex = new NetworkVariable<int>();      //复活点编号
     NetworkVariable<int> netScore = new NetworkVariable<int>();             //玩家积分
     NetworkVariable<float> netRespawnWait = new NetworkVariable<float>();   //等待剩余
@@ -30,6 +31,7 @@ public class Player_Net_State : NetworkBehaviour
     public float VerticalSpeed => netVerticalSpeed.Value;   //垂直速度
     public int Health => netHealth.Value;                   //玩家血量
     public int Ammo => netAmmo.Value;                       //剩余弹药
+    public int Magazine => netMagazine.Value;               //剩余弹夹
     public int RespawnIndex => netRespawnIndex.Value;       //复活点编号
     public int Score => netScore.Value;                     //玩家积分
     public float RespawnWait => netRespawnWait.Value;       //等待剩余
@@ -107,6 +109,7 @@ public class Player_Net_State : NetworkBehaviour
         // 生命与弹药
         netHealth.Value = c.Con_ObjectSystem.HP;
         netAmmo.Value = c.Con_gun_Control.ammo;
+        netMagazine.Value = c.Con_gun_Control.magazineCount;
 
         // 垂直速度
         netVerticalSpeed.Value = c.rigidbody != null ? c.rigidbody.velocity.y : 0f;
@@ -125,12 +128,13 @@ public class Player_Net_State : NetworkBehaviour
     }
 
     //初始化同步
-    public void Init_Push(int hp, int ammo, int respawnIdx)
+    public void Init_Push(int hp, int ammo, int magazine, int respawnIdx)
     {
         if (!IsServer) return;
 
         netHealth.Value = hp;
         netAmmo.Value = ammo;
+        netMagazine.Value = magazine;
         netRespawnIndex.Value = respawnIdx;
     }
 

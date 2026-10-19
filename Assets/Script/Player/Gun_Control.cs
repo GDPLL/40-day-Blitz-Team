@@ -26,6 +26,8 @@ public class Gun_Control : NetworkBehaviour
 
     public int ammo = 30;          // 弹药
     public int maxAmmo = 30;       // 弹匣容量
+    public int magazineCount = 6;      // 剩余弹夹数，含当前弹夹
+    public int maxMagazineCount = 6;   // 弹夹总数
     public float fireRate = 900f;   // 射速，发每分钟
     public float range = 100f;     // 射程
     public int damage = 34;        // 单发伤害
@@ -56,6 +58,7 @@ public class Gun_Control : NetworkBehaviour
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
     float reloadTimer;             // 换弹计时
+    bool reloadMagazineSpent;      // 本次换弹已消耗弹夹
     bool isRaised;                 // 举枪中
 
     public bool IsReloading => reloadTimer > 0f;   // 换弹中
@@ -144,6 +147,9 @@ public class Gun_Control : NetworkBehaviour
         if (c == null) return;
         if (!c.IsServer && !c.IsOwner) return;      //客机只看别人表现
         if (c.Con_player_HostNetworkEvent == null) return;
+        if (c.Con_ObjectSystem != null && c.Con_ObjectSystem.isDead) return;
+        if (c.Con_net_State != null &&
+            (c.Con_net_State.RespawnWait > 0f || c.Con_net_State.Is_Out)) return;
 
         // 主机取网络包，客机本机取本地包
         InputPacket packet = c.IsServer
@@ -244,6 +250,12 @@ public class Gun_Control : NetworkBehaviour
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
         originalLocalRot = Gun_Root.localRotation;      // 记录初始旋转
 
+        // 旧实例缺字段时补默认弹夹数
+        if (maxMagazineCount <= 0) maxMagazineCount = 6;
+        if (magazineCount <= 0) magazineCount = maxMagazineCount;
+        magazineCount = Mathf.Clamp(magazineCount, 1, maxMagazineCount);
+        reloadMagazineSpent = false;
+
         Blood_Template_Init();
 
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
@@ -319,7 +331,11 @@ public class Gun_Control : NetworkBehaviour
         if (reloadTimer > 0f)
         {
             Gun_Reload_Tick(Time.deltaTime);
-            if (reloadTimer <= 0f) ammo = maxAmmo;
+            if (reloadTimer <= 0f)
+            {
+                ammo = maxAmmo;
+                reloadMagazineSpent = false;
+            }
         }
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
@@ -331,6 +347,7 @@ public class Gun_Control : NetworkBehaviour
         if (reloadTimer <= 0f) return;
 
         reloadTimer -= dt;
+        if (reloadTimer <= 0f) reloadMagazineSpent = false;
     }
 
     // 物理帧表现，射线显示计时
@@ -497,12 +514,15 @@ public class Gun_Control : NetworkBehaviour
         }
     }
 
-    // 换弹，起换弹计时，装填在计时结束
+    // 换弹，起换弹计时并丢弃当前弹夹，装填在计时结束
     public void Gun_Reload_Date()
     {
         if (IsReloading) return;        //换弹中不重复触发
         if (ammo == maxAmmo) return;    //满弹不换
+        if (magazineCount <= 1) return; //没有备用弹夹
 
+        magazineCount--;
+        reloadMagazineSpent = true;
         reloadTimer = reloadTime;
         Reload_event?.Invoke();     //换弹音效
     }
@@ -510,6 +530,13 @@ public class Gun_Control : NetworkBehaviour
     // 取消换弹
     public void Gun_Reload_Cancel()
     {
+        // 换弹中断时归还已丢掉的弹夹
+        if (reloadMagazineSpent)
+        {
+            magazineCount = Mathf.Min(magazineCount + 1, maxMagazineCount);
+            reloadMagazineSpent = false;
+        }
+
         reloadTimer = 0f;
     }
 

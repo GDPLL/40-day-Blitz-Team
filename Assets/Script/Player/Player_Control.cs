@@ -48,6 +48,20 @@ public class Player_Control : Character_Move
     //玩家编号，按加入编号，界面显示用
     public int Player_Number => (int)OwnerClientId + 1;
 
+    //对外读取弹夹数量
+    public int MagazineCount
+    {
+        get
+        {
+            if (Con_gun_Control == null) return 0;
+            if (IsServer) return Con_gun_Control.magazineCount;
+            return Con_net_State != null ? Con_net_State.Magazine : Con_gun_Control.magazineCount;
+        }
+    }
+
+    public int MaxMagazineCount =>
+        Con_gun_Control != null ? Con_gun_Control.maxMagazineCount : 0;
+
     //本地变量
     private bool IsComplete;            //组件层完善判断
     private bool isStarted;             //是否已初始化
@@ -164,7 +178,8 @@ public class Player_Control : Character_Move
 
         // 初始化同步
         if (IsServer && Con_net_State != null && Con_ObjectSystem != null && Con_gun_Control != null && Con_move != null)
-            Con_net_State.Init_Push(Con_ObjectSystem.HP, Con_gun_Control.ammo, Con_ObjectSystem.respawnIndex);
+            Con_net_State.Init_Push(Con_ObjectSystem.HP, Con_gun_Control.ammo,
+                Con_gun_Control.magazineCount, Con_ObjectSystem.respawnIndex);
 
         if (Con_body != null) Con_body.Body_Init(rigidbody);
         if (Con_gun_Control != null)
@@ -449,6 +464,7 @@ public class Player_Control : Character_Move
         if (!IsServer)
         {
             Con_gun_Control.ammo = Con_net_State.Ammo;
+            Con_gun_Control.magazineCount = Con_net_State.Magazine;
             Con_gun_Control.SetAimShow(Con_net_State.HasTarget, Con_net_State.TargetPos, Con_net_State.AimAngle);
         }
 
