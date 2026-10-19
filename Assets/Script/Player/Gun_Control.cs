@@ -540,6 +540,15 @@ public class Gun_Control : NetworkBehaviour
         reloadTimer = 0f;
     }
 
+    // 复活恢复满弹夹与满弹匣
+    public void Gun_Respawn_Reset()
+    {
+        ammo = maxAmmo;
+        magazineCount = maxMagazineCount;
+        reloadTimer = 0f;
+        reloadMagazineSpent = false;
+    }
+
     // 手臂IK开关，on为启用，按层序号取
     public void Arm_Rig_Date(bool on)
     {

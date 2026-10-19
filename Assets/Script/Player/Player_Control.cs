@@ -254,11 +254,34 @@ public class Player_Control : Character_Move
     {
         Con_move.Reset_State(position, rotation);
 
-        // 复活取消换弹
-        if (Con_gun_Control != null) Con_gun_Control.Gun_Reload_Cancel();
+        // 复活恢复满弹夹与满弹匣
+        if (Con_gun_Control != null)
+        {
+            Con_gun_Control.Gun_Respawn_Reset();
+            if (IsServer && Con_net_State != null)
+            {
+                Con_net_State.Ammo_Magazine_Push(
+                    Con_gun_Control.ammo, Con_gun_Control.magazineCount);
+
+                // 本机客机同步清除换弹计时与弹药显示
+                ClientRpcParams ps = new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+                };
+                Respawn_Weapon_ClientRpc(ps);
+            }
+        }
 
         // 客机强制瞬移
         if (Con_reconcile != null) Con_reconcile.Teleport_Push(position, rotation);
+    }
+
+    // 复活时重置本机枪械状态
+    [ClientRpc]
+    void Respawn_Weapon_ClientRpc(ClientRpcParams ps = default)
+    {
+        if (IsServer) return;   //主机本地已经重置
+        if (Con_gun_Control != null) Con_gun_Control.Gun_Respawn_Reset();
     }
 
 

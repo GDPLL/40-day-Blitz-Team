@@ -138,6 +138,15 @@ public class Player_Net_State : NetworkBehaviour
         netRespawnIndex.Value = respawnIdx;
     }
 
+    // 复活重置弹药与弹夹，主机写入
+    public void Ammo_Magazine_Push(int ammo, int magazine)
+    {
+        if (!IsServer) return;
+
+        netAmmo.Value = ammo;
+        netMagazine.Value = magazine;
+    }
+
     //复活等待时间，主机写入
     public void Respawn_Wait_Push(float wait)
     {
