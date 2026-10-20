@@ -45,7 +45,12 @@ public class Gun_Control : NetworkBehaviour
     public int fireEffectPrewarm = 12;      // 预热数量
     public float fireEffectLife = 2f;       // 存活时长
 
+    [Header("命中特效对象池")]
+    public int hitEffectPrewarm = 8;        // 预热数量
+    public float hitEffectLife = 2f;        // 存活时长
+
     [Header("命中爆浆")]
+    public int bloodPrewarm = 8;            // 预热数量
     public int bloodCount = 26;             // 每次命中粒子数
     public float bloodLife = 1.2f;          // 粒子存活时长，秒
     public float bloodSpeed = 4.5f;         // 喷射速度，米每秒
@@ -262,8 +267,10 @@ public class Gun_Control : NetworkBehaviour
 
         Blood_Template_Init();
 
-        // 提前建好枪口特效，避免第一次开火集中实例化
+        // 提前建好射击特效，避免第一次生成时集中实例化
+        if (bloodTemplate != null) Object_Pool_Manager.Prewarm(bloodTemplate.gameObject, bloodPrewarm);
         if (fireEffect != null) Object_Pool_Manager.Prewarm(fireEffect, fireEffectPrewarm);
+        if (hitEffect != null) Object_Pool_Manager.Prewarm(hitEffect, hitEffectPrewarm);
 
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
@@ -320,13 +327,32 @@ public class Gun_Control : NetworkBehaviour
             return;
         }
 
-        GameObject go = Instantiate(bloodTemplate.gameObject, hitPoint, Quaternion.LookRotation(-dir));
-        go.SetActive(true);
+        GameObject go = Object_Pool_Manager.Spawn(
+            bloodTemplate.gameObject,
+            hitPoint,
+            Quaternion.LookRotation(-dir),
+            bloodLife + 0.3f);
+        if (go == null) return;
 
+        // 复用对象时清除上一轮残留粒子，再手动发射本轮爆浆
         ParticleSystem ps = go.GetComponent<ParticleSystem>();
-        ps.Emit(bloodCount);
+        if (ps == null)
+        {
+            Object_Pool_Manager.Despawn(go);
+            return;
+        }
 
-        Destroy(go, bloodLife + 0.3f);
+        ps.Clear(true);
+        ps.Emit(bloodCount);
+    }
+
+    // 枪体销毁时释放运行时爆浆模板对应的池
+    public override void OnDestroy()
+    {
+        if (bloodTemplate != null)
+            Object_Pool_Manager.Release_Pool(bloodTemplate.gameObject);
+
+        base.OnDestroy();
     }
 
     // 物理帧逻辑，射速计时与精度更新
@@ -502,12 +528,12 @@ public class Gun_Control : NetworkBehaviour
         {
             end = hitPoint;                    // 命中落点
 
-            // 在落点生成对象
+            // 命中特效走对象池
             if (hitEffect != null)
             {
                 Vector3 bounceDir = Vector3.Reflect(dir, hitNormal);
                 if (bounceDir.sqrMagnitude <= 0.001f) bounceDir = -hitNormal;   // 极端角度兜底
-                Instantiate(hitEffect, hitPoint, Quaternion.LookRotation(bounceDir));
+                Object_Pool_Manager.Spawn(hitEffect, hitPoint, Quaternion.LookRotation(bounceDir), hitEffectLife);
             }
         }
 
