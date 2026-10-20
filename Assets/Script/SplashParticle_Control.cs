@@ -17,7 +17,15 @@ public class SplashParticle_Control : MonoBehaviour, IPooled_Effect
 
     public bool IsAudio;
 
+    ParticleSystem rootParticle;
+
     public float Pool_Lifetime => time > 0f ? time : 2f;
+
+    void Awake()
+    {
+        // 落点预制体根节点自身也有粒子，需和子粒子一起重播
+        rootParticle = GetComponent<ParticleSystem>();
+    }
 
     // 非池化实例保留自销毁，池化实例由管理器统一回收
     void Start()
@@ -37,10 +45,16 @@ public class SplashParticle_Control : MonoBehaviour, IPooled_Effect
     // 回收时停止残留粒子和声音
     public void On_Pool_Despawn()
     {
-        foreach (ParticleSystem particle in particles)
+        if (rootParticle != null)
+            rootParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        if (particles != null)
         {
-            if (particle == null) continue;
-            particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            foreach (ParticleSystem particle in particles)
+            {
+                if (particle == null || particle == rootParticle) continue;
+                particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            }
         }
 
         if (audioSource != null) audioSource.Stop();
@@ -50,11 +64,20 @@ public class SplashParticle_Control : MonoBehaviour, IPooled_Effect
     // 播放全部粒子和命中音效
     void Play_Performance()
     {
-        foreach (ParticleSystem particle in particles)
+        if (rootParticle != null)
         {
-            if (particle == null) continue;
-            particle.Clear(true);
-            particle.Play(true);
+            rootParticle.Clear(true);
+            rootParticle.Play(true);
+        }
+
+        if (particles != null)
+        {
+            foreach (ParticleSystem particle in particles)
+            {
+                if (particle == null || particle == rootParticle) continue;
+                particle.Clear(true);
+                particle.Play(true);
+            }
         }
 
         Play_Sound();
