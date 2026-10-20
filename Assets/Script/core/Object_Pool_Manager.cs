@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Pool;
 
 // 池化对象回调，复用时在这里重播表现
 public interface IPooled_Effect
@@ -37,7 +38,7 @@ public class Object_Pool_Manager : MonoBehaviour
     }
 
     // 缓存实例和组件查询结果
-    class Pool_Item
+    class Pool_Node
     {
         public GameObject Go;
         public IPooled_Effect Effect;
@@ -48,7 +49,7 @@ public class Object_Pool_Manager : MonoBehaviour
     class Pool
     {
         public GameObject Prefab;
-        public readonly Stack<Pool_Item> Idle = new Stack<Pool_Item>();
+        public ObjectPool<Pool_Node> BuiltinPool;
         public float DefaultLife = -1f;
         public bool Released;
     }
@@ -56,7 +57,7 @@ public class Object_Pool_Manager : MonoBehaviour
     // 活跃实例的寿命记录，节点循环使用
     class Active_Item
     {
-        public Pool_Item Item;
+        public Pool_Node Item;
         public double EndTime;
         public int ListIndex;
     }
@@ -151,11 +152,7 @@ public class Object_Pool_Manager : MonoBehaviour
         if (manager == null || manager.shuttingDown) return;
 
         Pool pool = manager.Get_Pool(prefab);
-        while (pool.Idle.Count < count)
-        {
-            Pool_Item item = manager.Create_Item(pool);
-            pool.Idle.Push(item);
-        }
+        manager.Prewarm_Pool(pool, count);
     }
 
     // 是否由池管理，空闲实例也要识别，避免预热对象误走自身销毁逻辑
@@ -172,22 +169,13 @@ public class Object_Pool_Manager : MonoBehaviour
 
         instance.pools.Remove(prefab);
         pool.Released = true;
-
-        while (pool.Idle.Count > 0)
-        {
-            Pool_Item item = pool.Idle.Pop();
-            if (item.Go != null)
-            {
-                instance.pooledObjects.Remove(item.Go);
-                Destroy(item.Go);
-            }
-        }
+        pool.BuiltinPool.Clear();
     }
 
     GameObject Spawn_Internal(GameObject prefab, Vector3 position, Quaternion rotation, float life)
     {
         Pool pool = Get_Pool(prefab);
-        Pool_Item item = Rent_Item(pool);
+        Pool_Node item = pool.BuiltinPool.Get();
         if (item == null || item.Go == null) return null;
 
         float duration = life > 0f ? life : pool.DefaultLife;
@@ -220,7 +208,7 @@ public class Object_Pool_Manager : MonoBehaviour
             return;
         }
 
-        Pool_Item item = active.Item;
+        Pool_Node item = active.Item;
         activeMap.Remove(target);
         Remove_Active_At(active.ListIndex);
 
@@ -230,28 +218,21 @@ public class Object_Pool_Manager : MonoBehaviour
             return;
         }
 
-        if (item.Go != null)
-        {
-            item.Effect?.On_Pool_Despawn();
-            item.Go.SetActive(false);
-        }
-
         if (item.Go == null)
         {
             pooledObjects.Remove(target);
             return;
         }
 
-        // 池已释放或缓存已满，多出来的实例直接销毁
-        if (item.Owner == null || item.Owner.Released || item.Owner.Idle.Count >= Max_Idle_Per_Prefab)
+        // 池已释放时不再放回，直接销毁
+        if (item.Owner == null || item.Owner.Released)
         {
-            pooledObjects.Remove(item.Go);
-            Destroy(item.Go);
+            Destroy_Node(item);
             return;
         }
 
-        item.Go.transform.SetParent(poolRoot, false);
-        item.Owner.Idle.Push(item);
+        // Release 会触发 Release_Node，统一停止表现并放回 ObjectPool
+        item.Owner.BuiltinPool.Release(item);
     }
 
     Pool Get_Pool(GameObject prefab)
@@ -259,7 +240,12 @@ public class Object_Pool_Manager : MonoBehaviour
         Pool pool;
         if (pools.TryGetValue(prefab, out pool)) return pool;
 
-        pool = new Pool { Prefab = prefab, DefaultLife = Calculate_Life(prefab) };
+        pool = new Pool
+        {
+            Prefab = prefab,
+            DefaultLife = Calculate_Life(prefab)
+        };
+        pool.BuiltinPool = Create_Builtin_Pool(pool);
         pools.Add(prefab, pool);
         return pool;
     }
@@ -282,27 +268,47 @@ public class Object_Pool_Manager : MonoBehaviour
         return maxLife > 0f ? maxLife + 0.1f : Default_Life;
     }
 
-    Pool_Item Rent_Item(Pool pool)
+    ObjectPool<Pool_Node> Create_Builtin_Pool(Pool pool)
     {
-        while (pool.Idle.Count > 0)
-        {
-            Pool_Item cached = pool.Idle.Pop();
-            if (cached.Go != null) return cached;
+        // 编辑器和开发包开启重复回收检查，正式包关闭以减少检查开销
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        const bool collectionCheck = true;
+#else
+        const bool collectionCheck = false;
+#endif
 
-            pooledObjects.Remove(cached.Go);
-        }
-
-        return Create_Item(pool);
+        return new ObjectPool<Pool_Node>(
+            createFunc: () => Create_Node(pool),
+            actionOnGet: null,
+            actionOnRelease: Release_Node,
+            actionOnDestroy: Destroy_Node,
+            collectionCheck: collectionCheck,
+            defaultCapacity: 12,
+            maxSize: Max_Idle_Per_Prefab);
     }
 
-    Pool_Item Create_Item(Pool pool)
+    void Prewarm_Pool(Pool pool, int count)
+    {
+        count = Mathf.Clamp(count, 0, Max_Idle_Per_Prefab);
+        if (count <= 0 || pool.BuiltinPool.CountInactive >= count) return;
+
+        // ObjectPool 没有直接预热 API，先全部取出并持有，再统一放回
+        Pool_Node[] temp = new Pool_Node[count];
+        for (int i = 0; i < count; i++)
+            temp[i] = pool.BuiltinPool.Get();
+
+        for (int i = 0; i < count; i++)
+            pool.BuiltinPool.Release(temp[i]);
+    }
+
+    Pool_Node Create_Node(Pool pool)
     {
         GameObject go = Instantiate(pool.Prefab);
         go.name = pool.Prefab.name;
         go.transform.SetParent(poolRoot, false);
         go.SetActive(false);
 
-        Pool_Item item = new Pool_Item
+        Pool_Node item = new Pool_Node
         {
             Go = go,
             Effect = go.GetComponent<IPooled_Effect>(),
@@ -311,6 +317,23 @@ public class Object_Pool_Manager : MonoBehaviour
 
         pooledObjects.Add(go);
         return item;
+    }
+
+    void Release_Node(Pool_Node node)
+    {
+        if (node == null || node.Go == null) return;
+
+        node.Effect?.On_Pool_Despawn();
+        node.Go.SetActive(false);
+        node.Go.transform.SetParent(poolRoot, false);
+    }
+
+    void Destroy_Node(Pool_Node node)
+    {
+        if (node == null || node.Go == null) return;
+
+        pooledObjects.Remove(node.Go);
+        Destroy(node.Go);
     }
 
     Active_Item Get_Active_Item()
