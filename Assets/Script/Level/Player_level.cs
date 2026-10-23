@@ -11,7 +11,8 @@ public class Player_level : MonoBehaviour
     public Level_EndCollider level_EndCollider; //撤离点     
     public Level_elevator level_elevator;    //电梯    
     public GameObject time3mObject;          //3m10s索道对象
-    public int gasDamage = 5;               //毒气每秒伤害
+    public int gasDamage = 5;               //前期毒气每秒伤害
+    public int lateGasDamage = 3;           //后期毒气每秒伤害
     public float gameTime;    //关卡已进行时间
 
     [Header("测试")]
@@ -33,11 +34,12 @@ public class Player_level : MonoBehaviour
     //节点时刻 30s 3m 3m10s 4m 5m 5m30s 9m
     readonly float[] nodeTime = { 30f, 180f, 190f, 240f, 300f, 330f, 540f };
     //节点毒气高度，0为不变
-    readonly float[] nodeGasY = { -10f, 45f, 0f, 95f, 120f, 165f, 0f };
+    readonly float[] nodeGasY = { -10f, 45f, 0f, 90f, 110f, 145f, 0f };
     //毒气粒子1-4
     public ParticleSystem[] gasParticle = new ParticleSystem[4];
     float gasHeight;                        //当前毒气高度
     public float Gas_Height => gasHeight;   //对外读取
+    public int Gas_Damage => gameTime >= nodeTime[4] ? lateGasDamage : gasDamage; //后期毒气伤害
     int gasShowIndex;                       //毒气粒子进度
 
     // 判定位置是否在毒气内

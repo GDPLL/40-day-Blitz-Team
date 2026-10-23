@@ -40257,6 +40257,7 @@ MonoBehaviour:
   level_elevator: {fileID: 1765029329}
   time3mObject: {fileID: 1942598111}
   gasDamage: 5
+  lateGasDamage: 3
   gameTime: 0
   testStop: 0
   gasParticle:

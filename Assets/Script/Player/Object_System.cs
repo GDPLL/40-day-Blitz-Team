@@ -203,7 +203,7 @@ public class Object_System : MonoBehaviour , Idamage
             if (gasTimer >= 1f)
             {
                 gasTimer = 0f;
-                Takedamage(Player_level.Instance.gasDamage, 999, new Vector3(), out _);
+                Takedamage(Player_level.Instance.Gas_Damage, 999, new Vector3(), out _);
             }
         }
         else gasTimer = 0f;
