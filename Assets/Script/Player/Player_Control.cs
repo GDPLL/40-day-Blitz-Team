@@ -289,7 +289,46 @@ public class Player_Control : Character_Move
     public void Player_Control_Date_Update()
     {
         if (Con_move != null) Con_move.Move_Update();
+        if (IsOwner && !IsServer && Con_input_Manage != null)
+            Aim_Predict_Date(Con_input_Manage.LastPacket);
         if (Con_gun_Control != null) Con_gun_Control.Gun_Update();
+    }
+
+    // 客机本机用本地世界数据预测锁定目标
+    void Aim_Predict_Date(InputPacket packet)
+    {
+        if (Con_gun_Control == null || Con_lock == null) return;
+        if (Con_ObjectSystem != null &&
+            (Con_ObjectSystem.isDead ||
+             (Con_net_State != null && (Con_net_State.RespawnWait > 0f || Con_net_State.Is_Out))))
+            return;
+
+        // 本机预测直接取当前输入，避免与表现层混用上一包按键状态
+        if (Con_input_Manage != null)
+        {
+            InputPacket localPacket = Con_input_Manage.GetPacket();
+            localPacket.inputSeq = packet.inputSeq;
+            localPacket.clientTick = packet.clientTick;
+            packet = localPacket;
+        }
+
+        Con_gun_Control.SetAimState(packet.shoulder, packet.ads);
+
+        Vector3 origin = packet.viewPos != Vector3.zero
+            ? packet.viewPos
+            : Con_gun_Control.MuzzlePosition;
+        Vector3 aimDir = packet.aimPoint - origin;
+        if (aimDir.sqrMagnitude <= 0.001f) aimDir = packet.viewDir;
+
+        Con_gun_Control.SetAimDirection(aimDir);
+        Con_gun_Control.SetAimOrigin(origin);
+
+        bool aimDown = packet.mouse1 || packet.mouse2 || packet.shoulder || packet.ads;
+        Con_lock.Target_Date(origin, aimDir, packet.aimPoint, Con_gun_Control.range,
+            Con_gun_Control.OuterAngle, out bool hasTarget, out Vector3 targetPos);
+
+        ulong targetId = hasTarget ? Con_lock.Current_Target_Id : ulong.MaxValue;
+        Con_gun_Control.Target_Push(aimDown && hasTarget, targetPos, targetId);
     }
 
     // 主机每帧各端逻辑更新
@@ -356,7 +395,7 @@ public class Player_Control : Character_Move
             Con_lock.Target_Date(origin, aimDir, packet.aimPoint, Con_gun_Control.range, Con_gun_Control.OuterAngle,
                 out bool hasTarget, out Vector3 targetPos);
 
-            Con_gun_Control.Target_Push(hasTarget, targetPos);
+            Con_gun_Control.Target_Push(hasTarget, targetPos, Con_lock.Current_Target_Id);
             Con_lock.Lock_On_Date(aimDown, Con_gun_Control.CurrentAngle, Con_gun_Control.InnerAngle);
         }
 
@@ -488,7 +527,8 @@ public class Player_Control : Character_Move
         {
             Con_gun_Control.ammo = Con_net_State.Ammo;
             Con_gun_Control.magazineCount = Con_net_State.Magazine;
-            Con_gun_Control.SetAimShow(Con_net_State.HasTarget, Con_net_State.TargetPos, Con_net_State.AimAngle);
+            if (!IsOwner)
+                Con_gun_Control.SetAimShow(Con_net_State.HasTarget, Con_net_State.TargetPos, Con_net_State.AimAngle);
         }
 
         // 举枪，锁定时指锁定点
@@ -530,6 +570,10 @@ public class Player_Control : Character_Move
 
         // 移动，与主机同一套逻辑，含落地失重与坠地音效
         Con_move.Move_ClientOwn_Fixed_Predict(packet, Con_gun_Control.IsReloading);
+
+        // 移动后重算本地瞄准，再推进本机精度预测
+        Aim_Predict_Date(packet);
+        Con_gun_Control.Gun_Aim_Predict_Fixed(Time.fixedDeltaTime);
 
         // 场景交互，索道等本机自己走
         Player_Scene_Interaction_Date(GetComponent<Collider>());

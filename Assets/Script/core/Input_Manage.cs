@@ -16,6 +16,8 @@ public class Input_Manage : NetworkBehaviour
     [Header("网络输入")]
     public float sendRate = 60f;    // 发送频率
     float sendTimer;                // 发送计时
+    uint inputSeq;                  // 输入序号
+    uint clientTick;                // 已采样逻辑帧
 
     // 翻滚双击检测
     readonly KeyCode[] rollKeys = { KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D };
@@ -55,6 +57,7 @@ public class Input_Manage : NetworkBehaviour
     void Update()
     {
         if (Player_Main.player_Main == null || !Player_Main.player_Main.isInit) return;  // 等待关卡初始化完成
+        clientTick++;
         Input_get();
 
         DebugE(DebugKey);
@@ -73,7 +76,10 @@ public class Input_Manage : NetworkBehaviour
         if (sendTimer < 1f / sendRate) return;
 
         sendTimer = 0f;
-        LastPacket = GetPacket();               //本机预测共用这个包
+        InputPacket packet = GetPacket();
+        packet.inputSeq = ++inputSeq;
+        packet.clientTick = clientTick;
+        LastPacket = packet;                    //本机预测共用这个包
         SubmitInputServerRpc(LastPacket);
     }
 

@@ -16,6 +16,8 @@ public class Player_Lock_Date : NetworkBehaviour
     readonly HashSet<ulong> lockDoneSources = new HashSet<ulong>();  //完成锁定的来源
     int lockSentStage;              //已下发阶段
     readonly RaycastHit[] hitBuffer = new RaycastHit[16];   //遮挡检测缓存
+    public ulong Current_Target_Id =>
+        lockTarget != null ? lockTarget.OwnerClientId : ulong.MaxValue;
 
     // 主机每帧搜索目标，结果由Control推给枪械
     public void Target_Date(Vector3 origin, Vector3 fwd, Vector3 aimPoint, float range, float outerAngle,
@@ -23,6 +25,7 @@ public class Player_Lock_Date : NetworkBehaviour
     {
         hasTarget = false;
         targetPos = Vector3.zero;
+        SetLockTarget(false, null);
 
         fwd = fwd.normalized;
 
@@ -36,9 +39,12 @@ public class Player_Lock_Date : NetworkBehaviour
         {
             if (col.transform.IsChildOf(self)) continue;
 
+            Player_Control target = col.GetComponentInParent<Player_Control>();
+            if (target == null) continue;
+
             hasTarget = true;
             targetPos = col.ClosestPoint(aimPoint);
-            SetLockTarget(true, col.GetComponentInParent<Player_Control>());
+            SetLockTarget(true, target);
             return;
         }
 
@@ -63,9 +69,12 @@ public class Player_Lock_Date : NetworkBehaviour
         if (nearest < float.MaxValue &&
             (enemyMask.value & (1 << closest.collider.gameObject.layer)) != 0)
         {
+            Player_Control target = closest.collider.GetComponentInParent<Player_Control>();
+            if (target == null) return;
+
             hasTarget = true;
             targetPos = closest.point;
-            SetLockTarget(true, closest.collider.GetComponentInParent<Player_Control>());
+            SetLockTarget(true, target);
             return;
         }
 
@@ -98,7 +107,7 @@ public class Player_Lock_Date : NetworkBehaviour
             bestTarget = col.GetComponentInParent<Player_Control>();
         }
 
-        if (bestAngle >= float.MaxValue) return;   //外圈内无目标
+        if (bestAngle >= float.MaxValue || bestTarget == null) return;   //外圈内无目标
 
         hasTarget = true;
         targetPos = bestPoint;

@@ -84,9 +84,10 @@ public class Gun_Control : NetworkBehaviour
         public float farDistance = 40f;   // 最远参考距离
         public float farFactor = 0.15f;   // 远距离系数
         public int stableShots = 16;      // 稳定弹药数
+        public float bloomHold = 0.05f;   // 单发扩圈保持时间
 
         public AimProfile(float outer, float inner, float speed,
-            float near, float far, float factor, int stable)
+            float near, float far, float factor, int stable, float hold)
         {
             outerAngle = outer;
             innerAngle = inner;
@@ -95,13 +96,14 @@ public class Gun_Control : NetworkBehaviour
             farDistance = far;
             farFactor = factor;
             stableShots = stable;
+            bloomHold = hold;
         }
     }
 
     [Header("精度：各姿态参数")]
-    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f, 16);       // 腰射
-    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f, 5);   // 据枪
-    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f, 2);       // 开镜
+    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f, 16, 0.12f);       // 腰射
+    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f, 5, 0.03f);   // 据枪
+    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f, 2, 0f);         // 开镜
 
     [Header("精度：开火消耗")]
     public float stableCost = 0.30f;   // 稳定段总消耗比例
@@ -123,17 +125,20 @@ public class Gun_Control : NetworkBehaviour
     bool hasTarget;          // 是否有目标
     bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
+    ulong currentTargetId = ulong.MaxValue;   // 当前锁定目标编号
     Vector3 aimDirection;    // 准星方向
     ulong ownerId;           // 持有者编号
     Vector3 aimOrigin;       // 准星射线起点
 
     float currentAngle;                                       // 当前精度圈
     int shotCount;                                            // 本次连发已射发数
+    float accuracyHoldTimer;                                  // 开火扩圈保持计时
     public float CurrentAngle => currentAngle;                // 对外读取
     public float OuterAngle => CurrentProfile().outerAngle;   // 当前姿态外圈
     public float InnerAngle => CurrentProfile().innerAngle;   // 当前姿态内圈
     public bool HasTarget => hasTarget;                       // 是否锁定
     public Vector3 TargetPos => targetPos;                    // 锁定点
+    public ulong TargetId => currentTargetId;                  // 锁定目标编号
 
     // 位置绑定兜底，未拖拽时取自身
     Transform Gun_Root => gunRoot != null ? gunRoot : transform;
@@ -223,6 +228,7 @@ public class Gun_Control : NetworkBehaviour
         aimingAds = adsOn;
         currentAngle = CurrentProfile().outerAngle;   //立刻重置到新外圈
         shotCount = 0;                                //换姿态重新计稳定
+        accuracyHoldTimer = 0f;
     }
 
     // 设置移动状态
@@ -234,18 +240,20 @@ public class Gun_Control : NetworkBehaviour
     }
 
     // 注入锁定目标，由锁定模块推送
-    public void Target_Push(bool has, Vector3 worldPosition)
+    public void Target_Push(bool has, Vector3 worldPosition, ulong id = ulong.MaxValue)
     {
         hasTarget = has;
         targetPos = worldPosition;
+        currentTargetId = has ? id : ulong.MaxValue;
     }
 
     // 注入锁定与精度圈，客户端显示用
-    public void SetAimShow(bool has, Vector3 worldPosition, float angle)
+    public void SetAimShow(bool has, Vector3 worldPosition, float angle, ulong id = ulong.MaxValue)
     {
         hasTarget = has;
         targetPos = worldPosition;
         currentAngle = angle;
+        currentTargetId = has ? id : ulong.MaxValue;
     }
 
     // 注入完成
@@ -374,6 +382,12 @@ public class Gun_Control : NetworkBehaviour
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
     }
 
+    // 客机本机精度预测，固定帧推进
+    public void Gun_Aim_Predict_Fixed(float dt)
+    {
+        UpdateAimAccuracy(dt);
+    }
+
     // 换弹计时推进，客机本机预测用
     public void Gun_Reload_Tick(float dt)
     {
@@ -409,6 +423,13 @@ public class Gun_Control : NetworkBehaviour
             return;
         }
 
+        // 开火后短暂保持扩圈，避免下一物理帧立即缩回
+        if (accuracyHoldTimer > 0f)
+        {
+            accuracyHoldTimer -= dt;
+            return;
+        }
+
         float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance, p);
         currentAngle = Mathf.MoveTowards(currentAngle, p.innerAngle, speed * dt);   // 收缩到内圈
 
@@ -428,6 +449,7 @@ public class Gun_Control : NetworkBehaviour
 
         currentAngle = Mathf.Min(currentAngle + cost, p.outerAngle);
         shotCount++;
+        accuracyHoldTimer = Mathf.Max(accuracyHoldTimer, p.bloomHold);
     }
 
     // 移动姿态系数
@@ -652,6 +674,7 @@ public class Gun_Control : NetworkBehaviour
 
         fireTime = Time.time;
 
+        Aim_Cost_Date();     // 本机预测本次开火的精度消耗
         Gun_Shoot_Local_Performance(MuzzlePosition, Gun_Root.forward);
 
         if (Own_Control.Con_player_camera != null)
