@@ -40,6 +40,9 @@ public class Player_level : MonoBehaviour
     public float Gas_Height => gasHeight;   //对外读取
     int gasShowIndex;                       //毒气粒子进度
 
+    // 判定位置是否在毒气内
+    public bool Gas_Contains(Vector3 position) => gasHeight > 0f && position.y < gasHeight;
+
     //毒气释放节点序号，与 nodeGasY 对应
     readonly int[] gasNode = { 1, 3, 4, 5 };
     public float alarmWarn = 30f;           //警报提前秒数
@@ -133,7 +136,8 @@ public class Player_level : MonoBehaviour
 
         for (int i = 0; i < gasParticle.Length; i++)
         {
-            if (gasParticle[i] != null) gasParticle[i].Stop();
+            if (gasParticle[i] != null)
+                gasParticle[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
     }
 

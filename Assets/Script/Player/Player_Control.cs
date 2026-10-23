@@ -481,7 +481,7 @@ public class Player_Control : Character_Move
         if (Con_player_Audio != null && Con_ObjectSystem != null)
         {
             bool inGas = Player_level.Instance != null
-                && transform.position.y < Player_level.Instance.Gas_Height;
+                && Player_level.Instance.Gas_Contains(transform.position);
             Con_player_Audio.Player_Audio_Body_Show(Con_ObjectSystem.HP, Con_ObjectSystem.healCap, inGas);
         }
 

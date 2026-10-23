@@ -177,7 +177,8 @@ public class Player_Body : Character_Move
         if (!(bodyCol is CapsuleCollider cap)) return;
 
         cap.height = colHeight * scale;
-        //cap.center = colCenter * scale;
+        cap.center = new Vector3(colCenter.x,
+            colCenter.y - (colHeight - cap.height) * 0.5f, colCenter.z);
     }
 
     // 按节奏沿移动方向施加推力

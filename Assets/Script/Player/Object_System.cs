@@ -197,7 +197,7 @@ public class Object_System : MonoBehaviour , Idamage
         if (c.Con_net_State.Is_Out) return true;   //已淘汰不再参与
 
         // 毒气，低于毒气高度每秒扣血
-        if (Player_level.Instance != null && c.transform.position.y < Player_level.Instance.Gas_Height)
+        if (Player_level.Instance != null && Player_level.Instance.Gas_Contains(c.transform.position))
         {
             gasTimer += Time.deltaTime;
             if (gasTimer >= 1f)
