@@ -26,7 +26,7 @@ public class Player_Move_Date : MonoBehaviour
     public bool isPeekRight;    //右探头
     public float slideTimer;    //滑铲剩余时间
     public float slideTime = 1.77f;    //滑铲时长
-    public float crouchEnterTime = 0.99f;    //蹲下过渡时长
+    public float crouchEnterTime = 0.82f;    //蹲下过渡时长
 
     bool jumpRequest;           //本物理帧请求起跳
     bool rollRequest;           //本物理帧请求翻滚

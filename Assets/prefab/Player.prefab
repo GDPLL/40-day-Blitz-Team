@@ -1581,9 +1581,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animation: {fileID: 3216577502545468986}
   crouchModelLift: 0.19
-  crouchLiftRiseTime: 0.99
+  crouchLiftRiseTime: 0.82
   crouchLiftFallTime: 0.15
   crouchHoldOffset: 2.44
+  slideTurnTime: 0.12
+  footGroundHeight: 0.02
+  footGroundSpeed: 12
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -2029,7 +2032,7 @@ MonoBehaviour:
   isPeekRight: 0
   slideTimer: 0
   slideTime: 1.77
-  crouchEnterTime: 0.99
+  crouchEnterTime: 0.82
 --- !u!1 &7746808583437207710
 GameObject:
   m_ObjectHideFlags: 0

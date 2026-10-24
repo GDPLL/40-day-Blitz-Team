@@ -13,6 +13,9 @@ public class Player_animation : MonoBehaviour
             return;
         }
         modelBasePosition = animation.transform.localPosition;
+        modelBaseRotation = animation.transform.localRotation;
+        leftToe = animation.GetBoneTransform(HumanBodyBones.LeftToes);
+        rightToe = animation.GetBoneTransform(HumanBodyBones.RightToes);
 
         // 蹲走动画强制循环
         foreach (AnimationClip clip in animation.runtimeAnimatorController.animationClips)
@@ -45,13 +48,20 @@ public class Player_animation : MonoBehaviour
 
     public new Animator animation;   // 动画组件
     public float crouchModelLift = 0.19f;   // 蹲姿模型抬升
-    public float crouchLiftRiseTime = 0.99f;   // 蹲姿抬升时长
+    public float crouchLiftRiseTime = 0.82f;   // 蹲姿抬升时长
     public float crouchLiftFallTime = 0.15f;   // 蹲姿恢复时长
     public float crouchHoldOffset = 2.44f;    // 蹲姿末帧时间
-    float peekWeightTimer;          // 探头层保留时间
+    public float slideTurnTime = 0.12f;       // 滑铲转身时长
+    public float footGroundHeight = 0.02f;    // 脚底离角色根高度
+    public float footGroundSpeed = 12f;       // 脚底修正速度
     int actionState = -1;           // 当前动作层状态
     Vector3 modelBasePosition;      // 模型基础位置
+    Quaternion modelBaseRotation;   // 模型基础旋转
     float crouchLift;               // 当前模型抬升
+    float slideTurn;                // 当前滑铲转身进度
+    Transform leftToe;              // 左脚趾骨骼
+    Transform rightToe;             // 右脚趾骨骼
+    bool groundActive;              // 是否需要脚底校正
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -85,6 +95,7 @@ public class Player_animation : MonoBehaviour
         bool slide = (state & BitSlide) != 0;
         bool crouchEnter = (state & BitCrouchEnter) != 0;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
+        bool grounded = (state & BitGround) != 0;
 
         animation.SetBool("walk", walk);
         animation.SetBool("raiseGun", (state & BitGun) != 0);
@@ -140,27 +151,46 @@ public class Player_animation : MonoBehaviour
             animation.SetLayerWeight(2, Smooth_Weight(2, handTarget, handTime));
         }
 
-        // 探头层只在探头和回正期间生效
-        if (peek) peekWeightTimer = 0.65f;
-        else if (peekWeightTimer > 0f) peekWeightTimer -= Time.deltaTime;
+        // 探头层平滑淡入淡出
         if (animation.layerCount > 4)
         {
-            float peekTarget = peek || peekWeightTimer > 0f ? 1f : 0f;
-            animation.SetLayerWeight(4, Smooth_Weight(4, peekTarget, 0.1f));
+            float peekTarget = peek ? 1f : 0f;
+            animation.SetLayerWeight(4, Smooth_Weight(4, peekTarget, 0.2f));
         }
 
-        // 蹲姿抬升模型，避免脚部穿地
+        // 蹲姿退出时恢复模型高度
         Vector3 modelPosition = modelBasePosition;
-        float liftTarget = squat && !slide ? crouchModelLift : 0f;
-        float liftTime = liftTarget > crouchLift ? crouchLiftRiseTime : crouchLiftFallTime;
-        if (liftTime > 0f) crouchLift = Mathf.MoveTowards(crouchLift, liftTarget,
-            crouchModelLift * Time.deltaTime / liftTime);
-        else crouchLift = liftTarget;
+        groundActive = grounded && (squat || slide);
+        if (!groundActive) crouchLift = Mathf.MoveTowards(crouchLift, 0f,
+            crouchModelLift * Time.deltaTime / crouchLiftFallTime);
         modelPosition.y += crouchLift;
         animation.transform.localPosition = modelPosition;
 
+        // 滑铲时脚部朝前
+        float slideTurnTarget = slide ? 1f : 0f;
+        if (slideTurnTime > 0f)
+            slideTurn = Mathf.MoveTowards(slideTurn, slideTurnTarget,
+                Time.deltaTime / slideTurnTime);
+        else slideTurn = slideTurnTarget;
+        animation.transform.localRotation = modelBaseRotation
+            * Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(0f, -45f, 0f), slideTurn);
+
         // 垂直速度，正升负降
         animation.SetFloat("VerticalSpeed", verticalSpeed);
+    }
+
+    // Animator更新后校正脚底
+    public void Player_animation_Ground_Performance()
+    {
+        if (!groundActive || leftToe == null || rightToe == null) return;
+
+        float minFootY = Mathf.Min(leftToe.position.y, rightToe.position.y);
+        float footError = transform.root.position.y + footGroundHeight - minFootY;
+        crouchLift = Mathf.Clamp(crouchLift + footError, -1.5f, 1f);
+
+        Vector3 modelPosition = modelBasePosition;
+        modelPosition.y += crouchLift;
+        animation.transform.localPosition = modelPosition;
     }
 
     // 平滑图层权重
