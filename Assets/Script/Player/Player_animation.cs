@@ -19,6 +19,8 @@ public class Player_animation : MonoBehaviour
         {
             if (clip.name.Contains("squat"))
                 clip.wrapMode = WrapMode.Loop;
+            else if (clip.name == "crouch2")
+                clip.wrapMode = WrapMode.ClampForever;
         }
     }
 
@@ -43,9 +45,13 @@ public class Player_animation : MonoBehaviour
 
     public new Animator animation;   // 动画组件
     public float crouchModelLift = 0.19f;   // 蹲姿模型抬升
+    public float crouchLiftRiseTime = 0.99f;   // 蹲姿抬升时长
+    public float crouchLiftFallTime = 0.15f;   // 蹲姿恢复时长
+    public float crouchHoldOffset = 2.44f;    // 蹲姿末帧时间
     float peekWeightTimer;          // 探头层保留时间
     int actionState = -1;           // 当前动作层状态
     Vector3 modelBasePosition;      // 模型基础位置
+    float crouchLift;               // 当前模型抬升
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -92,6 +98,7 @@ public class Player_animation : MonoBehaviour
         animation.SetBool("IsSlide", slide);
         animation.SetBool("PeekLeft", (state & BitPeekLeft) != 0);
         animation.SetBool("PeekRight", (state & BitPeekRight) != 0);
+        animation.SetFloat("CrouchActionSpeed", squat && walk ? 1f : 0f);
 
         // 奔跑满速，走路半速，静止为零，换弹只能走路
         bool run = (state & BitRun) != 0 && !reload;
@@ -107,36 +114,60 @@ public class Player_animation : MonoBehaviour
         int nextAction;
         if (slide) nextAction = 3;
         else if (crouchEnter) nextAction = 4;
-        else nextAction = squat ? (walk ? 2 : 4) : 0;
+        else nextAction = squat ? 2 : 0;
         if (animation.layerCount > 1)
         {
-            animation.SetLayerWeight(1, nextAction > 0 ? 1f : 0f);
+            float actionTarget = nextAction > 0 ? 1f : 0f;
+            float actionTime = actionTarget > animation.GetLayerWeight(1) ? 0.18f : 0.15f;
+            animation.SetLayerWeight(1, Smooth_Weight(1, actionTarget, actionTime));
             if (nextAction != actionState)
             {
                 string stateName = nextAction == 3 ? "Slide"
                     : nextAction == 2 ? "CrouchMove"
                     : nextAction == 4 ? "CrouchIdle"
                     : nextAction == 1 ? "CrouchHold" : "ActionEmpty";
-                animation.CrossFadeInFixedTime(stateName, 0.12f, 1);
+                float stateOffset = nextAction == 1 ? crouchHoldOffset : 0f;
+                animation.CrossFadeInFixedTime(stateName, 0.12f, 1, stateOffset);
                 actionState = nextAction;
             }
         }
 
         // 滑铲使用整身手臂动作
-        if (animation.layerCount > 2) animation.SetLayerWeight(2, slide ? 0f : 1f);
+        if (animation.layerCount > 2)
+        {
+            float handTarget = slide ? 0f : 1f;
+            float handTime = slide ? 0.08f : 0.15f;
+            animation.SetLayerWeight(2, Smooth_Weight(2, handTarget, handTime));
+        }
 
         // 探头层只在探头和回正期间生效
         if (peek) peekWeightTimer = 0.65f;
         else if (peekWeightTimer > 0f) peekWeightTimer -= Time.deltaTime;
         if (animation.layerCount > 4)
-            animation.SetLayerWeight(4, peek || peekWeightTimer > 0f ? 1f : 0f);
+        {
+            float peekTarget = peek || peekWeightTimer > 0f ? 1f : 0f;
+            animation.SetLayerWeight(4, Smooth_Weight(4, peekTarget, 0.1f));
+        }
 
         // 蹲姿抬升模型，避免脚部穿地
         Vector3 modelPosition = modelBasePosition;
-        if (squat && !slide) modelPosition.y += crouchModelLift;
+        float liftTarget = squat && !slide ? crouchModelLift : 0f;
+        float liftTime = liftTarget > crouchLift ? crouchLiftRiseTime : crouchLiftFallTime;
+        if (liftTime > 0f) crouchLift = Mathf.MoveTowards(crouchLift, liftTarget,
+            crouchModelLift * Time.deltaTime / liftTime);
+        else crouchLift = liftTarget;
+        modelPosition.y += crouchLift;
         animation.transform.localPosition = modelPosition;
 
         // 垂直速度，正升负降
         animation.SetFloat("VerticalSpeed", verticalSpeed);
+    }
+
+    // 平滑图层权重
+    float Smooth_Weight(int layer, float target, float duration)
+    {
+        if (duration <= 0f) return target;
+        float step = Time.deltaTime / duration;
+        return Mathf.MoveTowards(animation.GetLayerWeight(layer), target, step);
     }
 }

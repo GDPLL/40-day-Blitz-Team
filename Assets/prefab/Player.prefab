@@ -1581,6 +1581,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animation: {fileID: 3216577502545468986}
   crouchModelLift: 0.19
+  crouchLiftRiseTime: 0.99
+  crouchLiftFallTime: 0.15
+  crouchHoldOffset: 2.44
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0
