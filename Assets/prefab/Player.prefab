@@ -1876,22 +1876,25 @@ MonoBehaviour:
     farDistance: 15
     farFactor: 1
     stableShots: 16
+    bloomHold: 0.12
   shoulderAim:
     outerAngle: 16
     innerAngle: 2
-    growSpeed: 15
+    growSpeed: 18
     nearDistance: 6
     farDistance: 35
     farFactor: 1
     stableShots: 5
+    bloomHold: 0.03
   adsAim:
     outerAngle: 10
     innerAngle: 0.2
-    growSpeed: 5
+    growSpeed: 7
     nearDistance: 60
     farDistance: 500
     farFactor: 1
     stableShots: 4
+    bloomHold: 0
   stableCost: 0.3
   burstCost: 0.35
   moveFactorSquatStand: 1.3

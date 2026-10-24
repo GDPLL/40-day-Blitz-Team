@@ -102,8 +102,8 @@ public class Gun_Control : NetworkBehaviour
 
     [Header("精度：各姿态参数")]
     public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f, 16, 0.12f);       // 腰射
-    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f, 5, 0.03f);   // 据枪
-    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f, 2, 0f);         // 开镜
+    public AimProfile shoulderAim = new AimProfile(10f, 4f, 18f, 6f, 35f, 1f, 5, 0.03f);   // 据枪
+    public AimProfile adsAim = new AimProfile(15f, 2f, 7f, 100f, 500f, 1f, 2, 0f);         // 开镜
 
     [Header("精度：开火消耗")]
     public float stableCost = 0.30f;   // 稳定段总消耗比例
