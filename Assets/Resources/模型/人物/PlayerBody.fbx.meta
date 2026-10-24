@@ -1621,7 +1621,7 @@ ModelImporter:
     globalScale: 1.59
     rootMotionBoneName: 
     defaultPoseIndex: -1
-    hasTranslationDoF: 0
+    hasTranslationDoF: 1
     hasExtraRoot: 1
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}

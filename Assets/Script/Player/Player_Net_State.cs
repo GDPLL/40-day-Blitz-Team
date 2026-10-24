@@ -57,8 +57,9 @@ public class Player_Net_State : NetworkBehaviour
         if (mv.rollTimer > 0f) state |= Player_animation.BitRoll;
         if (c.Con_gun_Control != null && c.Con_gun_Control.IsReloading) state |= Player_animation.BitReload;            //换弹
         if (mv.isWeightLess) state |= Player_animation.BitWeightLess;    //失重
-        if (!dead && mv.slideTimer > 0f) state |= Player_animation.BitSlide;
+        if (!dead && mv.Is_Slide) state |= Player_animation.BitSlide;
         if (!dead) state |= Player_animation.Pack_Peek(mv.isPeekLeft, mv.isPeekRight);
+        if (!dead && mv.Is_Crouch_Enter) state |= Player_animation.BitCrouchEnter;
 
         // 落地与方向取本机数据
         if (mv.isOnGround) state |= Player_animation.BitGround;
@@ -87,8 +88,9 @@ public class Player_Net_State : NetworkBehaviour
         if (mv.rollTimer > 0f) state |= Player_animation.BitRoll;
         if (c.Con_gun_Control != null && c.Con_gun_Control.IsReloading) state |= Player_animation.BitReload;            //换弹
         if (mv.isWeightLess) state |= Player_animation.BitWeightLess;    //失重
-        if (!dead && mv.slideTimer > 0f) state |= Player_animation.BitSlide;
+        if (!dead && mv.Is_Slide) state |= Player_animation.BitSlide;
         if (!dead) state |= Player_animation.Pack_Peek(mv.isPeekLeft, mv.isPeekRight);
+        if (!dead && mv.Is_Crouch_Enter) state |= Player_animation.BitCrouchEnter;
 
         // 移动方向取输入包，各端一致
         state |= Player_animation.Pack_Move(c.Con_player_HostNetworkEvent.Packet.move);

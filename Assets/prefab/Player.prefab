@@ -1518,7 +1518,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3580946079
+  GlobalObjectIdHash: 3179484703
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -1580,6 +1580,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animation: {fileID: 3216577502545468986}
+  crouchModelLift: 0.19
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1665,12 +1666,13 @@ MonoBehaviour:
   turnSpeed: 360
   walkSpeed: 5
   runSpeed: 8
-  squatSpeed: 1
+  squatSpeed: 2
   walkForce: 1000
   runForce: 3000
-  squatForce: 100
+  squatForce: 900
   walkInterval: 0.7755
   runInterval: 0.14
+  squatInterval: 0.2
   jumpForce: 400
   rb: {fileID: 6445952189836789830}
   rollForce: 1000
@@ -1678,6 +1680,9 @@ MonoBehaviour:
   rollDelay: 0.8991
   rollTime: 0.5
   rollSquatScale: 0.5
+  slideSpeed: 8
+  slideForce: 900
+  slideSquatScale: 0.5
   deadSquatScale: 0.23
 --- !u!114 &2084833044355557849
 MonoBehaviour:
@@ -2017,6 +2022,11 @@ MonoBehaviour:
   isJumpDown: 0
   isRollDown: 0
   rollTimer: 0
+  isPeekLeft: 0
+  isPeekRight: 0
+  slideTimer: 0
+  slideTime: 1.77
+  crouchEnterTime: 0.99
 --- !u!1 &7746808583437207710
 GameObject:
   m_ObjectHideFlags: 0
@@ -4346,12 +4356,7 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
-  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
-    are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform
-    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform
-    'mixamorig:LeftForeArm'\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform
-    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tand more ..."
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0

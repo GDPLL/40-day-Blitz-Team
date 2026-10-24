@@ -4,7 +4,23 @@ using UnityEngine;
 public class Player_animation : MonoBehaviour
 {
     Player_Control Own_Control; //父级
-    public void Owner_Init(Player_Control control) { Own_Control = control; }
+    public void Owner_Init(Player_Control control)
+    {
+        Own_Control = control;
+        if (animation == null || animation.runtimeAnimatorController == null)
+        {
+            Debug.LogError("Player_animation|Owner_Init|动画组件为空");
+            return;
+        }
+        modelBasePosition = animation.transform.localPosition;
+
+        // 蹲走动画强制循环
+        foreach (AnimationClip clip in animation.runtimeAnimatorController.animationClips)
+        {
+            if (clip.name.Contains("squat"))
+                clip.wrapMode = WrapMode.Loop;
+        }
+    }
 
     // 状态位取值定义
     public const uint BitWalk = 1u << 0;         //移动
@@ -20,12 +36,16 @@ public class Player_animation : MonoBehaviour
     public const uint BitSlide = 1u << 14;       //滑铲
     public const uint BitPeekLeft = 1u << 15;    //左探头
     public const uint BitPeekRight = 1u << 16;   //右探头
+    public const uint BitCrouchEnter = 1u << 17; //蹲下过渡
 
     const int MoveXShift = 8;                   //方向X位偏移
     const int MoveYShift = 10;                  //方向Y位偏移
 
     public new Animator animation;   // 动画组件
+    public float crouchModelLift = 0.19f;   // 蹲姿模型抬升
     float peekWeightTimer;          // 探头层保留时间
+    int actionState = -1;           // 当前动作层状态
+    Vector3 modelBasePosition;      // 模型基础位置
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -57,6 +77,7 @@ public class Player_animation : MonoBehaviour
         bool reload = (state & BitReload) != 0;
         bool squat = (state & BitSquat) != 0;
         bool slide = (state & BitSlide) != 0;
+        bool crouchEnter = (state & BitCrouchEnter) != 0;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
 
         animation.SetBool("walk", walk);
@@ -83,8 +104,23 @@ public class Player_animation : MonoBehaviour
         animation.SetFloat("MoveY", move.y);
 
         // 蹲姿和滑铲使用独立全身层
+        int nextAction;
+        if (slide) nextAction = 3;
+        else if (crouchEnter) nextAction = 4;
+        else nextAction = squat ? (walk ? 2 : 4) : 0;
         if (animation.layerCount > 1)
-            animation.SetLayerWeight(1, squat || slide ? 1f : 0f);
+        {
+            animation.SetLayerWeight(1, nextAction > 0 ? 1f : 0f);
+            if (nextAction != actionState)
+            {
+                string stateName = nextAction == 3 ? "Slide"
+                    : nextAction == 2 ? "CrouchMove"
+                    : nextAction == 4 ? "CrouchIdle"
+                    : nextAction == 1 ? "CrouchHold" : "ActionEmpty";
+                animation.CrossFadeInFixedTime(stateName, 0.12f, 1);
+                actionState = nextAction;
+            }
+        }
 
         // 滑铲使用整身手臂动作
         if (animation.layerCount > 2) animation.SetLayerWeight(2, slide ? 0f : 1f);
@@ -94,6 +130,11 @@ public class Player_animation : MonoBehaviour
         else if (peekWeightTimer > 0f) peekWeightTimer -= Time.deltaTime;
         if (animation.layerCount > 4)
             animation.SetLayerWeight(4, peek || peekWeightTimer > 0f ? 1f : 0f);
+
+        // 蹲姿抬升模型，避免脚部穿地
+        Vector3 modelPosition = modelBasePosition;
+        if (squat && !slide) modelPosition.y += crouchModelLift;
+        animation.transform.localPosition = modelPosition;
 
         // 垂直速度，正升负降
         animation.SetFloat("VerticalSpeed", verticalSpeed);

@@ -26,15 +26,18 @@ public class Player_Move_Date : MonoBehaviour
     public bool isPeekRight;    //右探头
     public float slideTimer;    //滑铲剩余时间
     public float slideTime = 1.77f;    //滑铲时长
+    public float crouchEnterTime = 0.99f;    //蹲下过渡时长
 
     bool jumpRequest;           //本物理帧请求起跳
     bool rollRequest;           //本物理帧请求翻滚
     bool slideRequest;          //本物理帧请求滑铲
     bool slideBefore;           //滑铲按键上一帧状态
+    bool crouchBefore;          //蹲下按键上一帧状态
     float rollDelay;            //翻滚施力延迟
     Vector2 rollDir;            //翻滚方向
     float bodyScale = 1f;       //碰撞体当前比例
     float respawnSquatTimer;    //复活倒地保持计时
+    float crouchEnterTimer;     //蹲下过渡剩余时间
 
     // 瞬移优先级
     public const int Priority_Reconcile = 0;   //纠偏
@@ -48,6 +51,8 @@ public class Player_Move_Date : MonoBehaviour
     bool hasRequest;            //有待处理申请
 
     public bool Teleported { get; private set; }   //本物理帧是否瞬移
+    public bool Is_Crouch_Enter => crouchEnterTimer > 0f;   //是否蹲下过渡
+    public bool Is_Slide => slideTimer > 0f || slideRequest; //是否滑铲
 
     // 瞬移申请，高优先级覆盖低优先级
     public void Teleport_Request(Vector3 position, Quaternion rotation, int priority)
@@ -124,6 +129,8 @@ public class Player_Move_Date : MonoBehaviour
         slideTimer = 0f;
         slideRequest = false;
         slideBefore = false;
+        crouchBefore = false;
+        crouchEnterTimer = 0f;
         isPeekLeft = false;
         isPeekRight = false;
         respawnSquatTimer = respawnSquatTime;
@@ -206,8 +213,10 @@ public class Player_Move_Date : MonoBehaviour
         Player_Body body = c.Con_body;
         if (body == null) return;
 
-        // 计算移动数据
-        body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !reload, isSquat);   //换弹只能走路
+        // 蹲下过渡期间禁止移动
+        bool crouchEnter = crouchEnterTimer > 0f;
+        Vector2 move = crouchEnter ? Vector2.zero : packet.move;
+        body.Body_Move_Date(move, packet.viewDir, isRuning && !reload, isSquat);   //换弹只能走路
 
         // 滑铲只在地面且未翻滚时触发
         if (slideRequest)
@@ -215,6 +224,7 @@ public class Player_Move_Date : MonoBehaviour
             slideRequest = false;
             if (slideTimer <= 0f && rollTimer <= 0f && isOnGround)
             {
+                crouchEnterTimer = 0f;
                 slideTimer = slideTime;
                 body.Body_Slide_Date(packet.move, packet.viewDir);
             }
@@ -268,7 +278,15 @@ public class Player_Move_Date : MonoBehaviour
         }
 
         // 输入施推力
-        if (isWASDDowm && rollTimer <= 0f && slideTimer <= 0f) body.Body_Move();
+        if (isWASDDowm && rollTimer <= 0f && slideTimer <= 0f && !crouchEnter)
+            body.Body_Move();
+
+        // 蹲下过渡计时
+        if (crouchEnterTimer > 0f)
+        {
+            crouchEnterTimer -= Time.fixedDeltaTime;
+            if (crouchEnterTimer <= 0f) crouchEnterTimer = 0f;
+        }
     }
 
     // 翻滚死亡失重共用碰撞体缩放
@@ -323,9 +341,19 @@ public class Player_Move_Date : MonoBehaviour
         isRuning = packet.run;
         isSquat = packet.squat;
 
+        // 进入蹲姿时锁定移动
+        if (isSquat && !crouchBefore && rollTimer <= 0f && slideTimer <= 0f)
+            crouchEnterTimer = crouchEnterTime;
+        if (!isSquat) crouchEnterTimer = 0f;
+        crouchBefore = isSquat;
+
         // 滑铲按键边沿
         bool slideInput = isRuning && isSquat && isWASDDowm && isOnGround;
-        if (slideInput && !slideBefore) slideRequest = true;
+        if (slideInput && !slideBefore)
+        {
+            crouchEnterTimer = 0f;
+            slideRequest = true;
+        }
         slideBefore = slideInput;
 
         // 探头互斥

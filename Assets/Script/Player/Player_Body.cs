@@ -18,6 +18,7 @@ public class Player_Body : Character_Move
     float airForce = 0.1f;                  // 空中推力比例
     public float walkInterval = 0.2f;               // 走路施力间隔秒
     public float runInterval = 0.14f;               // 跑步施力间隔秒
+    public float squatInterval = 0.2f;              // 蹲走施力间隔秒
     float moveTimer;                                // 施力计时
     float moveInterval;                             // 当前施力间隔
     bool hasInput;                                  // 本帧有移动输入
@@ -89,7 +90,7 @@ public class Player_Body : Character_Move
         {
             currentForce = squatForce;
             currentSpeed = squatSpeed;
-            moveInterval = walkInterval;    //蹲走按走路节奏
+            moveInterval = squatInterval;
         }
 
         // 停止输入重置计时，重新输入立刻施力
