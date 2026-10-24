@@ -22,9 +22,15 @@ public class Player_Move_Date : MonoBehaviour
     public bool isJumpDown;     //跳跃空格
     public bool isRollDown;     //翻滚输入
     public float rollTimer;     //翻滚剩余时间
+    public bool isPeekLeft;     //左探头
+    public bool isPeekRight;    //右探头
+    public float slideTimer;    //滑铲剩余时间
+    public float slideTime = 1.77f;    //滑铲时长
 
     bool jumpRequest;           //本物理帧请求起跳
     bool rollRequest;           //本物理帧请求翻滚
+    bool slideRequest;          //本物理帧请求滑铲
+    bool slideBefore;           //滑铲按键上一帧状态
     float rollDelay;            //翻滚施力延迟
     Vector2 rollDir;            //翻滚方向
     float bodyScale = 1f;       //碰撞体当前比例
@@ -115,6 +121,11 @@ public class Player_Move_Date : MonoBehaviour
         // 复活重置翻滚，碰撞体保持倒地
         rollTimer = 0f;
         rollDelay = 0f;
+        slideTimer = 0f;
+        slideRequest = false;
+        slideBefore = false;
+        isPeekLeft = false;
+        isPeekRight = false;
         respawnSquatTimer = respawnSquatTime;
 
         Player_Body body = Own_Control.Con_body;
@@ -197,14 +208,29 @@ public class Player_Move_Date : MonoBehaviour
 
         // 计算移动数据
         body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !reload, isSquat);   //换弹只能走路
-        body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速，含落地检测
+
+        // 滑铲只在地面且未翻滚时触发
+        if (slideRequest)
+        {
+            slideRequest = false;
+            if (slideTimer <= 0f && rollTimer <= 0f && isOnGround)
+            {
+                slideTimer = slideTime;
+                body.Body_Slide_Date(packet.move, packet.viewDir);
+            }
+        }
+
+        body.Body_Fixed_Date(rollTimer > 0f, slideTimer > 0f);   //动作期间保留速度
 
         // 起跳，每物理帧最多一次
         if (jumpRequest)
         {
             jumpRequest = false;
-            body.Body_Jump_Date();
-            if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
+            if (slideTimer <= 0f)
+            {
+                body.Body_Jump_Date();
+                if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
+            }
         }
 
         // 翻滚，每物理帧最多一次，翻滚中不重复
@@ -212,7 +238,7 @@ public class Player_Move_Date : MonoBehaviour
         {
             rollRequest = false;
 
-            if (rollTimer <= 0f)
+            if (rollTimer <= 0f && slideTimer <= 0f)
             {
                 rollDir = packet.move;                      //记下方向，延迟后用
                 rollDelay = body.rollDelay;                 //第二段延迟
@@ -234,8 +260,15 @@ public class Player_Move_Date : MonoBehaviour
         // 翻滚计时
         if (rollTimer > 0f) rollTimer -= Time.fixedDeltaTime;
 
+        // 滑铲计时
+        if (slideTimer > 0f)
+        {
+            slideTimer -= Time.fixedDeltaTime;
+            if (slideTimer <= 0f) slideTimer = 0f;
+        }
+
         // 输入施推力
-        if (isWASDDowm && rollTimer <= 0f) body.Body_Move();   //翻滚中不给移动力
+        if (isWASDDowm && rollTimer <= 0f && slideTimer <= 0f) body.Body_Move();
     }
 
     // 翻滚死亡失重共用碰撞体缩放
@@ -245,7 +278,9 @@ public class Player_Move_Date : MonoBehaviour
         if (body == null) return;
 
         // 翻滚用翻滚比例，死亡失重倒地取更小比例
-        float scale = rollTimer > 0f ? body.rollSquatScale : 1f;
+        float scale = 1f;
+        if (slideTimer > 0f) scale = body.slideSquatScale;
+        if (rollTimer > 0f) scale = body.rollSquatScale;
         if (dead || isWeightLess || respawnSquatTimer > 0f) scale = body.deadSquatScale;
 
         // 复活倒地保持计时
@@ -287,6 +322,15 @@ public class Player_Move_Date : MonoBehaviour
         // 奔跑与蹲下
         isRuning = packet.run;
         isSquat = packet.squat;
+
+        // 滑铲按键边沿
+        bool slideInput = isRuning && isSquat && isWASDDowm && isOnGround;
+        if (slideInput && !slideBefore) slideRequest = true;
+        slideBefore = slideInput;
+
+        // 探头互斥
+        isPeekLeft = packet.peekLeft && !packet.peekRight && slideTimer <= 0f;
+        isPeekRight = packet.peekRight && !packet.peekLeft && slideTimer <= 0f;
 
         // 跳跃，只记按下边沿
         if (packet.jump && !isJumpDown) jumpRequest = true;

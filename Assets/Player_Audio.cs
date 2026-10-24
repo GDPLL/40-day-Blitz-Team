@@ -195,7 +195,7 @@ public class Player_Audio : MonoBehaviour
     }
 
     // 移动表现，state为表现状态位
-    public void Player_Audio_Show(ushort state)
+    public void Player_Audio_Show(uint state)
     {
         // 只在地面移动才有脚步与装备晃动
         bool move = (state & Player_animation.BitWalk) != 0 && (state & Player_animation.BitGround) != 0;

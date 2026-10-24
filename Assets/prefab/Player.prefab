@@ -1853,6 +1853,8 @@ MonoBehaviour:
   bodyRoot: {fileID: 4678201328113845342}
   ammo: 30
   maxAmmo: 30
+  magazineCount: 6
+  maxMagazineCount: 6
   fireRate: 900
   range: 1000
   damage: 34
@@ -1861,6 +1863,11 @@ MonoBehaviour:
   armRigLayer: 0
   hitEffect: {fileID: 4015259995318076048, guid: 5ba040b8213866147a03bf9330ad54ae, type: 3}
   fireEffect: {fileID: 2654986424484326109, guid: 1dc1100dd1826c749a3d423464c7488f, type: 3}
+  fireEffectPrewarm: 12
+  fireEffectLife: 2
+  hitEffectPrewarm: 8
+  hitEffectLife: 2
+  bloodPrewarm: 8
   bloodCount: 26
   bloodLife: 1.2
   bloodSpeed: 4.5
@@ -4341,13 +4348,10 @@ Animator:
   m_StabilizeFeet: 0
   m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
     are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:Hips'\n\tTransform 'mixamorig:RightFoot'\n\tTransform
-    'mixamorig:LeftLeg'\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:LeftToeBase'\n\tTransform
-    'mixamorig:Spine1'\n\tTransform 'mixamorig:Spine2'\n\tTransform 'mixamorig:LeftHandPinky3'\n\tTransform
-    'mixamorig:LeftHandThumb1'\n\tTransform 'mixamorig:RightHandPinky3'\n\tand more
-    ...\n\tFrom animation clip 'squat foeword'\n\tFrom animation clip 'squat to the
-    right'\n\tFrom animation clip 'squat back'\n\tFrom animation clip 'squat to the
-    left'\n\tFrom animation clip 'Probe back'\n\tFrom animation clip 'Probe out'"
+    by Humanoid clips.\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform
+    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tTransform 'mixamorig:RightArm'\n\tTransform
+    'mixamorig:LeftForeArm'\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:RightForeArm'\n\tTransform
+    'mixamorig:LeftArm'\n\tTransform 'mixamorig:RightHand'\n\tand more ..."
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -4367,7 +4371,15 @@ MonoBehaviour:
   m_RigLayers:
   - m_Rig: {fileID: 5173853234409128208}
     m_Active: 1
-  m_Effectors: []
+  m_Effectors:
+  - m_Transform: {fileID: 7716673261367819362}
+    m_Style:
+      shape: {fileID: 4300000, guid: c6793350c150f456688e39a81f97364a, type: 2}
+      color: {r: 1, g: 0, b: 0, a: 0.5}
+      size: 0.1
+      position: {x: 0, y: 0, z: 0}
+      rotation: {x: 0, y: 0, z: 0}
+    m_Visible: 1
 --- !u!4 &5075539921238429896 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8142028300753827730, guid: 93d97806ba2134943ac50e9dd500eb5d, type: 3}
@@ -4461,6 +4473,11 @@ Transform:
 --- !u!4 &7652066818745528251 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2549001063973680925, guid: 93d97806ba2134943ac50e9dd500eb5d, type: 3}
+  m_PrefabInstance: {fileID: 5291242258775873702}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7716673261367819362 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2484128538761520324, guid: 93d97806ba2134943ac50e9dd500eb5d, type: 3}
   m_PrefabInstance: {fileID: 5291242258775873702}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &7930197992931159091 stripped

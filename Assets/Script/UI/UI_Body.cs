@@ -106,7 +106,7 @@ public class UI_Body : MonoBehaviour
     }
 
     // 按血量与状态位刷新，state 为表现状态位
-    public void UI_Body_Show(int hp, int maxHp, ushort state)
+    public void UI_Body_Show(int hp, int maxHp, uint state)
     {
         if (!isReady) return;
 
@@ -150,7 +150,7 @@ public class UI_Body : MonoBehaviour
     }
 
     // 按状态位取姿态编号，死亡优先
-    int Pose_Index(ushort state, bool dead, bool gunUp)
+    int Pose_Index(uint state, bool dead, bool gunUp)
     {
         if (dead) return Fallback_Index(Pose_Death);
 

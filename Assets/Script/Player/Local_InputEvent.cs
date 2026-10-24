@@ -21,6 +21,8 @@ public class Local_InputEvent : MonoBehaviour
     public event Action ReloadHeld_event;           // 换弹
     public event Action<bool> Squat_event;          // 蹲下
     public event Action<bool> Roll_event;           // 翻滚
+    public event Action<bool> PeekLeft_event;       // 左探头
+    public event Action<bool> PeekRight_event;      // 右探头
 
     // 注入全局输入
     public void Local_Input_Init(Input_Manage inputManage)
@@ -55,5 +57,7 @@ public class Local_InputEvent : MonoBehaviour
         if (input_Manage.ReloadHeld) ReloadHeld_event?.Invoke();
         Squat_event?.Invoke(input_Manage.SquatHeld);
         Roll_event?.Invoke(input_Manage.RollDown);
+        PeekLeft_event?.Invoke(input_Manage.PeekLeftHeld);
+        PeekRight_event?.Invoke(input_Manage.PeekRightHeld);
     }
 }

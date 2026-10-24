@@ -8,7 +8,7 @@ public class Player_Net_State : NetworkBehaviour
     public void Owner_Init(Player_Control control) { Own_Control = control; }
 
     //同步表现状态
-    NetworkVariable<ushort> netShowState = new NetworkVariable<ushort>();    //表现状态位
+    NetworkVariable<uint> netShowState = new NetworkVariable<uint>();    //表现状态位
     NetworkVariable<Vector3> netAimPoint = new NetworkVariable<Vector3>();  //瞄准落点
     NetworkVariable<Vector3> netTargetPos = new NetworkVariable<Vector3>(); //锁定点
     NetworkVariable<bool> netHasTarget = new NetworkVariable<bool>();       //是否锁定
@@ -23,7 +23,7 @@ public class Player_Net_State : NetworkBehaviour
     NetworkVariable<bool> netOut = new NetworkVariable<bool>();             //已淘汰，不再复活
 
     //对外读取
-    public ushort Show_State => netShowState.Value;         //表现状态位
+    public uint Show_State => netShowState.Value;           //表现状态位
     public Vector3 AimPoint => netAimPoint.Value;           //瞄准落点
     public Vector3 TargetPos => netTargetPos.Value;         //锁定点
     public bool HasTarget => netHasTarget.Value;            //是否锁定
@@ -38,7 +38,7 @@ public class Player_Net_State : NetworkBehaviour
     public bool Is_Out => netOut.Value;                     //已淘汰
 
     //本机表现状态位，按键本地预测
-    public ushort Show_State_Local()
+    public uint Show_State_Local()
     {
         Player_Control c = Own_Control;
         if (c == null || c.Con_input_Manage == null || c.Con_move == null) return netShowState.Value;
@@ -46,16 +46,19 @@ public class Player_Net_State : NetworkBehaviour
         Input_Manage im = c.Con_input_Manage;
         Player_Move_Date mv = c.Con_move;
 
-        ushort state = 0;
+        uint state = 0;
         if (im.WASDHeld) state |= Player_animation.BitWalk;
         if (im.RunHeld) state |= Player_animation.BitRun;
         if (im.SquatHeld) state |= Player_animation.BitSquat;
         if (im.MouseHeld || im.ShoulderHeld || im.AdsHeld) state |= Player_animation.BitGun;
         if (im.JumpDownHeld) state |= Player_animation.BitJump;
-        if (netRespawnWait.Value > 0f || netOut.Value) state |= Player_animation.BitDeath;
+        bool dead = netRespawnWait.Value > 0f || netOut.Value;
+        if (dead) state |= Player_animation.BitDeath;
         if (mv.rollTimer > 0f) state |= Player_animation.BitRoll;
         if (c.Con_gun_Control != null && c.Con_gun_Control.IsReloading) state |= Player_animation.BitReload;            //换弹
         if (mv.isWeightLess) state |= Player_animation.BitWeightLess;    //失重
+        if (!dead && mv.slideTimer > 0f) state |= Player_animation.BitSlide;
+        if (!dead) state |= Player_animation.Pack_Peek(mv.isPeekLeft, mv.isPeekRight);
 
         // 落地与方向取本机数据
         if (mv.isOnGround) state |= Player_animation.BitGround;
@@ -64,7 +67,7 @@ public class Player_Net_State : NetworkBehaviour
     }
 
     //主机打包表现状态位
-    ushort PackShowState()
+    uint PackShowState()
     {
         Player_Control c = Own_Control;
         Player_Move_Date mv = c.Con_move;
@@ -72,17 +75,20 @@ public class Player_Net_State : NetworkBehaviour
         InputPacket packet = c.Con_player_HostNetworkEvent.Packet;
         bool aimDown = packet.mouse1 || packet.mouse2 || packet.shoulder || packet.ads;
 
-        ushort state = 0;
+        uint state = 0;
         if (mv.isWASDDowm) state |= Player_animation.BitWalk;
         if (mv.isRuning) state |= Player_animation.BitRun;
         if (mv.isSquat) state |= Player_animation.BitSquat;
         if (aimDown) state |= Player_animation.BitGun;
         if (mv.isJumpDown) state |= Player_animation.BitJump;
         if (mv.isOnGround) state |= Player_animation.BitGround;
-        if (c.Con_ObjectSystem.isDead || netOut.Value) state |= Player_animation.BitDeath;
+        bool dead = c.Con_ObjectSystem.isDead || netOut.Value;
+        if (dead) state |= Player_animation.BitDeath;
         if (mv.rollTimer > 0f) state |= Player_animation.BitRoll;
         if (c.Con_gun_Control != null && c.Con_gun_Control.IsReloading) state |= Player_animation.BitReload;            //换弹
         if (mv.isWeightLess) state |= Player_animation.BitWeightLess;    //失重
+        if (!dead && mv.slideTimer > 0f) state |= Player_animation.BitSlide;
+        if (!dead) state |= Player_animation.Pack_Peek(mv.isPeekLeft, mv.isPeekRight);
 
         // 移动方向取输入包，各端一致
         state |= Player_animation.Pack_Move(c.Con_player_HostNetworkEvent.Packet.move);

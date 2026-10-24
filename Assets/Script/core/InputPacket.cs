@@ -24,6 +24,8 @@ public struct InputPacket : INetworkSerializable
     public bool reload;             // 换弹
     public bool squat;              // 蹲下
     public bool roll;               // 翻滚
+    public bool peekLeft;           // 左探头
+    public bool peekRight;          // 右探头
 
     // 网络序列化
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
@@ -45,5 +47,7 @@ public struct InputPacket : INetworkSerializable
         serializer.SerializeValue(ref reload);
         serializer.SerializeValue(ref squat);
         serializer.SerializeValue(ref roll);
+        serializer.SerializeValue(ref peekLeft);
+        serializer.SerializeValue(ref peekRight);
     }
 }

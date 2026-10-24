@@ -33,6 +33,9 @@ public class Player_Body : Character_Move
     public float rollDelay = 0.8991f;       // 翻滚施力延迟秒
     public float rollTime = 0.5f;           // 翻滚时长
     public float rollSquatScale = 0.5f;     // 翻滚碰撞体比例
+    public float slideSpeed = 8f;           // 滑铲最大速度
+    public float slideForce = 900f;         // 滑铲推力
+    public float slideSquatScale = 0.5f;    // 滑铲碰撞体比例
     public float deadSquatScale = 0.23f;    // 死亡失重碰撞体比例
     Collider bodyCol;                       // 玩家碰撞体
     Vector3 colCenter;                      // 碰撞体原始中心
@@ -104,20 +107,20 @@ public class Player_Body : Character_Move
         return (axis.x * right + axis.y * forward).normalized;
     }
 
-    // 物理帧逻辑，落地检测与限速，rolling为翻滚中
-    public void Body_Fixed_Date(bool rolling)
+    // 物理帧逻辑，落地检测与限速
+    public void Body_Fixed_Date(bool rolling, bool sliding)
     {
         IsGrounded = isGrounded();
 
         // 松开方向立刻刹停，翻滚与空中不刹
-        if (!rolling && !hasInput && IsGrounded)
+        if (!rolling && !sliding && !hasInput && IsGrounded)
         {
             rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
             return;
         }
 
         // 地面移动：速度严格沿移动方向，去掉侧向滑步并完成限速
-        if (!rolling && IsGrounded)
+        if (!rolling && !sliding && IsGrounded)
         {
             float along = Mathf.Clamp(Vector3.Dot(rb.velocity, currentMoveDirection), 0f, currentSpeed);
             rb.velocity = currentMoveDirection * along + Vector3.up * rb.velocity.y;
@@ -126,6 +129,7 @@ public class Player_Body : Character_Move
 
         // 翻滚中限到翻滚速度
         if (rolling) Limit_Speed(rollSpeed);
+        else if (sliding) Limit_Speed(slideSpeed);
     }
 
     // 限水平速度，limit为上限
@@ -169,6 +173,14 @@ public class Player_Body : Character_Move
         Vector3 dir = axis.sqrMagnitude > 0.01f ? GetMoveDir(axis, viewDir) : transform.forward;
 
         rb.AddForce(dir * rollForce, ForceMode.Impulse);
+    }
+
+    // 滑铲，axis为输入轴，viewDir为视角方向
+    public void Body_Slide_Date(Vector2 axis, Vector3 viewDir)
+    {
+        Vector3 dir = axis.sqrMagnitude > 0.01f ? GetMoveDir(axis, viewDir) : currentMoveDirection;
+        currentMoveDirection = dir;
+        rb.AddForce(dir * slideForce, ForceMode.Impulse);
     }
 
     // 碰撞体高度缩放，scale为比例

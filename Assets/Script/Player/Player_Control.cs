@@ -502,7 +502,7 @@ public class Player_Control : Character_Move
     // 客户端每帧各端表现层更新
     public void Player_Control_Show_ClientUpdate()
     {
-        ushort state = IsOwner ? Con_net_State.Show_State_Local() : Con_net_State.Show_State;   //本机用本地输入预测
+        uint state = IsOwner ? Con_net_State.Show_State_Local() : Con_net_State.Show_State;   //本机用本地输入预测
 
         // 本机用本地垂直速度，其余读下发值
         float verticalSpeed = IsOwner && rigidbody != null ? rigidbody.velocity.y : Con_net_State.VerticalSpeed;

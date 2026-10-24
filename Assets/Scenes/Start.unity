@@ -158,6 +158,8 @@ MonoBehaviour:
   sendRate: 20
   focusDistance: 10
   AimPoint: {x: 0, y: 0, z: 0}
+  doubleClickTime: 0.25
+  rollHold: 0.1
   MoveAxis: {x: 0, y: 0}
   JumpDownHeld: 0
   Mouse1Held: 0
@@ -166,8 +168,12 @@ MonoBehaviour:
   RunHeld: 0
   ReloadHeld: 0
   SquatHeld: 0
+  PeekLeftHeld: 0
+  PeekRightHeld: 0
   ShoulderHeld: 0
   AdsHeld: 0
+  RollDown: 0
+  RollDir: {x: 0, y: 0}
   DebugKey: 0
 --- !u!4 &7224402
 Transform:
