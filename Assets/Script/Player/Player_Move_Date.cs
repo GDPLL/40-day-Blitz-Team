@@ -348,13 +348,13 @@ public class Player_Move_Date : MonoBehaviour
         crouchBefore = isSquat;
 
         // 滑铲按键边沿
-        bool slideKeys = isRuning && isSquat && isWASDDowm;
-        if (slideKeys && !slideBefore)
+        bool slideInput = isRuning && isSquat && isWASDDowm && isOnGround;
+        if (slideInput && !slideBefore)
         {
             crouchEnterTimer = 0f;
             slideRequest = true;
         }
-        slideBefore = slideKeys;
+        slideBefore = slideInput;
 
         // 探头互斥
         isPeekLeft = packet.peekLeft && !packet.peekRight && slideTimer <= 0f;

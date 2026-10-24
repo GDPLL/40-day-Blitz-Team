@@ -14,6 +14,8 @@ public class Player_animation : MonoBehaviour
         }
         modelBasePosition = animation.transform.localPosition;
         modelBaseRotation = animation.transform.localRotation;
+        leftToe = animation.GetBoneTransform(HumanBodyBones.LeftToes);
+        rightToe = animation.GetBoneTransform(HumanBodyBones.RightToes);
 
         // 蹲走动画强制循环
         foreach (AnimationClip clip in animation.runtimeAnimatorController.animationClips)
@@ -52,13 +54,6 @@ public class Player_animation : MonoBehaviour
     public float slideTurnTime = 0.12f;       // 滑铲转身时长
     public float footGroundHeight = 0.02f;    // 脚底离角色根高度
     public float footGroundSpeed = 12f;       // 脚底修正速度
-    public float slideFootClearance = 0.1f;   // 滑铲腿部安全余量
-    public float slideGroundBlendTime = 0.15f; // 滑铲接地缓入时长
-    public float groundHoldTime = 0.12f;      // 接地状态保持时长
-    public float slideGroundFollow = 0.2f;    // 滑铲接地吸收比例
-    public float crouchGroundFollow = 0.5f;   // 蹲姿接地吸收比例
-    public float slideModelLift = -0.6f;       // 滑铲模型高度
-    public float slideLiftTime = 0.2f;         // 滑铲高度调整时长
     int actionState = -1;           // 当前动作层状态
     Vector3 modelBasePosition;      // 模型基础位置
     Quaternion modelBaseRotation;   // 模型基础旋转
@@ -67,10 +62,6 @@ public class Player_animation : MonoBehaviour
     Transform leftToe;              // 左脚趾骨骼
     Transform rightToe;             // 右脚趾骨骼
     bool groundActive;              // 是否需要脚底校正
-    bool slideGroundActive;         // 是否滑铲接地
-    float slideGroundBlend;         // 滑铲接地补偿比例
-    float groundHoldTimer;          // 接地状态保持时间
-    float slideModelOffset;         // 当前滑铲高度
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -104,6 +95,7 @@ public class Player_animation : MonoBehaviour
         bool slide = (state & BitSlide) != 0;
         bool crouchEnter = (state & BitCrouchEnter) != 0;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
+        bool grounded = (state & BitGround) != 0;
 
         animation.SetBool("walk", walk);
         animation.SetBool("raiseGun", (state & BitGun) != 0);
@@ -166,12 +158,11 @@ public class Player_animation : MonoBehaviour
             animation.SetLayerWeight(4, Smooth_Weight(4, peekTarget, 0.2f));
         }
 
-        // 按动作使用固定模型高度
+        // 蹲姿退出时恢复模型高度
         Vector3 modelPosition = modelBasePosition;
-        float targetLift = slide ? slideModelLift : squat ? crouchModelLift : 0f;
-        float changeTime = slide ? slideLiftTime : crouchLiftFallTime;
-        float blend = changeTime > 0f ? 1f - Mathf.Exp(-Time.deltaTime / changeTime) : 1f;
-        crouchLift = Mathf.Lerp(crouchLift, targetLift, blend);
+        groundActive = grounded && (squat || slide);
+        if (!groundActive) crouchLift = Mathf.MoveTowards(crouchLift, 0f,
+            crouchModelLift * Time.deltaTime / crouchLiftFallTime);
         modelPosition.y += crouchLift;
         animation.transform.localPosition = modelPosition;
 
@@ -186,6 +177,20 @@ public class Player_animation : MonoBehaviour
 
         // 垂直速度，正升负降
         animation.SetFloat("VerticalSpeed", verticalSpeed);
+    }
+
+    // Animator更新后校正脚底
+    public void Player_animation_Ground_Performance()
+    {
+        if (!groundActive || leftToe == null || rightToe == null) return;
+
+        float minFootY = Mathf.Min(leftToe.position.y, rightToe.position.y);
+        float footError = transform.root.position.y + footGroundHeight - minFootY;
+        crouchLift = Mathf.Clamp(crouchLift + footError, -1.5f, 1f);
+
+        Vector3 modelPosition = modelBasePosition;
+        modelPosition.y += crouchLift;
+        animation.transform.localPosition = modelPosition;
     }
 
     // 平滑图层权重

@@ -48,11 +48,7 @@ public class Player_Body : Character_Move
     public void Body_Init(Rigidbody rigidbody)
     {
         rb = rigidbody;
-        if (rb != null)
-        {
-            rb.freezeRotation = true;    // 防碰撞翻滚
-            rb.interpolation = RigidbodyInterpolation.Interpolate;
-        }
+        if (rb != null) rb.freezeRotation = true;    // 防碰撞翻滚
 
         // 缓存碰撞体原始尺寸
         bodyCol = GetComponent<Collider>();

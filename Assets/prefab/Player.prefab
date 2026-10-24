@@ -1587,13 +1587,6 @@ MonoBehaviour:
   slideTurnTime: 0.12
   footGroundHeight: 0.02
   footGroundSpeed: 12
-  slideFootClearance: 0.1
-  slideGroundBlendTime: 0.15
-  groundHoldTime: 0.12
-  slideGroundFollow: 0.2
-  crouchGroundFollow: 0.5
-  slideModelLift: -0.6
-  slideLiftTime: 0.2
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1618,7 +1611,7 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 1
+  m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
 --- !u!114 &6287345104829123456
