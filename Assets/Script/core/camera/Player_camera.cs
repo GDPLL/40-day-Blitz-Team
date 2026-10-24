@@ -62,7 +62,13 @@ public class Player_camera : MonoBehaviour
     public float cameraPullInSpeed = 25f;    // 拉近速度
     public float cameraPushOutSpeed = 6f;    // 推远速度
 
+    [Header("滑铲跟随")]
+    public float slideCameraHeight = 1.45f;  // 滑铲相机高度
+    public float slideCameraSmoothTime = 0.18f;  // 滑铲平滑时间
+
     float cameraDistance;                     // 当前遮挡距离
+    Vector3 targetVelocity;                   // 跟随速度缓存
+    bool slideFollowActive;                   // 是否退出滑铲跟随
     readonly RaycastHit[] cameraHitBuffer = new RaycastHit[8];   // 遮挡检测缓存
 
     [Header("视角切换平滑")]
@@ -107,6 +113,7 @@ public class Player_camera : MonoBehaviour
     enum Signal_Phase { None, Break, Hold, Recover, Out }
 
     NetworkObject pNet;   // 联网对象
+    Player_Control ownControl; // 玩家控制
     Camera cam;           // 相机组件
 
     float startFov;       // 常规视角
@@ -136,6 +143,10 @@ public class Player_camera : MonoBehaviour
 
         PlayerHeadTransform = _PlayerHeadTransform;
         pNet = PlayerHeadTransform.GetComponentInParent<NetworkObject>();
+        ownControl = PlayerHeadTransform.GetComponentInParent<Player_Control>();
+        if (ownControl == null && pNet != null) ownControl = pNet.GetComponent<Player_Control>();
+        if (Target_Object != null) Target_Object.position = PlayerHeadTransform.position;
+        targetVelocity = Vector3.zero;
 
         startFov = cam.fieldOfView;                                      // 记录常规视角
         currentFov = startFov;
@@ -230,8 +241,29 @@ public class Player_camera : MonoBehaviour
             }
         }
 
-        // 应用位置
-        Target_Object.position = PlayerHeadTransform.position;
+        // 滑铲时使用根节点稳定锚点
+        bool sliding = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.Is_Slide;
+        Vector3 targetPosition = sliding
+            ? ownControl.transform.position + Vector3.up * slideCameraHeight
+            : PlayerHeadTransform.position;
+        if (sliding)
+        {
+            slideFollowActive = true;
+            Target_Object.position = Vector3.SmoothDamp(Target_Object.position, targetPosition,
+                ref targetVelocity, slideCameraSmoothTime);
+        }
+        else if (slideFollowActive && Vector3.Distance(Target_Object.position, targetPosition) > 0.02f)
+        {
+            Target_Object.position = Vector3.SmoothDamp(Target_Object.position, targetPosition,
+                ref targetVelocity, 0.12f);
+        }
+        else
+        {
+            Target_Object.position = targetPosition;
+            targetVelocity = Vector3.zero;
+            slideFollowActive = false;
+        }
         Camera_Object.transform.position = CameraBlockPosition(Target_Object.position, worldOffset)
             + shakeOffset + suppressPosOffset;
 

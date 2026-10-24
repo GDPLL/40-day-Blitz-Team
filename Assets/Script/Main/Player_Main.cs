@@ -133,19 +133,6 @@ public class Player_Main : NetworkBehaviour
 
     }
 
-    // Animator更新后统一校正脚底
-    void LateUpdate()
-    {
-        if (!isInit) return;
-
-        for (int i = 0; i < oplayer_Controls.Count; i++)
-        {
-            Player_Control control = oplayer_Controls[i];
-            if (control == null || control.Con_player_Animation == null) continue;
-            control.Con_player_Animation.Player_animation_Ground_Performance();
-        }
-    }
-
     //订阅场景初始化
     void Awake()
     {
