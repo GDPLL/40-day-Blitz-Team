@@ -38,6 +38,9 @@ public class Player_Body : Character_Move
     public float rollSquatScale = 0.5f;     // 翻滚碰撞体比例
     public float slideSpeed = 10f;          // 滑铲最大速度
     public float slideForce = 900f;         // 滑铲推力
+    public float slideUphillLoss = 0.5f;    // 上坡速度损失
+    public float slideDownhillBonus = 2.5f; // 下坡速度加成
+    public float slideMaintainAccel = 30f;  // 滑铲维持加速度
     public float slideSquatScale = 0.5f;    // 滑铲碰撞体比例
     public float deadSquatScale = 0.23f;    // 死亡失重碰撞体比例
     Collider bodyCol;                       // 玩家碰撞体
@@ -156,7 +159,7 @@ public class Player_Body : Character_Move
 
         // 翻滚中限到翻滚速度
         if (rolling) Limit_Horizontal_Speed(rollSpeed);
-        else if (sliding) Limit_Slide_Speed(slideSpeed);
+        else if (sliding) Slide_Speed_Date(slideSpeed);
     }
 
     // 当前移动方向投影到坡面
@@ -191,6 +194,42 @@ public class Player_Body : Character_Move
         if (tangentVelocity.magnitude <= limit) return;
 
         rb.velocity = tangentVelocity.normalized * limit + groundNormal * normalSpeed;
+    }
+
+    // 按坡向维持滑铲速度，baseSpeed为横坡速度
+    void Slide_Speed_Date(float baseSpeed)
+    {
+        if (!IsGrounded)
+        {
+            Limit_Horizontal_Speed(baseSpeed);
+            return;
+        }
+
+        float normalSpeed = Vector3.Dot(rb.velocity, groundNormal);
+        Vector3 tangentVelocity = rb.velocity - groundNormal * normalSpeed;
+        Vector3 downhill = Vector3.ProjectOnPlane(Physics.gravity, groundNormal);
+        Vector3 moveDirection = tangentVelocity.sqrMagnitude > 0.001f
+            ? tangentVelocity.normalized : Ground_Move_Direction(groundNormal);
+
+        float slopeAmount = downhill.sqrMagnitude > 0.001f
+            ? Vector3.Dot(moveDirection, downhill.normalized) : 0f;
+        float slopeSpeed = slopeAmount >= 0f
+            ? slopeAmount * slideDownhillBonus
+            : slopeAmount * slideUphillLoss;
+        float targetSpeed = Mathf.Max(0f, baseSpeed + slopeSpeed);
+        float tangentSpeed = Vector3.Dot(tangentVelocity, moveDirection);
+
+        if (tangentSpeed < targetSpeed)
+        {
+            float acceleration = Mathf.Min(slideMaintainAccel,
+                (targetSpeed - tangentSpeed) / Time.fixedDeltaTime);
+            rb.AddForce(moveDirection * acceleration, ForceMode.Acceleration);
+        }
+        else if (tangentVelocity.magnitude > targetSpeed)
+        {
+            rb.velocity = tangentVelocity.normalized * targetSpeed
+                + groundNormal * normalSpeed;
+        }
     }
 
     // 检测并缓存地面，返回是否落地

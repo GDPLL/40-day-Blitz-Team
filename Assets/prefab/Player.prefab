@@ -1691,6 +1691,9 @@ MonoBehaviour:
   rollSquatScale: 0.5
   slideSpeed: 10
   slideForce: 900
+  slideUphillLoss: 0.5
+  slideDownhillBonus: 2.5
+  slideMaintainAccel: 30
   slideSquatScale: 0.5
   deadSquatScale: 0.23
 --- !u!114 &2084833044355557849
