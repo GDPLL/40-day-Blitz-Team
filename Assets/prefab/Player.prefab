@@ -1689,7 +1689,7 @@ MonoBehaviour:
   rollDelay: 0.8991
   rollTime: 0.5
   rollSquatScale: 0.5
-  slideSpeed: 8
+  slideSpeed: 10
   slideForce: 900
   slideSquatScale: 0.5
   deadSquatScale: 0.23
@@ -2035,6 +2035,7 @@ MonoBehaviour:
   isPeekRight: 0
   slideTimer: 0
   slideTime: 1.77
+  slideExitTime: 0.5
   crouchEnterTime: 0.82
 --- !u!1 &7746808583437207710
 GameObject:

@@ -36,7 +36,7 @@ public class Player_Body : Character_Move
     public float rollDelay = 0.8991f;       // 翻滚施力延迟秒
     public float rollTime = 0.5f;           // 翻滚时长
     public float rollSquatScale = 0.5f;     // 翻滚碰撞体比例
-    public float slideSpeed = 8f;           // 滑铲最大速度
+    public float slideSpeed = 10f;          // 滑铲最大速度
     public float slideForce = 900f;         // 滑铲推力
     public float slideSquatScale = 0.5f;    // 滑铲碰撞体比例
     public float deadSquatScale = 0.23f;    // 死亡失重碰撞体比例
@@ -120,7 +120,7 @@ public class Player_Body : Character_Move
     }
 
     // 物理帧逻辑，落地检测与限速
-    public void Body_Fixed_Date(bool rolling, bool sliding)
+    public void Body_Fixed_Date(bool rolling, bool sliding, float speedOverride = 0f)
     {
         Body_Ground_Date();
         bool slopeGrounded = IsGrounded && groundNormal.y < 0.9995f;
@@ -129,7 +129,7 @@ public class Player_Body : Character_Move
             rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
 
         // 松开方向立刻刹停，翻滚与空中不刹
-        if (!rolling && !sliding && !hasInput && IsGrounded)
+        if (!rolling && !sliding && !hasInput && IsGrounded && speedOverride <= 0f)
         {
             if (!slopeGrounded)
                 rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
@@ -139,16 +139,17 @@ public class Player_Body : Character_Move
         // 地面移动：速度严格沿移动方向，去掉侧向滑步并完成限速
         if (!rolling && !sliding && IsGrounded)
         {
+            float limitSpeed = speedOverride > 0f ? speedOverride : currentSpeed;
             if (slopeGrounded)
             {
                 float normalSpeed = Vector3.Dot(rb.velocity, groundNormal);
                 if (normalSpeed > 0f)
                     rb.velocity -= groundNormal * normalSpeed;
-                Limit_Slide_Speed(currentSpeed);
+                Limit_Slide_Speed(limitSpeed);
                 return;
             }
 
-            float along = Mathf.Clamp(Vector3.Dot(rb.velocity, currentMoveDirection), 0f, currentSpeed);
+            float along = Mathf.Clamp(Vector3.Dot(rb.velocity, currentMoveDirection), 0f, limitSpeed);
             rb.velocity = currentMoveDirection * along + Vector3.up * rb.velocity.y;
             return;
         }

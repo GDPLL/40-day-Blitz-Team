@@ -24,6 +24,7 @@ public class Player_Move_Date : MonoBehaviour
     public bool isPeekRight;    //右探头
     public float slideTimer;    //滑铲剩余时间
     public float slideTime = 1.77f;    //滑铲时长
+    public float slideExitTime = 0.5f; //滑铲起身过渡
     public float crouchEnterTime = 0.82f;    //蹲下过渡时长
 
     bool jumpRequest;           //本物理帧请求起跳
@@ -36,6 +37,9 @@ public class Player_Move_Date : MonoBehaviour
     float bodyScale = 1f;       //碰撞体当前比例
     float respawnSquatTimer;    //复活倒地保持计时
     float crouchEnterTimer;     //蹲下过渡剩余时间
+    float slideExitTimer;       //起身过渡剩余时间
+    float slideExitStartSpeed;  //起身初始速度
+    float slideExitTargetSpeed; //起身目标速度
 
     // 瞬移优先级
     public const int Priority_Reconcile = 0;   //纠偏
@@ -125,6 +129,7 @@ public class Player_Move_Date : MonoBehaviour
         rollTimer = 0f;
         rollDelay = 0f;
         slideTimer = 0f;
+        slideExitTimer = 0f;
         slideRequest = false;
         slideBefore = false;
         crouchBefore = false;
@@ -229,11 +234,20 @@ public class Player_Move_Date : MonoBehaviour
             {
                 crouchEnterTimer = 0f;
                 slideTimer = slideTime;
+                slideExitTimer = 0f;
                 body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
             }
         }
 
-        body.Body_Fixed_Date(rollTimer > 0f, slideTimer > 0f);   //动作期间保留速度
+        float speedOverride = 0f;
+        if (slideExitTimer > 0f && slideExitTime > 0f)
+        {
+            float progress = 1f - slideExitTimer / slideExitTime;
+            speedOverride = Mathf.Lerp(slideExitStartSpeed, slideExitTargetSpeed,
+                Mathf.Clamp01(progress));
+        }
+
+        body.Body_Fixed_Date(rollTimer > 0f, slideTimer > 0f, speedOverride);   //动作期间保留速度
 
         // 起跳，每物理帧最多一次
         if (jumpRequest)
@@ -277,7 +291,17 @@ public class Player_Move_Date : MonoBehaviour
         if (slideTimer > 0f)
         {
             slideTimer -= Time.fixedDeltaTime;
-            if (slideTimer <= 0f) slideTimer = 0f;
+            if (slideTimer <= 0f)
+            {
+                slideTimer = 0f;
+                Slide_Exit_Date(packet);
+            }
+        }
+
+        if (slideExitTimer > 0f)
+        {
+            slideExitTimer -= Time.fixedDeltaTime;
+            if (slideExitTimer <= 0f) slideExitTimer = 0f;
         }
         // 输入施推力
         if (isWASDDowm && rollTimer <= 0f && slideTimer <= 0f && !crouchEnter)
@@ -289,6 +313,28 @@ public class Player_Move_Date : MonoBehaviour
             crouchEnterTimer -= Time.fixedDeltaTime;
             if (crouchEnterTimer <= 0f) crouchEnterTimer = 0f;
         }
+    }
+
+    // 计算滑铲起身惯性
+    void Slide_Exit_Date(InputPacket packet)
+    {
+        Player_Control c = Own_Control;
+        Player_Body body = c.Con_body;
+        Rigidbody rb = c.rigidbody;
+        if (body == null || rb == null || slideExitTime <= 0f) return;
+
+        Vector3 normal = body.IsGrounded ? body.GroundNormal : Vector3.up;
+        float normalSpeed = Vector3.Dot(rb.velocity, normal);
+        float tangentSpeed = (rb.velocity - normal * normalSpeed).magnitude;
+        bool moveHeld = packet.move.sqrMagnitude >= 0.01f;
+        bool runExit = moveHeld && isRuning && !isSquat;
+
+        slideExitStartSpeed = tangentSpeed;
+        if (!moveHeld) slideExitTargetSpeed = 0f;
+        else if (runExit) slideExitTargetSpeed = body.runSpeed;
+        else if (isSquat) slideExitTargetSpeed = body.squatSpeed;
+        else slideExitTargetSpeed = body.walkSpeed;
+        slideExitTimer = slideExitTime;
     }
 
     // 翻滚死亡失重共用碰撞体缩放
