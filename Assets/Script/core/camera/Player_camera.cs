@@ -250,12 +250,16 @@ public class Player_camera : MonoBehaviour
             && ownControl.Con_move.Is_Slide;
         if (sliding)
         {
-            Vector3 slideTarget = ownControl.transform.position
-                + Vector3.up * slideCameraHeight;
+            // 水平方向锁住插值后的角色根节点，避免角色与平滑相机产生相对抖动
+            Vector3 slideAnchor = ownControl.transform.position;
+            float targetHeight = slideAnchor.y + slideCameraHeight;
             if (ownControl.Con_move.slideTimer <= slideCameraReleaseTime)
-                slideTarget = PlayerHeadTransform.position;
-            Target_Object.position = Vector3.SmoothDamp(Target_Object.position, slideTarget,
-                ref targetVelocity, slideCameraSmoothTime);
+                targetHeight = PlayerHeadTransform.position.y;
+
+            float slideY = Mathf.SmoothDamp(Target_Object.position.y, targetHeight,
+                ref heightVelocity, slideCameraSmoothTime);
+            Target_Object.position = new Vector3(slideAnchor.x, slideY, slideAnchor.z);
+            targetVelocity = Vector3.zero;
         }
         else
         {
