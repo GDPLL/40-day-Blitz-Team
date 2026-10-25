@@ -1587,6 +1587,9 @@ MonoBehaviour:
   slideTurnTime: 0.12
   footGroundHeight: 0.02
   footGroundSpeed: 12
+  slideModelLift: -0.6
+  slideLiftTime: 0.2
+  slideGroundSmoothTime: 0.12
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0

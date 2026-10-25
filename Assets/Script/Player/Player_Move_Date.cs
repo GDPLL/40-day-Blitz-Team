@@ -138,6 +138,7 @@ public class Player_Move_Date : MonoBehaviour
         Player_Body body = Own_Control.Con_body;
         if (body != null)
         {
+            body.Body_Slide_Interpolation_Date(false);
             bodyScale = body.deadSquatScale;
             body.Body_Size_Date(bodyScale);
         }
@@ -276,6 +277,7 @@ public class Player_Move_Date : MonoBehaviour
             slideTimer -= Time.fixedDeltaTime;
             if (slideTimer <= 0f) slideTimer = 0f;
         }
+        body.Body_Slide_Interpolation_Date(slideTimer > 0f);
 
         // 输入施推力
         if (isWASDDowm && rollTimer <= 0f && slideTimer <= 0f && !crouchEnter)
@@ -348,13 +350,13 @@ public class Player_Move_Date : MonoBehaviour
         crouchBefore = isSquat;
 
         // 滑铲按键边沿
-        bool slideInput = isRuning && isSquat && isWASDDowm && isOnGround;
-        if (slideInput && !slideBefore)
+        bool slideKeys = isRuning && isSquat && isWASDDowm;
+        if (slideKeys && !slideBefore)
         {
             crouchEnterTimer = 0f;
             slideRequest = true;
         }
-        slideBefore = slideInput;
+        slideBefore = slideKeys;
 
         // 探头互斥
         isPeekLeft = packet.peekLeft && !packet.peekRight && slideTimer <= 0f;

@@ -41,6 +41,7 @@ public class Player_Body : Character_Move
     Collider bodyCol;                       // 玩家碰撞体
     Vector3 colCenter;                      // 碰撞体原始中心
     float colHeight;                        // 碰撞体原始高度
+    RigidbodyInterpolation defaultInterpolation; // 刚体默认视觉插值
 
     public bool IsGrounded { get; private set; }    // 是否在地面
 
@@ -48,7 +49,11 @@ public class Player_Body : Character_Move
     public void Body_Init(Rigidbody rigidbody)
     {
         rb = rigidbody;
-        if (rb != null) rb.freezeRotation = true;    // 防碰撞翻滚
+        if (rb != null)
+        {
+            rb.freezeRotation = true;    // 防碰撞翻滚
+            defaultInterpolation = rb.interpolation;
+        }
 
         // 缓存碰撞体原始尺寸
         bodyCol = GetComponent<Collider>();
@@ -182,6 +187,16 @@ public class Player_Body : Character_Move
         Vector3 dir = axis.sqrMagnitude > 0.01f ? GetMoveDir(axis, viewDir) : currentMoveDirection;
         currentMoveDirection = dir;
         rb.AddForce(dir * slideForce, ForceMode.Impulse);
+    }
+
+    // 滑铲时开启视觉插值，避免物理帧位移让角色相对平滑相机抖动
+    public void Body_Slide_Interpolation_Date(bool active)
+    {
+        if (rb == null) return;
+        RigidbodyInterpolation target = active
+            ? RigidbodyInterpolation.Interpolate
+            : defaultInterpolation;
+        if (rb.interpolation != target) rb.interpolation = target;
     }
 
     // 碰撞体高度缩放，scale为比例
