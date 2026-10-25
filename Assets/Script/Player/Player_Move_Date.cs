@@ -7,8 +7,6 @@ public class Player_Move_Date : MonoBehaviour
     public void Owner_Init(Player_Control _Control) => Own_Control = _Control;
 
     // 移动数据
-    [Header("落地检测")]
-    public float groundCheckDistance = 0.2f;    //落地检测距离
     [Header("复活倒地")]
     public float respawnSquatTime = 0.23f;      //复活倒地碰撞体保持秒
     [Header("位置纠偏")]
@@ -150,23 +148,28 @@ public class Player_Move_Date : MonoBehaviour
     // 落地检测并缓存
     public void Ground_Date()
     {
-        isOnGround = IsGrounded();
+        Player_Body body = Own_Control != null ? Own_Control.Con_body : null;
+        if (body == null)
+        {
+            Debug.LogError("Player_Move_Date|Ground_Date|未找到 Player_Body");
+            isOnGround = false;
+            return;
+        }
+
+        isOnGround = body.Body_Ground_Date();
     }
 
     // 落地检测
     public bool IsGrounded()
     {
-        Collider col = Own_Control.GetComponent<Collider>();
-        if (col == null) col = Own_Control.GetComponentInChildren<Collider>();
-        if (col == null)
+        Player_Body body = Own_Control != null ? Own_Control.Con_body : null;
+        if (body == null)
         {
-            Debug.LogError("Player_Move_Date|IsGrounded|未找到 Collider");
+            Debug.LogError("Player_Move_Date|IsGrounded|未找到 Player_Body");
             return false;
         }
 
-        Vector3 origin = col.bounds.center;
-        float rayDistance = col.bounds.extents.y + groundCheckDistance;
-        return Physics.Raycast(origin, Vector3.down, rayDistance);
+        return body.Body_Ground_Date();
     }
 
     // 主机每物理帧移动驱动
@@ -227,7 +230,7 @@ public class Player_Move_Date : MonoBehaviour
             {
                 crouchEnterTimer = 0f;
                 slideTimer = slideTime;
-                body.Body_Slide_Date(packet.move, packet.viewDir);
+                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
             }
         }
 

@@ -57,6 +57,7 @@ public class Player_animation : MonoBehaviour
     public float slideModelLift = -0.6f;       // 滑铲模型高度
     public float slideLiftTime = 0.2f;         // 滑铲高度调整时长
     public float slideGroundSmoothTime = 0.12f; // 滑铲贴地校准平滑
+    public float slideSlopeSmoothTime = 0.08f; // 滑铲坡面法线平滑
     int actionState = -1;           // 当前动作层状态
     Vector3 modelBasePosition;      // 模型基础位置
     Quaternion modelBaseRotation;   // 模型基础旋转
@@ -68,6 +69,8 @@ public class Player_animation : MonoBehaviour
     bool slideActive;               // 上一帧是否滑铲
     bool slideGrounded;             // 滑铲时是否在地面
     float slideGroundOffset;        // 滑铲贴地偏移
+    Vector3 slideGroundNormal = Vector3.up; // 滑铲地面法线
+    Vector3 slideGroundPoint;       // 滑铲地面接触点
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -164,10 +167,21 @@ public class Player_animation : MonoBehaviour
             animation.SetLayerWeight(4, Smooth_Weight(4, peekTarget, 0.2f));
         }
 
+        RaycastHit slideHit = default;
+        bool hasSlideGround = slide && grounded && Own_Control != null
+            && Own_Control.Con_body != null
+            && Own_Control.Con_body.Body_Ground_Hit_Date(out slideHit);
+        float slopeBlend = slideSlopeSmoothTime > 0f
+            ? 1f - Mathf.Exp(-Time.deltaTime / slideSlopeSmoothTime)
+            : 1f;
+        Vector3 targetNormal = hasSlideGround ? slideHit.normal : Vector3.up;
+        slideGroundNormal = Vector3.Slerp(slideGroundNormal, targetNormal, slopeBlend).normalized;
+        if (hasSlideGround) slideGroundPoint = slideHit.point;
+
         // 滑铲使用固定高度，蹲姿保留脚底校正
         Vector3 modelPosition = modelBasePosition;
         groundActive = grounded && squat && !slide;
-        slideGrounded = grounded && slide;
+        slideGrounded = slide && grounded && hasSlideGround;
         if (slide && !slideActive) slideGroundOffset = 0f;
         if (slide)
         {
@@ -177,7 +191,14 @@ public class Player_animation : MonoBehaviour
         if (!groundActive && !slide) crouchLift = Mathf.MoveTowards(crouchLift, 0f,
             crouchModelLift * Time.deltaTime / crouchLiftFallTime);
         slideActive = slide;
-        modelPosition.y += crouchLift;
+        if (slide)
+        {
+            Vector3 localGroundNormal = animation.transform.parent != null
+                ? animation.transform.parent.InverseTransformDirection(slideGroundNormal)
+                : slideGroundNormal;
+            modelPosition += localGroundNormal * crouchLift;
+        }
+        else modelPosition.y += crouchLift;
         animation.transform.localPosition = modelPosition;
 
         // 滑铲时脚部朝前
@@ -186,8 +207,18 @@ public class Player_animation : MonoBehaviour
             slideTurn = Mathf.MoveTowards(slideTurn, slideTurnTarget,
                 Time.deltaTime / slideTurnTime);
         else slideTurn = slideTurnTarget;
-        animation.transform.localRotation = modelBaseRotation
+        Quaternion slideRotation = modelBaseRotation
             * Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(0f, -45f, 0f), slideTurn);
+        if (slide && slideGrounded)
+        {
+            Vector3 localNormal = animation.transform.parent != null
+                ? animation.transform.parent.InverseTransformDirection(slideGroundNormal)
+                : slideGroundNormal;
+            Quaternion slopeRotation = Quaternion.FromToRotation(
+                slideRotation * Vector3.up, localNormal);
+            slideRotation = slopeRotation * slideRotation;
+        }
+        animation.transform.localRotation = slideRotation;
 
         // 垂直速度，正升负降
         animation.SetFloat("VerticalSpeed", verticalSpeed);
@@ -196,13 +227,21 @@ public class Player_animation : MonoBehaviour
     // Animator更新后校正脚底
     public void Player_animation_Ground_Performance()
     {
-        if (leftToe == null || rightToe == null) return;
+        if (leftToe == null || rightToe == null)
+        {
+            Debug.LogError("Player_animation|Player_animation_Ground_Performance|脚趾骨骼为空");
+            return;
+        }
 
         // 滑铲只做低频贴地校准，避免脚部曲线逐帧反向拉扯模型
         if (slideActive && slideGrounded)
         {
-            float slideFootY = Mathf.Min(leftToe.position.y, rightToe.position.y);
-            float slideError = transform.root.position.y + footGroundHeight - slideFootY;
+            float leftFootGap = Vector3.Dot(
+                leftToe.position - slideGroundPoint, slideGroundNormal);
+            float rightFootGap = Vector3.Dot(
+                rightToe.position - slideGroundPoint, slideGroundNormal);
+            float slideFootGap = Mathf.Min(leftFootGap, rightFootGap);
+            float slideError = footGroundHeight - slideFootGap;
             slideError = Mathf.Clamp(slideError, -0.25f, 0.25f);
             float blend = slideGroundSmoothTime > 0f
                 ? 1f - Mathf.Exp(-Time.deltaTime / slideGroundSmoothTime)
@@ -211,8 +250,10 @@ public class Player_animation : MonoBehaviour
 
             crouchLift = Mathf.MoveTowards(crouchLift,
                 slideModelLift + slideGroundOffset, footGroundSpeed * Time.deltaTime);
-            Vector3 slidePosition = modelBasePosition;
-            slidePosition.y += crouchLift;
+            Vector3 localGroundNormal = animation.transform.parent != null
+                ? animation.transform.parent.InverseTransformDirection(slideGroundNormal)
+                : slideGroundNormal;
+            Vector3 slidePosition = modelBasePosition + localGroundNormal * crouchLift;
             animation.transform.localPosition = slidePosition;
             return;
         }

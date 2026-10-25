@@ -25,7 +25,9 @@ public class Player_Body : Character_Move
 
     // 跳跃与落地
     public float jumpForce = 250f;                  // 跳跃力
-    float groundCheckDistance = 0.2f;        // 落地检测距离
+    public LayerMask groundMask = ~0;               // 地面检测层
+    public float groundCheckDistance = 0.2f;        // 落地检测距离
+    public float maxSlopeAngle = 50f;               // 最大可站立坡度
     public Rigidbody rb;                            // 刚体
 
     // 翻滚
@@ -42,8 +44,11 @@ public class Player_Body : Character_Move
     Vector3 colCenter;                      // 碰撞体原始中心
     float colHeight;                        // 碰撞体原始高度
     RigidbodyInterpolation defaultInterpolation; // 刚体默认视觉插值
+    Vector3 groundNormal = Vector3.up;      // 当前地面法线
+    Vector3 groundPoint;                    // 当前地面接触点
 
     public bool IsGrounded { get; private set; }    // 是否在地面
+    public Vector3 GroundNormal => groundNormal;    // 地面法线
 
     // 初始化，刚体由外部注入
     public void Body_Init(Rigidbody rigidbody)
@@ -116,7 +121,7 @@ public class Player_Body : Character_Move
     // 物理帧逻辑，落地检测与限速
     public void Body_Fixed_Date(bool rolling, bool sliding)
     {
-        IsGrounded = isGrounded();
+        Body_Ground_Date();
 
         // 松开方向立刻刹停，翻滚与空中不刹
         if (!rolling && !sliding && !hasInput && IsGrounded)
@@ -134,12 +139,12 @@ public class Player_Body : Character_Move
         }
 
         // 翻滚中限到翻滚速度
-        if (rolling) Limit_Speed(rollSpeed);
-        else if (sliding) Limit_Speed(slideSpeed);
+        if (rolling) Limit_Horizontal_Speed(rollSpeed);
+        else if (sliding) Limit_Slide_Speed(slideSpeed);
     }
 
     // 限水平速度，limit为上限
-    void Limit_Speed(float limit)
+    void Limit_Horizontal_Speed(float limit)
     {
         Vector3 horizontalVelocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
         if (horizontalVelocity.magnitude <= limit) return;
@@ -148,20 +153,79 @@ public class Player_Body : Character_Move
         rb.velocity = new Vector3(limitedHorizontal.x, rb.velocity.y, limitedHorizontal.z);
     }
 
-    // 落地检测
-    bool isGrounded()
+    // 限斜面切线速度，limit为上限
+    void Limit_Slide_Speed(float limit)
     {
-        Collider col = GetComponent<Collider>();
+        if (!IsGrounded)
+        {
+            Limit_Horizontal_Speed(limit);
+            return;
+        }
+
+        float normalSpeed = Vector3.Dot(rb.velocity, groundNormal);
+        Vector3 tangentVelocity = rb.velocity - groundNormal * normalSpeed;
+        if (tangentVelocity.magnitude <= limit) return;
+
+        rb.velocity = tangentVelocity.normalized * limit + groundNormal * normalSpeed;
+    }
+
+    // 检测并缓存地面，返回是否落地
+    public bool Body_Ground_Date()
+    {
+        if (Body_Ground_Hit_Date(out RaycastHit hit))
+        {
+            groundNormal = hit.normal;
+            groundPoint = hit.point;
+            IsGrounded = true;
+            return true;
+        }
+
+        IsGrounded = false;
+        return false;
+    }
+
+    // 查询地面接触信息
+    public bool Body_Ground_Hit_Date(out RaycastHit hit)
+    {
+        Collider col = bodyCol;
+        if (col == null) col = GetComponent<Collider>();
         if (col == null) col = GetComponentInChildren<Collider>();
         if (col == null)
         {
-            Debug.LogError("Player_Body|isGrounded|未找到 Collider");
+            Debug.LogError("Player_Body|Body_Ground_Hit_Date|未找到 Collider");
+            hit = default;
             return false;
         }
 
+        return Ground_Ray_Date(col, groundMask, groundCheckDistance, maxSlopeAngle, out hit);
+    }
+
+    // 按胶囊底部球心检测坡面
+    static bool Ground_Ray_Date(Collider col, LayerMask mask, float checkDistance,
+        float maxAngle, out RaycastHit hit)
+    {
         Vector3 origin = col.bounds.center;
-        float rayDistance = col.bounds.extents.y + groundCheckDistance;
-        return Physics.Raycast(origin, Vector3.down, rayDistance);
+        float rayDistance = col.bounds.extents.y + checkDistance;
+
+        if (col is CapsuleCollider capsule && capsule.direction == 1)
+        {
+            Transform colTransform = capsule.transform;
+            float radius = capsule.radius * Mathf.Max(
+                Mathf.Abs(colTransform.lossyScale.x),
+                Mathf.Abs(colTransform.lossyScale.z));
+            radius = Mathf.Min(radius, col.bounds.extents.y);
+
+            origin.y -= col.bounds.extents.y - radius;
+            float slopeCos = Mathf.Max(Mathf.Cos(
+                Mathf.Clamp(maxAngle, 0f, 75f) * Mathf.Deg2Rad), 0.01f);
+            rayDistance = (radius + checkDistance) / slopeCos + 0.02f;
+        }
+
+        if (!Physics.Raycast(origin, Vector3.down, out hit, rayDistance,
+            mask, QueryTriggerInteraction.Ignore))
+            return false;
+
+        return Vector3.Angle(Vector3.up, hit.normal) <= maxAngle + 0.01f;
     }
 
     // 跳跃逻辑，只在地面起跳
@@ -182,10 +246,15 @@ public class Player_Body : Character_Move
     }
 
     // 滑铲，axis为输入轴，viewDir为视角方向
-    public void Body_Slide_Date(Vector2 axis, Vector3 viewDir)
+    public void Body_Slide_Date(Vector2 axis, Vector3 viewDir, Vector3 normal)
     {
         Vector3 dir = axis.sqrMagnitude > 0.01f ? GetMoveDir(axis, viewDir) : currentMoveDirection;
-        currentMoveDirection = dir;
+        dir = Vector3.ProjectOnPlane(dir, normal);
+        if (dir.sqrMagnitude <= 0.001f)
+            dir = Vector3.ProjectOnPlane(transform.forward, normal);
+        if (dir.sqrMagnitude <= 0.001f) dir = currentMoveDirection;
+
+        currentMoveDirection = dir.normalized;
         rb.AddForce(dir * slideForce, ForceMode.Impulse);
     }
 
