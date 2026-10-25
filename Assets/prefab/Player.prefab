@@ -1584,6 +1584,7 @@ MonoBehaviour:
   crouchLiftRiseTime: 0.82
   crouchLiftFallTime: 0.15
   crouchHoldOffset: 2.44
+  crouchActionSmoothTime: 0.32
   slideTurnTime: 0.12
   footGroundHeight: 0.02
   footGroundSpeed: 12
@@ -2039,7 +2040,6 @@ MonoBehaviour:
   slideTimer: 0
   slideTime: 1.77
   slideExitTime: 0.5
-  crouchEnterTime: 0.82
 --- !u!1 &7746808583437207710
 GameObject:
   m_ObjectHideFlags: 0

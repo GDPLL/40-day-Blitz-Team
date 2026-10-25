@@ -41,7 +41,6 @@ public class Player_animation : MonoBehaviour
     public const uint BitSlide = 1u << 14;       //滑铲
     public const uint BitPeekLeft = 1u << 15;    //左探头
     public const uint BitPeekRight = 1u << 16;   //右探头
-    public const uint BitCrouchEnter = 1u << 17; //蹲下过渡
 
     const int MoveXShift = 8;                   //方向X位偏移
     const int MoveYShift = 10;                  //方向Y位偏移
@@ -51,6 +50,7 @@ public class Player_animation : MonoBehaviour
     public float crouchLiftRiseTime = 0.82f;   // 蹲姿抬升时长
     public float crouchLiftFallTime = 0.15f;   // 蹲姿恢复时长
     public float crouchHoldOffset = 2.44f;    // 蹲姿末帧时间
+    public float crouchActionSmoothTime = 0.32f; // 蹲走停步平滑
     public float slideTurnTime = 0.12f;       // 滑铲转身时长
     public float footGroundHeight = 0.02f;    // 脚底离角色根高度
     public float footGroundSpeed = 12f;       // 脚底修正速度
@@ -62,6 +62,8 @@ public class Player_animation : MonoBehaviour
     Vector3 modelBasePosition;      // 模型基础位置
     Quaternion modelBaseRotation;   // 模型基础旋转
     float crouchLift;               // 当前模型抬升
+    float crouchActionSpeed;        // 当前蹲走速度
+    float crouchActionVelocity;     // 蹲走速度缓存
     float slideTurn;                // 当前滑铲转身进度
     Transform leftToe;              // 左脚趾骨骼
     Transform rightToe;             // 右脚趾骨骼
@@ -102,7 +104,6 @@ public class Player_animation : MonoBehaviour
         bool reload = (state & BitReload) != 0;
         bool squat = (state & BitSquat) != 0;
         bool slide = (state & BitSlide) != 0;
-        bool crouchEnter = (state & BitCrouchEnter) != 0;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
         bool grounded = (state & BitGround) != 0;
 
@@ -118,7 +119,12 @@ public class Player_animation : MonoBehaviour
         animation.SetBool("IsSlide", slide);
         animation.SetBool("PeekLeft", (state & BitPeekLeft) != 0);
         animation.SetBool("PeekRight", (state & BitPeekRight) != 0);
-        animation.SetFloat("CrouchActionSpeed", squat && walk ? 1f : 0f);
+        float crouchTarget = squat && walk ? 1f : 0f;
+        crouchActionSpeed = crouchActionSmoothTime > 0f
+            ? Mathf.SmoothDamp(crouchActionSpeed, crouchTarget,
+                ref crouchActionVelocity, crouchActionSmoothTime)
+            : crouchTarget;
+        animation.SetFloat("CrouchActionSpeed", crouchActionSpeed);
 
         // 奔跑满速，走路半速，静止为零，换弹只能走路
         bool run = (state & BitRun) != 0 && !reload;
@@ -133,7 +139,6 @@ public class Player_animation : MonoBehaviour
         // 蹲姿和滑铲使用独立全身层
         int nextAction;
         if (slide) nextAction = 3;
-        else if (crouchEnter) nextAction = 4;
         else nextAction = squat ? 2 : 0;
         if (animation.layerCount > 1)
         {
@@ -144,7 +149,6 @@ public class Player_animation : MonoBehaviour
             {
                 string stateName = nextAction == 3 ? "Slide"
                     : nextAction == 2 ? "CrouchMove"
-                    : nextAction == 4 ? "CrouchIdle"
                     : nextAction == 1 ? "CrouchHold" : "ActionEmpty";
                 float stateOffset = nextAction == 1 ? crouchHoldOffset : 0f;
                 animation.CrossFadeInFixedTime(stateName, 0.12f, 1, stateOffset);
