@@ -518,6 +518,7 @@ public class Player_Control : Character_Move
 
         // 换弹期间松开手臂IK，各端按同步状态驱动
         Con_gun_Control.Arm_Rig_Date((state & Player_animation.BitReload) == 0);
+        Con_gun_Control.Gun_Peek_Performance(state);
 
         // 弹药与瞄准数据同步到本地
         if (!IsServer)

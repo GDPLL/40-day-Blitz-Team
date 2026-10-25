@@ -370,11 +370,11 @@ public class Player_Move_Date : MonoBehaviour
 
         // 奔跑与蹲下
         isRuning = packet.run;
-        isSquat = packet.squat;
+        isSquat = packet.squat && rollTimer <= 0f;
 
         // 滑铲按键边沿
-        bool slideKeys = isRuning && isSquat && isWASDDowm;
-        if (slideKeys && !slideBefore)
+        bool slideKeys = isRuning && packet.squat && isWASDDowm;
+        if (slideKeys && !slideBefore && rollTimer <= 0f)
         {
             slideRequest = true;
         }

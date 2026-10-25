@@ -35,6 +35,14 @@ public class Gun_Control : NetworkBehaviour
     public RigBuilder armRig;      // 手臂IK构建器
     public int armRigLayer;        // 手臂IK所在的层序号
 
+    [Header("探头持枪")]
+    public float peekGunOffset = 0.30f;      // 探头枪位到身体中心的横向距离
+    public float peekGunSmoothTime = 0.12f;  // 探头持枪平滑时间
+    Vector3 gunBaseLocalPosition;            // 枪根原始局部位置
+    float gunBaseLateral;                    // 枪根原始姿态相对身体中心的横向位置
+    float currentPeekGunOffset;               // 当前探头持枪修正量
+    float peekGunVelocity;                    // 持枪横移平滑速度缓存
+
     // 两发之间的最小间隔
     public float FireInterval => 60f / fireRate;
 
@@ -265,6 +273,9 @@ public class Gun_Control : NetworkBehaviour
         ownerId = id;
         shotCount = 0;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
+        gunBaseLocalPosition = Gun_Root.localPosition;  // 记录枪根原始位置
+        gunBaseLateral = Vector3.Dot(
+            Gun_Root.position - Body_Root.position, Body_Root.right);
         originalLocalRot = Gun_Root.localRotation;      // 记录初始旋转
 
         // 旧实例缺字段时补默认弹夹数
@@ -614,6 +625,27 @@ public class Gun_Control : NetworkBehaviour
 
         armRig.layers[armRigLayer].active = on;
         armRig.Build();     //改层开关后重建图
+    }
+
+    // 探头时让枪根带动双手与枪口向同侧偏出，state 为同步表现状态
+    public void Gun_Peek_Performance(uint state)
+    {
+        float peekSide = 0f;
+        if ((state & Player_animation.BitPeekLeft) != 0) peekSide = -1f;
+        else if ((state & Player_animation.BitPeekRight) != 0) peekSide = 1f;
+        if ((state & Player_animation.BitReload) != 0) peekSide = 0f;   // 换弹动作优先
+
+        // 枪根原始姿态偏右手，换算为围绕身体中心等距的左右枪位
+        float targetOffset = peekSide != 0f
+            ? peekSide * peekGunOffset - gunBaseLateral : 0f;
+        currentPeekGunOffset = Mathf.SmoothDamp(currentPeekGunOffset, targetOffset,
+            ref peekGunVelocity, peekGunSmoothTime);
+
+        Vector3 worldOffset = Body_Root.right * currentPeekGunOffset;
+        Vector3 localOffset = Gun_Root.parent != null
+            ? Gun_Root.parent.InverseTransformVector(worldOffset)
+            : worldOffset;
+        Gun_Root.localPosition = gunBaseLocalPosition + localOffset;
     }
 
     // 是否有弹药

@@ -285,7 +285,11 @@ public class Player_camera : MonoBehaviour
             Vector3 headPosition = PlayerHeadTransform.position;
             float cameraY = Mathf.SmoothDamp(Target_Object.position.y, headPosition.y,
                 ref heightVelocity, followHeightSmoothTime);
-            Target_Object.position = new Vector3(headPosition.x, cameraY, headPosition.z);
+
+            // 横向使用稳定的角色根节点，避免左右探头动画的头部姿态叠出不同横移量
+            Vector3 horizontalAnchor = ownControl != null
+                ? ownControl.transform.position : headPosition;
+            Target_Object.position = new Vector3(horizontalAnchor.x, cameraY, horizontalAnchor.z);
             targetVelocity = Vector3.zero;
         }
         Camera_Object.transform.position = CameraBlockPosition(Target_Object.position, worldOffset)

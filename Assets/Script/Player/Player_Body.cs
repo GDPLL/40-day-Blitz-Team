@@ -49,9 +49,13 @@ public class Player_Body : Character_Move
     Vector3 groundNormal = Vector3.up;      // 当前地面法线
     Vector3 groundPoint;                    // 当前地面接触点
     bool jumpAirborne;                      // 是否处于起跳腾空
+    bool sceneLift;                         // 上一帧场景托举标记
 
     public bool IsGrounded { get; private set; }    // 是否在地面
     public Vector3 GroundNormal => groundNormal;    // 地面法线
+
+    // 场景托举时允许保留向上速度，标记在下一物理帧自动消费
+    public void Body_Scene_Lift_Date() => sceneLift = true;
 
     // 初始化，刚体由外部注入
     public void Body_Init(Rigidbody rigidbody)
@@ -127,8 +131,10 @@ public class Player_Body : Character_Move
     {
         Body_Ground_Date();
         bool slopeGrounded = IsGrounded && groundNormal.y < 0.9995f;
+        bool liftedByScene = sceneLift;
+        sceneLift = false;
 
-        if (!rolling && !sliding && !IsGrounded && !jumpAirborne && rb.velocity.y > 0f)
+        if (!rolling && !sliding && !liftedByScene && !IsGrounded && !jumpAirborne && rb.velocity.y > 0f)
             rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
 
         // 松开方向立刻刹停，翻滚与空中不刹

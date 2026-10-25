@@ -1518,7 +1518,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3179484703
+  GlobalObjectIdHash: 815433573
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -1591,6 +1591,7 @@ MonoBehaviour:
   slideModelLift: -0.6
   slideLiftTime: 0.2
   slideGroundSmoothTime: 0.12
+  slideSlopeSmoothTime: 0.08
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1684,6 +1685,11 @@ MonoBehaviour:
   runInterval: 0.14
   squatInterval: 0.2
   jumpForce: 400
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckDistance: 0.2
+  maxSlopeAngle: 50
   rb: {fileID: 6445952189836789830}
   rollForce: 1000
   rollSpeed: 12
@@ -1879,6 +1885,8 @@ MonoBehaviour:
   reloadTime: 3.06
   armRig: {fileID: 7373796111577540768}
   armRigLayer: 0
+  peekGunOffset: 0.22
+  peekGunSmoothTime: 0.12
   hitEffect: {fileID: 4015259995318076048, guid: 5ba040b8213866147a03bf9330ad54ae, type: 3}
   fireEffect: {fileID: 2654986424484326109, guid: 1dc1100dd1826c749a3d423464c7488f, type: 3}
   fireEffectPrewarm: 12
@@ -1905,7 +1913,7 @@ MonoBehaviour:
   shoulderAim:
     outerAngle: 16
     innerAngle: 2
-    growSpeed: 18
+    growSpeed: 25
     nearDistance: 6
     farDistance: 35
     farFactor: 1
@@ -1914,7 +1922,7 @@ MonoBehaviour:
   adsAim:
     outerAngle: 10
     innerAngle: 0.2
-    growSpeed: 7
+    growSpeed: 12
     nearDistance: 60
     farDistance: 500
     farFactor: 1
@@ -2024,7 +2032,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f73acdf0ebedc294cac6c4f4ceb2b8e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  groundCheckDistance: 0.2
   respawnSquatTime: 0.23
   reconcileSpeed: 5
   isOnGround: 0

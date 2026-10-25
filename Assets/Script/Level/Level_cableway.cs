@@ -32,6 +32,8 @@ public class Level_cableway : MonoBehaviour, IScene_Interaction
         // 未到目标高度，持续上升并锁住水平位置
         if (control.transform.position.y < target.position.y)
         {
+            if (control.Con_body != null) control.Con_body.Body_Scene_Lift_Date();
+
             // 刚上缆车，播开始声并起运行声
             if (!rising)
             {
@@ -48,8 +50,9 @@ public class Level_cableway : MonoBehaviour, IScene_Interaction
 
             control.rigidbody.AddForce(Vector3.up * upForce, ForceMode.Force);
 
-            Vector3 vector3 = new Vector3(this.transform.position.x, control.transform.position.y, this.transform.position.z);
-            control.transform.position = vector3;
+            Vector3 vector3 = new Vector3(this.transform.position.x, control.rigidbody.position.y, this.transform.position.z);
+            control.rigidbody.velocity = new Vector3(0f, control.rigidbody.velocity.y, 0f);
+            control.rigidbody.position = vector3;
             return;
         }
 

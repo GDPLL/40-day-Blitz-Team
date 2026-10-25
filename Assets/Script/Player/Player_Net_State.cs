@@ -49,7 +49,7 @@ public class Player_Net_State : NetworkBehaviour
         uint state = 0;
         if (im.WASDHeld) state |= Player_animation.BitWalk;
         if (im.RunHeld) state |= Player_animation.BitRun;
-        if (im.SquatHeld) state |= Player_animation.BitSquat;
+        if (mv.isSquat) state |= Player_animation.BitSquat;
         if (im.MouseHeld || im.ShoulderHeld || im.AdsHeld) state |= Player_animation.BitGun;
         if (im.JumpDownHeld) state |= Player_animation.BitJump;
         bool dead = netRespawnWait.Value > 0f || netOut.Value;
