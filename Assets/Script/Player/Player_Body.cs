@@ -43,9 +43,9 @@ public class Player_Body : Character_Move
     Collider bodyCol;                       // 玩家碰撞体
     Vector3 colCenter;                      // 碰撞体原始中心
     float colHeight;                        // 碰撞体原始高度
-    RigidbodyInterpolation defaultInterpolation; // 刚体默认视觉插值
     Vector3 groundNormal = Vector3.up;      // 当前地面法线
     Vector3 groundPoint;                    // 当前地面接触点
+    bool jumpAirborne;                      // 是否处于起跳腾空
 
     public bool IsGrounded { get; private set; }    // 是否在地面
     public Vector3 GroundNormal => groundNormal;    // 地面法线
@@ -57,7 +57,8 @@ public class Player_Body : Character_Move
         if (rb != null)
         {
             rb.freezeRotation = true;    // 防碰撞翻滚
-            defaultInterpolation = rb.interpolation;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            turnBody = rb;
         }
 
         // 缓存碰撞体原始尺寸
@@ -122,17 +123,31 @@ public class Player_Body : Character_Move
     public void Body_Fixed_Date(bool rolling, bool sliding)
     {
         Body_Ground_Date();
+        bool slopeGrounded = IsGrounded && groundNormal.y < 0.9995f;
+
+        if (!rolling && !sliding && !IsGrounded && !jumpAirborne && rb.velocity.y > 0f)
+            rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
 
         // 松开方向立刻刹停，翻滚与空中不刹
         if (!rolling && !sliding && !hasInput && IsGrounded)
         {
-            rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
+            if (!slopeGrounded)
+                rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
             return;
         }
 
         // 地面移动：速度严格沿移动方向，去掉侧向滑步并完成限速
         if (!rolling && !sliding && IsGrounded)
         {
+            if (slopeGrounded)
+            {
+                float normalSpeed = Vector3.Dot(rb.velocity, groundNormal);
+                if (normalSpeed > 0f)
+                    rb.velocity -= groundNormal * normalSpeed;
+                Limit_Slide_Speed(currentSpeed);
+                return;
+            }
+
             float along = Mathf.Clamp(Vector3.Dot(rb.velocity, currentMoveDirection), 0f, currentSpeed);
             rb.velocity = currentMoveDirection * along + Vector3.up * rb.velocity.y;
             return;
@@ -141,6 +156,14 @@ public class Player_Body : Character_Move
         // 翻滚中限到翻滚速度
         if (rolling) Limit_Horizontal_Speed(rollSpeed);
         else if (sliding) Limit_Slide_Speed(slideSpeed);
+    }
+
+    // 当前移动方向投影到坡面
+    Vector3 Ground_Move_Direction(Vector3 normal)
+    {
+        Vector3 moveDirection = Vector3.ProjectOnPlane(currentMoveDirection, normal);
+        return moveDirection.sqrMagnitude > 0.001f
+            ? moveDirection.normalized : currentMoveDirection;
     }
 
     // 限水平速度，limit为上限
@@ -172,6 +195,16 @@ public class Player_Body : Character_Move
     // 检测并缓存地面，返回是否落地
     public bool Body_Ground_Date()
     {
+        if (jumpAirborne)
+        {
+            if (rb != null && rb.velocity.y > 0.05f)
+            {
+                IsGrounded = false;
+                return false;
+            }
+            jumpAirborne = false;
+        }
+
         if (Body_Ground_Hit_Date(out RaycastHit hit))
         {
             groundNormal = hit.normal;
@@ -233,6 +266,8 @@ public class Player_Body : Character_Move
     {
         if (!IsGrounded) return;    //非地面不能起跳
 
+        jumpAirborne = true;
+        IsGrounded = false;
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
 
@@ -258,16 +293,6 @@ public class Player_Body : Character_Move
         rb.AddForce(dir * slideForce, ForceMode.Impulse);
     }
 
-    // 滑铲时开启视觉插值，避免物理帧位移让角色相对平滑相机抖动
-    public void Body_Slide_Interpolation_Date(bool active)
-    {
-        if (rb == null) return;
-        RigidbodyInterpolation target = active
-            ? RigidbodyInterpolation.Interpolate
-            : defaultInterpolation;
-        if (rb.interpolation != target) rb.interpolation = target;
-    }
-
     // 碰撞体高度缩放，scale为比例
     public void Body_Size_Date(float scale)
     {
@@ -281,23 +306,29 @@ public class Player_Body : Character_Move
     // 按节奏沿移动方向施加推力
     public void Body_Move()
     {
-        // 未到间隔不施力
         moveTimer += Time.fixedDeltaTime;
-        if (moveTimer < moveInterval) return;
+
+        // 坡面逐物理帧补速，平面按原间隔施力
+        bool slopeGrounded = IsGrounded && groundNormal.y < 0.9995f;
+        if (!slopeGrounded && moveTimer < moveInterval) return;
 
         moveTimer = 0f;
 
 
         // 只补到目标速度，多给会被限速削掉
-        Vector3 flat = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
-        float lack = (currentSpeed - Vector3.Dot(flat, currentMoveDirection)) * rb.mass;
+        Vector3 moveDirection = IsGrounded
+            ? Ground_Move_Direction(groundNormal) : currentMoveDirection;
+        float normalSpeed = IsGrounded ? Vector3.Dot(rb.velocity, groundNormal) : 0f;
+        Vector3 tangentVelocity = IsGrounded
+            ? rb.velocity - groundNormal * normalSpeed : rb.velocity;
+        float lack = (currentSpeed - Vector3.Dot(tangentVelocity, moveDirection)) * rb.mass;
         if (lack <= 0f) return;
 
         // 单段冲量不超过持续力折算值
         float impulse = Mathf.Min(lack, currentForce * moveInterval);
         float factor = IsGrounded ? 1f : airForce;    // 空中只留少量操控
 
-        rb.AddForce(currentMoveDirection * impulse * factor, ForceMode.Impulse);
+        rb.AddForce(moveDirection * impulse * factor, ForceMode.Impulse);
     }
 
     // 表现，转向移动方向

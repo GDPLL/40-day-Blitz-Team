@@ -456,9 +456,6 @@ public class Player_Control : Character_Move
     {
         if (!IsLocalPlayer) return;
 
-        // 相机跟随
-        if (Con_player_camera != null) Con_player_camera.Camera_Follow_Performance_Local();
-
         // 本机信号花屏
         if (Con_player_camera != null && Con_ObjectSystem != null)
             Con_player_camera.Camera_Signal_Performance_Local(Con_ObjectSystem.HP, Con_net_State.Is_Out);

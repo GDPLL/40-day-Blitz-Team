@@ -136,7 +136,6 @@ public class Player_Move_Date : MonoBehaviour
         Player_Body body = Own_Control.Con_body;
         if (body != null)
         {
-            body.Body_Slide_Interpolation_Date(false);
             bodyScale = body.deadSquatScale;
             body.Body_Size_Date(bodyScale);
         }
@@ -280,8 +279,6 @@ public class Player_Move_Date : MonoBehaviour
             slideTimer -= Time.fixedDeltaTime;
             if (slideTimer <= 0f) slideTimer = 0f;
         }
-        body.Body_Slide_Interpolation_Date(slideTimer > 0f);
-
         // 输入施推力
         if (isWASDDowm && rollTimer <= 0f && slideTimer <= 0f && !crouchEnter)
             body.Body_Move();

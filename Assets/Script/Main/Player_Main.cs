@@ -144,6 +144,10 @@ public class Player_Main : NetworkBehaviour
             if (control == null || control.Con_player_Animation == null) continue;
             control.Con_player_Animation.Player_animation_Ground_Performance();
         }
+
+        // 动画更新后跟随本机相机
+        if (oPlayer_Control != null && oPlayer_Control.Con_player_camera != null)
+            oPlayer_Control.Con_player_camera.Camera_Follow_Performance_Local();
     }
 
     //订阅场景初始化

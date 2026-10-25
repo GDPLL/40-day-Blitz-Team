@@ -61,6 +61,8 @@ public class Player_camera : MonoBehaviour
     public float cameraMinDistance = 0.3f;   // 相机最近距离
     public float cameraPullInSpeed = 25f;    // 拉近速度
     public float cameraPushOutSpeed = 6f;    // 推远速度
+    public float cameraDistanceSmoothTime = 0.08f;   // 遮挡距离平滑
+    public float cameraSnapDistance = 0.25f; // 突变拉近距离
 
     [Header("滑铲跟随")]
     public float slideCameraHeight = 1.45f;      // 滑铲相机高度
@@ -71,6 +73,7 @@ public class Player_camera : MonoBehaviour
     public float followHeightSmoothTime = 0.08f; // 头部高度平滑
 
     float cameraDistance;                     // 当前遮挡距离
+    float cameraDistanceVelocity;             // 遮挡距离速度
     Vector3 targetVelocity;                   // 跟随速度缓存
     float heightVelocity;                     // 高度速度缓存
     readonly RaycastHit[] cameraHitBuffer = new RaycastHit[8];   // 遮挡检测缓存
@@ -365,7 +368,17 @@ public class Player_camera : MonoBehaviour
         limit = Mathf.Max(limit, Mathf.Min(cameraMinDistance, want));
 
         float speed = limit < cameraDistance ? cameraPullInSpeed : cameraPushOutSpeed;   // 拉近快推远慢
-        cameraDistance = Mathf.MoveTowards(cameraDistance, limit, speed * Time.deltaTime);
+        if (limit < cameraDistance - cameraSnapDistance)
+        {
+            cameraDistance = limit;
+            cameraDistanceVelocity = 0f;
+        }
+        else
+        {
+            cameraDistance = Mathf.SmoothDamp(cameraDistance, limit,
+                ref cameraDistanceVelocity, cameraDistanceSmoothTime,
+                speed, Time.deltaTime);
+        }
 
         return pivot + dir * cameraDistance;
     }

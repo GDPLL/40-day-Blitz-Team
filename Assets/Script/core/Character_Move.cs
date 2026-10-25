@@ -11,14 +11,19 @@ public class Character_Move : NetworkBehaviour
     public float squatSpeed = 1f;    // 蹲下速度
 
     protected float currentSpeed;    // 当前速度
+    protected Rigidbody turnBody;    // 转向刚体
 
     // 平滑转向水平方向
     protected void SmoothRotate(Vector3 dir)
     {
         dir.y = 0f;
         if (dir.sqrMagnitude <= 0.001f) return;
-        transform.rotation = Quaternion.RotateTowards(
-            transform.rotation, Quaternion.LookRotation(dir.normalized),
+
+        Quaternion current = turnBody != null ? turnBody.rotation : transform.rotation;
+        Quaternion target = Quaternion.RotateTowards(
+            current, Quaternion.LookRotation(dir.normalized),
             turnSpeed * Time.deltaTime);
+        if (turnBody != null) turnBody.MoveRotation(target);
+        else transform.rotation = target;
     }
 }
