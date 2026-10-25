@@ -16,7 +16,6 @@ public class Player_animation : MonoBehaviour
         modelBaseRotation = animation.transform.localRotation;
         leftToe = animation.GetBoneTransform(HumanBodyBones.LeftToes);
         rightToe = animation.GetBoneTransform(HumanBodyBones.RightToes);
-
         // 蹲走动画强制循环
         foreach (AnimationClip clip in animation.runtimeAnimatorController.animationClips)
         {

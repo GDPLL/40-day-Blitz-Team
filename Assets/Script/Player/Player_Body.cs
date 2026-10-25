@@ -159,7 +159,8 @@ public class Player_Body : Character_Move
 
         // 翻滚中限到翻滚速度
         if (rolling) Limit_Horizontal_Speed(rollSpeed);
-        else if (sliding) Slide_Speed_Date(slideSpeed);
+        else if (sliding) Slope_Speed_Date(slideSpeed, slideUphillLoss,
+            slideDownhillBonus, slideMaintainAccel);
     }
 
     // 当前移动方向投影到坡面
@@ -196,8 +197,9 @@ public class Player_Body : Character_Move
         rb.velocity = tangentVelocity.normalized * limit + groundNormal * normalSpeed;
     }
 
-    // 按坡向维持滑铲速度，baseSpeed为横坡速度
-    void Slide_Speed_Date(float baseSpeed)
+    // 按坡向维持动作速度
+    void Slope_Speed_Date(float baseSpeed, float uphillLoss,
+        float downhillBonus, float maintainAccel)
     {
         if (!IsGrounded)
         {
@@ -214,14 +216,14 @@ public class Player_Body : Character_Move
         float slopeAmount = downhill.sqrMagnitude > 0.001f
             ? Vector3.Dot(moveDirection, downhill.normalized) : 0f;
         float slopeSpeed = slopeAmount >= 0f
-            ? slopeAmount * slideDownhillBonus
-            : slopeAmount * slideUphillLoss;
+            ? slopeAmount * downhillBonus
+            : slopeAmount * uphillLoss;
         float targetSpeed = Mathf.Max(0f, baseSpeed + slopeSpeed);
         float tangentSpeed = Vector3.Dot(tangentVelocity, moveDirection);
 
         if (tangentSpeed < targetSpeed)
         {
-            float acceleration = Mathf.Min(slideMaintainAccel,
+            float acceleration = Mathf.Min(maintainAccel,
                 (targetSpeed - tangentSpeed) / Time.fixedDeltaTime);
             rb.AddForce(moveDirection * acceleration, ForceMode.Acceleration);
         }
