@@ -23,6 +23,8 @@ public class Object_System : MonoBehaviour , Idamage
     //坠落伤害
     public float fallAccel = 400f;          //触发加速度,米每二次方秒
     public float fallDamageRate = 0.05f;    //超出部分的伤害比例
+    [Range(0f, 1f)]
+    public float rollFallDamageScale = 0.5f;    //翻滚摔落伤害倍率
     float fallSpeed;                        //空中最大下落速度
     float physicsDelta = 0.02f;             //物理帧间隔，算致死速度用
 
@@ -72,7 +74,7 @@ public class Object_System : MonoBehaviour , Idamage
     }
 
     // 坠落伤害，velocityY为当前垂直速度，grounded为是否在地面
-    public void Fall_Damage_Date(float velocityY, bool grounded, float deltaTime)
+    public void Fall_Damage_Date(float velocityY, bool grounded, float deltaTime, bool rolling)
     {
         if (deltaTime <= 0f) return;    //防除零
 
@@ -87,7 +89,8 @@ public class Object_System : MonoBehaviour , Idamage
 
         // 落地按空中峰值结算一次，换算成加速度
         float accel = fallSpeed / deltaTime;
-        int damage = (int)((accel - fallAccel) * fallDamageRate);
+        float damageScale = rolling ? rollFallDamageScale : 1f;
+        int damage = (int)((accel - fallAccel) * fallDamageRate * damageScale);
         if (damage > 0) Takedamage(damage, 999, new Vector3(), out _);
 
         fallSpeed = 0f;

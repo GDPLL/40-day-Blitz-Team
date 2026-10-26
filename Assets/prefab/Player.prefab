@@ -1505,6 +1505,7 @@ MonoBehaviour:
   healSpeed: 10
   fallAccel: 400
   fallDamageRate: 0.1
+  rollFallDamageScale: 0.5
   respawnIndex: 0
   isDead: 0
 --- !u!114 &-8760748900487357536

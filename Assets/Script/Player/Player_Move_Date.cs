@@ -181,7 +181,8 @@ public class Player_Move_Date : MonoBehaviour
         if (body == null || rb == null || c.Con_ObjectSystem == null) return;
 
         // 坠落伤害，按空中最大下落速度算
-        c.Con_ObjectSystem.Fall_Damage_Date(rb.velocity.y, body.IsGrounded, Time.fixedDeltaTime);
+        c.Con_ObjectSystem.Fall_Damage_Date(rb.velocity.y, body.IsGrounded,
+            Time.fixedDeltaTime, rollTimer > 0f);
     }
 
     // 客机本机物理帧移动驱动
