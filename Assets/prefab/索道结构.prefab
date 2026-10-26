@@ -292,7 +292,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 8115049865753790599}
   upForce: 1000
-  pushForce: 100
+  throwSpeed: 6
   audioSource: {fileID: 5762462779162781981}
   riseSource: {fileID: 3556678599063175773}
   startClip: {fileID: 8300000, guid: e99bd470780b0294fb02ccb888768dba, type: 3}
