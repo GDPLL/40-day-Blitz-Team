@@ -73,6 +73,10 @@ public class Player_animation : MonoBehaviour
     Vector3 slideGroundNormal = Vector3.up; // 滑铲地面法线
     Vector3 slideGroundPoint;       // 滑铲地面接触点
 
+    // 翻滚动画是否仍在播放
+    public bool Is_Rolling => animation.GetCurrentAnimatorStateInfo(0).shortNameHash
+        == Animator.StringToHash("翻滚");
+
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
     {
@@ -101,8 +105,9 @@ public class Player_animation : MonoBehaviour
     {
         bool walk = (state & BitWalk) != 0;
         bool reload = (state & BitReload) != 0;
-        bool squat = (state & BitSquat) != 0;
-        bool slide = (state & BitSlide) != 0;
+        bool rolling = (state & BitRoll) != 0 || Is_Rolling;
+        bool squat = (state & BitSquat) != 0 && !rolling;
+        bool slide = (state & BitSlide) != 0 && !rolling;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
         bool grounded = (state & BitGround) != 0;
 

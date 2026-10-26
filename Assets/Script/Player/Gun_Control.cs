@@ -36,7 +36,8 @@ public class Gun_Control : NetworkBehaviour
     public int armRigLayer;        // 手臂IK所在的层序号
 
     [Header("探头持枪")]
-    public float peekGunOffset = 0.30f;      // 探头枪位到身体中心的横向距离
+    public float peekGunOffset = 0.30f;     // 右探头枪位到身体中心的横向距离
+    public float peekGunLeftTravelScale = 1f; // 左探头相对原枪位的移动比例
     public float peekGunSmoothTime = 0.12f;  // 探头持枪平滑时间
     Vector3 gunBaseLocalPosition;            // 枪根原始局部位置
     float gunBaseLateral;                    // 枪根原始姿态相对身体中心的横向位置
@@ -635,9 +636,12 @@ public class Gun_Control : NetworkBehaviour
         else if ((state & Player_animation.BitPeekRight) != 0) peekSide = 1f;
         if ((state & Player_animation.BitReload) != 0) peekSide = 0f;   // 换弹动作优先
 
-        // 枪根原始姿态偏右手，换算为围绕身体中心等距的左右枪位
-        float targetOffset = peekSide != 0f
-            ? peekSide * peekGunOffset - gunBaseLateral : 0f;
+        // 右探头以目标枪位为准，左探头按右探头的移动量反向补偿，
+        // 避免右手持枪时为了跨到身体中心另一侧而拉脱双手
+        float rightTravel = peekGunOffset - gunBaseLateral;
+        float targetOffset = peekSide > 0f
+            ? rightTravel
+            : peekSide < 0f ? -rightTravel * peekGunLeftTravelScale : 0f;
         currentPeekGunOffset = Mathf.SmoothDamp(currentPeekGunOffset, targetOffset,
             ref peekGunVelocity, peekGunSmoothTime);
 

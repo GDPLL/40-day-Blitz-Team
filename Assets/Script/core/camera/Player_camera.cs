@@ -84,7 +84,7 @@ public class Player_camera : MonoBehaviour
     Vector3 localVelocity;                       // 平滑速度缓存
 
     [Header("探头镜头")]
-    public float peekCameraOffset = 0.4f;        // 探头横向镜头偏移
+    public float peekCameraOffset = 0.55f;       // 探头横向镜头偏移
     public float peekCameraRoll = 2f;            // 探头镜头滚转角度
     public float peekSmoothTime = 0.12f;         // 探头横移与滚转平滑
     float currentPeekRoll;                       // 当前探头滚转

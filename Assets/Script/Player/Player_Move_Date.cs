@@ -368,13 +368,17 @@ public class Player_Move_Date : MonoBehaviour
         else if (isWASDDowm && isOnGround && c.Con_body != null)
             c.Con_body.Body_Rotation_Performance();
 
+        // 翻滚动画结束前屏蔽蹲下
+        bool rolling = rollTimer > 0f
+            || (c.Con_player_Animation != null && c.Con_player_Animation.Is_Rolling);
+
         // 奔跑与蹲下
         isRuning = packet.run;
-        isSquat = packet.squat && rollTimer <= 0f;
+        isSquat = packet.squat && !rolling;
 
         // 滑铲按键边沿
         bool slideKeys = isRuning && packet.squat && isWASDDowm;
-        if (slideKeys && !slideBefore && rollTimer <= 0f)
+        if (slideKeys && !slideBefore && !rolling)
         {
             slideRequest = true;
         }
