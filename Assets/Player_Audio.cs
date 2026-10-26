@@ -39,6 +39,7 @@ public class Player_Audio : MonoBehaviour
         Jump,           //起跳
         Land,           //坠地
         Roll,           //翻滚
+        LockBuzzer,     //锁定蜂鸣
     }
 
     public AudioClip[] audioClips;      // 音效片段，按编号取
@@ -52,6 +53,7 @@ public class Player_Audio : MonoBehaviour
     public AudioSource breathSource;    // 呼吸音源，循环
     public AudioSource coughSource;     // 咳嗽音源，循环
     public AudioSource windSource;      // 风声音源，循环
+    public AudioSource lockBuzzerSource;    // 锁定蜂鸣音源
 
     public float tailDelay = 0.2f;      // 停火判定秒数
     public float gunMinInterval = 0.1f;     // 动作音最小间隔
@@ -61,6 +63,7 @@ public class Player_Audio : MonoBehaviour
     public float windMinSpeed = 8f;     // 起风速度
     public float windMaxSpeed = 20f;    // 满音量速度
     public float landSpeed = 6f;        // 坠地判定速度
+    public float lockBuzzerInterval = 0.5f;     // 锁定蜂鸣间隔
 
     Gun_Control gun;                    // 所属枪械
     bool isFiring;                      // 连发中
@@ -69,6 +72,8 @@ public class Player_Audio : MonoBehaviour
     int lastHp;                         // 上帧血量
     bool hasBody;                       // 生命音效已初始化
     float fallSpeed;                    // 空中最大下落速度
+    int lockBuzzerStage;                // 当前蜂鸣阶段
+    float nextLockBuzzerTime;           // 下次蜂鸣时刻
 
     // 初始化，gunControl为所属枪械
     public void Player_Audio_Init(Gun_Control gunControl)
@@ -116,6 +121,21 @@ public class Player_Audio : MonoBehaviour
             windSource.loop = true;
             windSource.volume = 0f;
         }
+
+        if (lockBuzzerSource == null)
+            Debug.LogError("Player_Audio|Player_Audio_Init|锁定蜂鸣音源为空");
+        else
+        {
+            lockBuzzerSource.playOnAwake = false;
+            lockBuzzerSource.loop = false;
+            lockBuzzerSource.spatialBlend = 0f;
+            lockBuzzerSource.Stop();
+        }
+
+        if (Clip(AudioNumKV.LockBuzzer) == null)
+            Debug.LogError("Player_Audio|Player_Audio_Init|锁定蜂鸣片段为空");
+        if (lockBuzzerInterval <= 0f)
+            Debug.LogError("Player_Audio|Player_Audio_Init|锁定蜂鸣间隔非法");
     }
 
     // 反注册
@@ -286,6 +306,76 @@ public class Player_Audio : MonoBehaviour
         // 触地那一下按落速判定
         if (fallSpeed > landSpeed) Play_Body(AudioNumKV.Land);
         fallSpeed = 0f;
+    }
+
+    // 切换锁定蜂鸣阶段，time为当前时刻
+    public void Lock_Buzzer_Performance_Local(int stage, float time)
+    {
+        if (stage < 0 || stage > 2)
+        {
+            Debug.LogError("Player_Audio|Lock_Buzzer_Performance_Local|阶段参数非法");
+            return;
+        }
+
+        if (stage == lockBuzzerStage) return;
+
+        if (lockBuzzerSource == null)
+        {
+            Debug.LogError("Player_Audio|Lock_Buzzer_Performance_Local|锁定蜂鸣音源为空");
+            lockBuzzerStage = 0;
+            return;
+        }
+
+        if (stage == 0)
+        {
+            lockBuzzerStage = 0;
+            lockBuzzerSource.Stop();
+            return;
+        }
+
+        AudioClip clip = Clip(AudioNumKV.LockBuzzer);
+        if (clip == null)
+        {
+            Debug.LogError("Player_Audio|Lock_Buzzer_Performance_Local|锁定蜂鸣片段为空");
+            lockBuzzerStage = 0;
+            lockBuzzerSource.Stop();
+            return;
+        }
+
+        if (stage == 1 && lockBuzzerInterval <= 0f)
+        {
+            Debug.LogError("Player_Audio|Lock_Buzzer_Performance_Local|锁定蜂鸣间隔非法");
+            lockBuzzerStage = 0;
+            lockBuzzerSource.Stop();
+            return;
+        }
+
+        lockBuzzerStage = stage;
+        lockBuzzerSource.Stop();
+        lockBuzzerSource.clip = clip;
+        lockBuzzerSource.loop = stage == 2;
+        lockBuzzerSource.Play();
+
+        if (stage == 1) nextLockBuzzerTime = time + lockBuzzerInterval;
+    }
+
+    // 间隔蜂鸣，time为当前时刻
+    public void Lock_Buzzer_Show(float time)
+    {
+        if (lockBuzzerStage != 1) return;
+
+        if (lockBuzzerSource == null)
+        {
+            Debug.LogError("Player_Audio|Lock_Buzzer_Show|锁定蜂鸣音源为空");
+            lockBuzzerStage = 0;
+            return;
+        }
+
+        if (time < nextLockBuzzerTime) return;
+
+        lockBuzzerSource.Play();
+        nextLockBuzzerTime += lockBuzzerInterval;
+        if (nextLockBuzzerTime <= time) nextLockBuzzerTime = time + lockBuzzerInterval;
     }
 
     // 命中目标

@@ -486,6 +486,10 @@ public class Player_Control : Character_Move
         if (Con_player_Audio != null && rigidbody != null)
             Con_player_Audio.Wind_Performance(rigidbody.velocity.magnitude);
 
+        // 锁定蜂鸣
+        if (Con_player_Audio != null)
+            Con_player_Audio.Lock_Buzzer_Show(Time.time);
+
         // 本机透视
         if (Con_xRay != null)
         {

@@ -1437,6 +1437,7 @@ GameObject:
   - component: {fileID: 7914971046313913987}
   - component: {fileID: 1326813372226240841}
   - component: {fileID: 622760688168328977}
+  - component: {fileID: 7075731802248219611}
   m_Layer: 8
   m_HasEditorInfo: 1
   m_Name: Player
@@ -1841,6 +1842,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 164f3b5685eedad47a92a2a78b6432fa, type: 3}
   - {fileID: 8300000, guid: b8735379de7759c4e8f55e1ab82dde40, type: 3}
   - {fileID: 8300000, guid: 293533feaeb98164e85395ce0e7f423a, type: 3}
+  - {fileID: 0}
+  - {fileID: 8300000, guid: 3c71a20d36c645b49ea12a7b84a65f10, type: 3}
   shotSource: {fileID: 8448340592767103017}
   loopSource: {fileID: 1293818048992969774}
   dropSource: {fileID: 5978881978128264792}
@@ -1851,6 +1854,7 @@ MonoBehaviour:
   breathSource: {fileID: 5829569019940220665}
   coughSource: {fileID: 3808929648953842536}
   windSource: {fileID: 4362577515952290951}
+  lockBuzzerSource: {fileID: 7075731802248219611}
   tailDelay: 0.2
   gunMinInterval: 0.1
   volumeMin: 0.9
@@ -1859,6 +1863,7 @@ MonoBehaviour:
   windMinSpeed: 8
   windMaxSpeed: 20
   landSpeed: 6
+  lockBuzzerInterval: 0.5
 --- !u!114 &1510269724543673231
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2122,6 +2127,102 @@ AudioSource:
     - serializedVersion: 3
       time: 1
       value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!82 &7075731802248219611
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 8300000, guid: 3c71a20d36c645b49ea12a7b84a65f10, type: 3}
+  m_PlayOnAwake: 0
+  m_Volume: 0.65
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0

@@ -196,12 +196,14 @@ public class Player_Lock_Date : NetworkBehaviour
     void Lock_On_Send(int stage)
     {
         Player_Control c = Own_Control;
+        if (c == null)
+        {
+            Debug.LogError("Player_Lock_Date|Lock_On_Send|玩家控制为空");
+            return;
+        }
 
         if (c.IsOwner)
-        {
-            if (c.Con_lockOn_UI == null) Debug.LogError("Player_Lock_Date|Lock_On_Send|锁定提示UI 为空");
-            else c.Con_lockOn_UI.Lock_On_Performance_Local(stage);
-        }
+            Lock_On_Local_Performance(stage, Time.time);
 
         ClientRpcParams ps = new ClientRpcParams
         {
@@ -217,13 +219,28 @@ public class Player_Lock_Date : NetworkBehaviour
         if (IsServer) return;   //主机已显示
         if (!IsOwner) return;   //只本机显示
 
-        if (Own_Control.Con_lockOn_UI == null)
+        Lock_On_Local_Performance(stage, Time.time);
+    }
+
+    // 本机锁定表现，time为当前时刻
+    void Lock_On_Local_Performance(int stage, float time)
+    {
+        Player_Control c = Own_Control;
+        if (c == null)
         {
-            Debug.LogError("Player_Lock_Date|Lock_On_ClientRpc|锁定提示UI 为空");
+            Debug.LogError("Player_Lock_Date|Lock_On_Local_Performance|玩家控制为空");
             return;
         }
 
-        Own_Control.Con_lockOn_UI.Lock_On_Performance_Local(stage);
+        if (c.Con_lockOn_UI == null)
+            Debug.LogError("Player_Lock_Date|Lock_On_Local_Performance|锁定提示UI为空");
+        else
+            c.Con_lockOn_UI.Lock_On_Performance_Local(stage);
+
+        if (c.Con_player_Audio == null)
+            Debug.LogError("Player_Lock_Date|Lock_On_Local_Performance|玩家音效为空");
+        else
+            c.Con_player_Audio.Lock_Buzzer_Performance_Local(stage, time);
     }
 
     // 死亡清空锁定状态
