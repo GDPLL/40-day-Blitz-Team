@@ -28,6 +28,7 @@ public class Player_Body : Character_Move
     public LayerMask groundMask = ~0;               // 地面检测层
     public float groundCheckDistance = 0.2f;        // 落地检测距离
     public float maxSlopeAngle = 50f;               // 最大可站立坡度
+    public float groundStopAccel = 30f;             // 地面停止减速度
     public Rigidbody rb;                            // 刚体
 
     // 翻滚
@@ -141,7 +142,18 @@ public class Player_Body : Character_Move
         if (!rolling && !sliding && !hasInput && IsGrounded && speedOverride <= 0f)
         {
             if (!slopeGrounded)
+            {
                 rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
+            }
+            else
+            {
+                float normalSpeed = Vector3.Dot(rb.velocity, groundNormal);
+                Vector3 tangentVelocity =
+                    rb.velocity - groundNormal * normalSpeed;
+                tangentVelocity = Vector3.MoveTowards(tangentVelocity,
+                    Vector3.zero, groundStopAccel * Time.fixedDeltaTime);
+                rb.velocity = tangentVelocity + groundNormal * normalSpeed;
+            }
             return;
         }
 

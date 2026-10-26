@@ -1692,6 +1692,7 @@ MonoBehaviour:
     m_Bits: 4294967295
   groundCheckDistance: 0.2
   maxSlopeAngle: 50
+  groundStopAccel: 30
   rb: {fileID: 6445952189836789830}
   rollForce: 1000
   rollSpeed: 12
