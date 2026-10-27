@@ -30,12 +30,14 @@ public class Player_Move_Date : MonoBehaviour
     bool rollRequest;           //本物理帧请求翻滚
     bool rollRequestAir;        //翻滚请求时空中
     bool slideRequest;          //本物理帧请求滑铲
+    bool slideRequestAir;       //滑铲请求时空中
     bool slideBefore;           //滑铲按键上一帧状态
     float rollDelay;            //翻滚施力延迟
     float rollPhysicsTimer;     //翻滚物理剩余时间
     Vector2 rollDir;            //翻滚方向
     bool rollPending;           //空中翻滚待落地
     bool rollHalf;              //翻滚后半段
+    bool slidePending;          //空中滑铲待落地
     float bodyScale = 1f;       //碰撞体当前比例
     float respawnSquatTimer;    //复活倒地保持计时
     float slideExitTimer;       //起身过渡剩余时间
@@ -137,6 +139,8 @@ public class Player_Move_Date : MonoBehaviour
         slideTimer = 0f;
         slideExitTimer = 0f;
         slideRequest = false;
+        slideRequestAir = false;
+        slidePending = false;
         slideBefore = false;
         isPeekLeft = false;
         isPeekRight = false;
@@ -228,18 +232,6 @@ public class Player_Move_Date : MonoBehaviour
 
         body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !reload, isSquat);   //换弹只能走路
 
-        // 滑铲只在地面且未翻滚时触发
-        if (slideRequest)
-        {
-            slideRequest = false;
-            if (slideTimer <= 0f && !Is_Roll_Active && isOnGround)
-            {
-                slideTimer = slideTime;
-                slideExitTimer = 0f;
-                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
-            }
-        }
-
         float speedOverride = 0f;
         if (slideExitTimer > 0f && slideExitTime > 0f)
         {
@@ -254,7 +246,7 @@ public class Player_Move_Date : MonoBehaviour
         if (jumpRequest)
         {
             jumpRequest = false;
-            if (slideTimer <= 0f && !rollPending)
+            if (slideTimer <= 0f && !rollPending && !slidePending)
             {
                 body.Body_Jump_Date();
                 if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
@@ -270,6 +262,9 @@ public class Player_Move_Date : MonoBehaviour
             {
                 bool requestAir = rollRequestAir || !body.IsGrounded;
                 rollRequestAir = false;
+                slideRequest = false;
+                slideRequestAir = false;
+                slidePending = false;
                 rollDir = packet.move;                      //记下方向，延迟后用
                 rollDelay = 0f;
                 rollHalf = false;
@@ -296,6 +291,36 @@ public class Player_Move_Date : MonoBehaviour
             rollPhysicsTimer = body.rollTime;
             body.Body_Roll_Date(rollDir, packet.viewDir, body.rollForce);
             if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Roll_Show();
+        }
+
+        // 翻滚优先执行滑铲
+        if (slideRequest)
+        {
+            slideRequest = false;
+            bool requestAir = slideRequestAir || !body.IsGrounded;
+            slideRequestAir = false;
+
+            if (requestAir && slideTimer <= 0f && !Is_Roll_Active)
+                slidePending = true;
+            else if (!requestAir && slideTimer <= 0f && !Is_Roll_Active && body.IsGrounded)
+            {
+                slidePending = false;
+                slideTimer = slideTime;
+                slideExitTimer = 0f;
+                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
+            }
+        }
+
+        // 空中滑铲落地启动
+        if (slidePending && body.IsGrounded)
+        {
+            slidePending = false;
+            if (slideTimer <= 0f && !Is_Roll_Active)
+            {
+                slideTimer = slideTime;
+                slideExitTimer = 0f;
+                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
+            }
         }
 
         // 延迟到点再施一次力
@@ -428,6 +453,7 @@ public class Player_Move_Date : MonoBehaviour
         if (slideKeys && !slideBefore && !rolling)
         {
             slideRequest = true;
+            slideRequestAir = !isOnGround;
         }
         slideBefore = slideKeys;
 

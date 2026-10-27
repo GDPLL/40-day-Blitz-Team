@@ -62,6 +62,7 @@ public class Player_animation : MonoBehaviour
 
     const int MoveXShift = 8;                   //方向X位偏移
     const int MoveYShift = 10;                  //方向Y位偏移
+    const float RollFootBlendDistance = 0.3f;   //翻滚脚底渐出距离
 
     public new Animator animation;   // 动画组件
     public float crouchModelLift = 0.19f;   // 蹲姿模型抬升
@@ -76,6 +77,13 @@ public class Player_animation : MonoBehaviour
     public float slideLiftTime = 0.2f;         // 滑铲高度调整时长
     public float slideGroundSmoothTime = 0.12f; // 滑铲贴地校准平滑
     public float slideSlopeSmoothTime = 0.08f; // 滑铲坡面法线平滑
+    public AnimationCurve rollLiftCurve = new AnimationCurve(
+        new Keyframe(0f, -0.2f),
+        new Keyframe(0.15f, -0.35f),
+        new Keyframe(0.5f, -0.8f),
+        new Keyframe(0.85f, -0.35f),
+        new Keyframe(1f, -0.2f));          // 翻滚模型高度
+    public float rollSlopeSmoothTime = 0.08f; // 翻滚坡面平滑
     int actionState = -1;           // 当前动作层状态
     Vector3 modelBasePosition;      // 模型基础位置
     Quaternion modelBaseRotation;   // 模型基础旋转
@@ -88,12 +96,16 @@ public class Player_animation : MonoBehaviour
     bool groundActive;              // 是否需要脚底校正
     bool slideActive;               // 上一帧是否滑铲
     bool slideGrounded;             // 滑铲时是否在地面
+    bool rollActive;                // 翻滚动作是否播放
+    bool rollGrounded;              // 翻滚时是否在地面
     bool rollHalfShown;             // 是否已定位后半段
     float rollHalfStart;            // 翻滚后半起点
     float rollHalfTime;             // 翻滚后半时长
     float slideGroundOffset;        // 滑铲贴地偏移
     Vector3 slideGroundNormal = Vector3.up; // 滑铲地面法线
     Vector3 slideGroundPoint;       // 滑铲地面接触点
+    Vector3 rollGroundNormal = Vector3.up; // 翻滚地面法线
+    Vector3 rollGroundPoint;        // 翻滚地面接触点
 
     // 翻滚动画是否仍在播放
     public bool Is_Rolling
@@ -107,6 +119,17 @@ public class Player_animation : MonoBehaviour
     }
 
     public float Roll_Half_Time => rollHalfTime; //翻滚后半时长
+
+    // 按动画进度取翻滚高度
+    float Roll_Lift_Date(float progress)
+    {
+        if (rollLiftCurve == null)
+        {
+            Debug.LogError("Player_animation|Roll_Lift_Date|翻滚高度曲线为空");
+            return 0f;
+        }
+        return rollLiftCurve.Evaluate(Mathf.Clamp01(progress));
+    }
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -223,9 +246,22 @@ public class Player_animation : MonoBehaviour
         slideGroundNormal = Vector3.Slerp(slideGroundNormal, targetNormal, slopeBlend).normalized;
         if (hasSlideGround) slideGroundPoint = slideHit.point;
 
+        RaycastHit rollHit = default;
+        bool hasRollGround = rolling && grounded && Own_Control != null
+            && Own_Control.Con_body != null
+            && Own_Control.Con_body.Body_Ground_Hit_Date(out rollHit);
+        float rollBlend = rollSlopeSmoothTime > 0f
+            ? 1f - Mathf.Exp(-Time.deltaTime / rollSlopeSmoothTime)
+            : 1f;
+        Vector3 rollTargetNormal = hasRollGround ? rollHit.normal : Vector3.up;
+        rollGroundNormal = Vector3.Slerp(rollGroundNormal,
+            rollTargetNormal, rollBlend).normalized;
+        if (hasRollGround) rollGroundPoint = rollHit.point;
         // 滑铲使用固定高度，蹲姿保留脚底校正
         Vector3 modelPosition = modelBasePosition;
         groundActive = grounded && squat && !slide;
+        rollActive = rolling;
+        rollGrounded = rolling && grounded && hasRollGround;
         slideGrounded = slide && grounded && hasSlideGround;
         if (slide && !slideActive) slideGroundOffset = 0f;
         if (slide)
@@ -236,7 +272,15 @@ public class Player_animation : MonoBehaviour
         if (!groundActive && !slide) crouchLift = Mathf.MoveTowards(crouchLift, 0f,
             crouchModelLift * Time.deltaTime / crouchLiftFallTime);
         slideActive = slide;
-        if (slide)
+        if (rollActive)
+        {
+            Vector3 localGroundNormal = animation.transform.parent != null
+                ? animation.transform.parent.InverseTransformDirection(rollGroundNormal)
+                : rollGroundNormal;
+            float rollProgress = animation.GetCurrentAnimatorStateInfo(0).normalizedTime;
+            modelPosition += localGroundNormal * Roll_Lift_Date(rollProgress);
+        }
+        else if (slide)
         {
             Vector3 localGroundNormal = animation.transform.parent != null
                 ? animation.transform.parent.InverseTransformDirection(slideGroundNormal)
@@ -254,7 +298,16 @@ public class Player_animation : MonoBehaviour
         else slideTurn = slideTurnTarget;
         Quaternion slideRotation = modelBaseRotation
             * Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(0f, -45f, 0f), slideTurn);
-        if (slide && slideGrounded)
+        if (rollActive && rollGrounded)
+        {
+            Vector3 localNormal = animation.transform.parent != null
+                ? animation.transform.parent.InverseTransformDirection(rollGroundNormal)
+                : rollGroundNormal;
+            Quaternion slopeRotation = Quaternion.FromToRotation(
+                slideRotation * Vector3.up, localNormal);
+            slideRotation = slopeRotation * slideRotation;
+        }
+        else if (slide && slideGrounded)
         {
             Vector3 localNormal = animation.transform.parent != null
                 ? animation.transform.parent.InverseTransformDirection(slideGroundNormal)
@@ -275,6 +328,43 @@ public class Player_animation : MonoBehaviour
         if (leftToe == null || rightToe == null)
         {
             Debug.LogError("Player_animation|Player_animation_Ground_Performance|脚趾骨骼为空");
+            return;
+        }
+
+        if (rollActive)
+        {
+            Vector3 localGroundNormal = animation.transform.parent != null
+                ? animation.transform.parent.InverseTransformDirection(rollGroundNormal)
+                : rollGroundNormal;
+            float rollProgress = animation.GetCurrentAnimatorStateInfo(0).normalizedTime;
+            Vector3 rollPosition =
+                modelBasePosition + localGroundNormal * Roll_Lift_Date(rollProgress);
+
+            if (rollGrounded)
+            {
+                float leftFootGap = Vector3.Dot(
+                    leftToe.position - rollGroundPoint, rollGroundNormal);
+                float rightFootGap = Vector3.Dot(
+                    rightToe.position - rollGroundPoint, rollGroundNormal);
+                float minFootGap = Mathf.Min(leftFootGap, rightFootGap);
+                float footBlend = 1f - Mathf.InverseLerp(
+                    footGroundHeight + 0.08f,
+                    footGroundHeight + RollFootBlendDistance,
+                    minFootGap);
+                float rollFootError = footGroundHeight - minFootGap;
+                rollPosition += localGroundNormal * rollFootError * footBlend;
+            }
+
+            animation.transform.localPosition = rollPosition;
+
+            Quaternion rollRotation = modelBaseRotation;
+            if (rollGrounded)
+            {
+                Quaternion slopeRotation = Quaternion.FromToRotation(
+                    rollRotation * Vector3.up, localGroundNormal);
+                rollRotation = slopeRotation * rollRotation;
+            }
+            animation.transform.localRotation = rollRotation;
             return;
         }
 

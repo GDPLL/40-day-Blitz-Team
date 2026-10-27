@@ -68,6 +68,8 @@ public class Player_camera : MonoBehaviour
     public float slideCameraHeight = 1.45f;      // 滑铲相机高度
     public float slideCameraSmoothTime = 0.12f;  // 滑铲跟随平滑
     public float slideCameraReleaseTime = 0.25f;  // 滑铲高度提前恢复
+    public float rollCameraHeight = 1.45f;       // 翻滚相机高度
+    public float rollCameraSmoothTime = 0.12f;   // 翻滚跟随平滑
 
     [Header("高度跟随")]
     public float followHeightSmoothTime = 0.08f; // 头部高度平滑
@@ -267,17 +269,24 @@ public class Player_camera : MonoBehaviour
         // 滑铲时保持固定相机高度
         bool sliding = ownControl != null && ownControl.Con_move != null
             && ownControl.Con_move.Is_Slide;
-        if (sliding)
+        bool rolling = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_player_Animation != null
+            && (ownControl.Con_move.Is_Roll_Active
+                || ownControl.Con_player_Animation.Is_Rolling);
+        if (sliding || rolling)
         {
             // 水平方向锁住插值后的角色根节点，避免角色与平滑相机产生相对抖动
-            Vector3 slideAnchor = ownControl.transform.position;
-            float targetHeight = slideAnchor.y + slideCameraHeight;
-            if (ownControl.Con_move.slideTimer <= slideCameraReleaseTime)
+            Vector3 actionAnchor = ownControl.transform.position;
+            float cameraHeight = sliding ? slideCameraHeight : rollCameraHeight;
+            float cameraSmoothTime = sliding
+                ? slideCameraSmoothTime : rollCameraSmoothTime;
+            float targetHeight = actionAnchor.y + cameraHeight;
+            if (sliding && ownControl.Con_move.slideTimer <= slideCameraReleaseTime)
                 targetHeight = PlayerHeadTransform.position.y;
 
-            float slideY = Mathf.SmoothDamp(Target_Object.position.y, targetHeight,
-                ref heightVelocity, slideCameraSmoothTime);
-            Target_Object.position = new Vector3(slideAnchor.x, slideY, slideAnchor.z);
+            float actionY = Mathf.SmoothDamp(Target_Object.position.y, targetHeight,
+                ref heightVelocity, cameraSmoothTime);
+            Target_Object.position = new Vector3(actionAnchor.x, actionY, actionAnchor.z);
             targetVelocity = Vector3.zero;
         }
         else
