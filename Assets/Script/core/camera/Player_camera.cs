@@ -80,6 +80,13 @@ public class Player_camera : MonoBehaviour
     float heightVelocity;                     // 高度速度缓存
     readonly RaycastHit[] cameraHitBuffer = new RaycastHit[8];   // 遮挡检测缓存
 
+    [Header("动作视角")]
+    public float runFovBoost = 6f;               // 奔跑视野增量
+    public float rollFovBoost = 15f;             // 翻滚视野增量
+    public float slideFovBoost = 12f;            // 滑铲视野增量
+    public float actionFovAttackTime = 0.14f;    // 视野展开时长
+    public float actionFovReleaseTime = 0.24f;   // 视野恢复时长
+
     [Header("视角切换平滑")]
     public float modeSwitchSmoothTime = 0.15f;   // 平滑时间
     Vector3 currentLocalOffset;                  // 当前局部偏移
@@ -135,6 +142,8 @@ public class Player_camera : MonoBehaviour
     float startFov;       // 常规视角
     float currentFov;     // 当前视角
     float fovVelocity;    // 视角平滑缓存
+    float actionFovOffset;    // 当前动作视野
+    float actionFovVelocity;  // 动作视野速度
 
     // 记录初始视角与偏移
     public void Player_camera_Start(Transform _PlayerHeadTransform)
@@ -161,6 +170,14 @@ public class Player_camera : MonoBehaviour
         pNet = PlayerHeadTransform.GetComponentInParent<NetworkObject>();
         ownControl = PlayerHeadTransform.GetComponentInParent<Player_Control>();
         if (ownControl == null && pNet != null) ownControl = pNet.GetComponent<Player_Control>();
+        if (ownControl == null)
+        {
+            Debug.LogError("Player_camera|Player_camera_Start|未找到 Player_Control");
+            return;
+        }
+        if (ownControl.Con_gun_Control == null)
+            Debug.LogError("Player_camera|Player_camera_Start|Con_gun_Control 为空");
+
         Target_Object.position = PlayerHeadTransform.position;
         heightVelocity = 0f;
 
@@ -251,9 +268,41 @@ public class Player_camera : MonoBehaviour
         // 压制抖动
         SuppressOffset(Time.deltaTime);
 
-        // 开镜视角插值
-        currentFov = Mathf.SmoothDamp(currentFov, isAds ? adsFov : startFov, ref fovVelocity, modeSwitchSmoothTime);
-        cam.fieldOfView = currentFov + suppressFovOffset;
+        // 当前动作状态
+        bool sliding = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.Is_Slide;
+        bool rolling = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_player_Animation != null
+            && (ownControl.Con_move.Is_Roll_Active
+                || ownControl.Con_player_Animation.Is_Rolling);
+        bool rollPushing = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.Is_Roll_Push;
+        bool running = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.isRuning
+            && ownControl.Con_move.isWASDDowm
+            && !ownControl.Con_move.isSquat
+            && ownControl.Con_gun_Control != null
+            && !ownControl.Con_gun_Control.IsReloading;
+
+        // 按动作取视野增量
+        float targetActionFov = 0f;
+        if (!isAds)
+        {
+            if (sliding) targetActionFov = slideFovBoost;
+            else if (rollPushing) targetActionFov = rollFovBoost;
+            else if (running) targetActionFov = runFovBoost;
+        }
+
+        float actionSmoothTime = targetActionFov > actionFovOffset
+            ? actionFovAttackTime : actionFovReleaseTime;
+        actionFovOffset = Mathf.SmoothDamp(actionFovOffset, targetActionFov,
+            ref actionFovVelocity, actionSmoothTime);
+
+        // 开镜与动作视野插值
+        currentFov = Mathf.SmoothDamp(currentFov, isAds ? adsFov : startFov,
+            ref fovVelocity, modeSwitchSmoothTime);
+        cam.fieldOfView = Mathf.Clamp(
+            currentFov + actionFovOffset + suppressFovOffset, 1f, 179f);
 
         // 震动计时
         if (isShaking)
@@ -267,12 +316,6 @@ public class Player_camera : MonoBehaviour
         }
 
         // 滑铲时保持固定相机高度
-        bool sliding = ownControl != null && ownControl.Con_move != null
-            && ownControl.Con_move.Is_Slide;
-        bool rolling = ownControl != null && ownControl.Con_move != null
-            && ownControl.Con_player_Animation != null
-            && (ownControl.Con_move.Is_Roll_Active
-                || ownControl.Con_player_Animation.Is_Rolling);
         if (sliding || rolling)
         {
             // 水平方向锁住插值后的角色根节点，避免角色与平滑相机产生相对抖动

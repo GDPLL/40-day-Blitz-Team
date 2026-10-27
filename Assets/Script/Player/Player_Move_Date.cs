@@ -58,6 +58,7 @@ public class Player_Move_Date : MonoBehaviour
     public bool Teleported { get; private set; }   //本物理帧是否瞬移
     public bool Is_Slide => slideTimer > 0f || slideRequest; //是否滑铲
     public bool Is_Roll_Active => rollTimer > 0f || rollPending; //是否翻滚占用
+    public bool Is_Roll_Push => rollTimer > 0f && rollDelay <= 0f; //是否二段翻滚
     public bool Is_Roll_Half => rollTimer > 0f && rollHalf; //是否后半段
 
     // 瞬移申请，高优先级覆盖低优先级

@@ -88,9 +88,15 @@ public class Object_System : MonoBehaviour , Idamage
         }
 
         // 落地按空中峰值结算一次，换算成加速度
-        float accel = fallSpeed / deltaTime;
-        float damageScale = rolling ? rollFallDamageScale : 1f;
-        int damage = (int)((accel - fallAccel) * fallDamageRate * damageScale);
+        int damage;
+        // 致死速度无视翻滚减伤
+        if (fallSpeed >= Fatal_Fall_Speed) damage = MaxHp;
+        else
+        {
+            float accel = fallSpeed / deltaTime;
+            float damageScale = rolling ? rollFallDamageScale : 1f;
+            damage = (int)((accel - fallAccel) * fallDamageRate * damageScale);
+        }
         if (damage > 0) Takedamage(damage, 999, new Vector3(), out _);
 
         fallSpeed = 0f;
