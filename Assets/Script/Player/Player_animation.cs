@@ -6,6 +6,12 @@ public class Player_animation : MonoBehaviour
     Player_Control Own_Control; //父级
     public void Owner_Init(Player_Control control)
     {
+        if (control == null)
+        {
+            Debug.LogError("Player_animation|Owner_Init|玩家控制为空");
+            return;
+        }
+
         Own_Control = control;
         if (animation == null || animation.runtimeAnimatorController == null)
         {
@@ -16,6 +22,7 @@ public class Player_animation : MonoBehaviour
         modelBaseRotation = animation.transform.localRotation;
         leftToe = animation.GetBoneTransform(HumanBodyBones.LeftToes);
         rightToe = animation.GetBoneTransform(HumanBodyBones.RightToes);
+        float rollClipLength = 0f;
         // 蹲走动画强制循环
         foreach (AnimationClip clip in animation.runtimeAnimatorController.animationClips)
         {
@@ -23,7 +30,18 @@ public class Player_animation : MonoBehaviour
                 clip.wrapMode = WrapMode.Loop;
             else if (clip.name == "crouch2")
                 clip.wrapMode = WrapMode.ClampForever;
+            if (clip.name == "Armature|fangun")
+                rollClipLength = clip.length;
         }
+
+        Player_Body body = control.Con_body;
+        if (rollClipLength <= 0f || body == null)
+        {
+            Debug.LogError("Player_animation|Owner_Init|翻滚动画数据为空");
+            return;
+        }
+        rollHalfStart = Mathf.Clamp01(body.rollDelay / rollClipLength);
+        rollHalfTime = Mathf.Max(0f, rollClipLength - body.rollDelay);
     }
 
     // 状态位取值定义
@@ -35,6 +53,7 @@ public class Player_animation : MonoBehaviour
     public const uint BitGround = 1u << 5;       //在地面
     public const uint BitDeath = 1u << 6;        //死亡
     public const uint BitRoll = 1u << 7;         //翻滚
+    public const uint BitRollHalf = 1u << 17;    //翻滚后半段
     public const uint BitWeightLess = 1u << 12;  //失重
     public const uint BitReload = 1u << 13;      //换弹
     public const uint BitSlide = 1u << 14;       //滑铲
@@ -69,13 +88,25 @@ public class Player_animation : MonoBehaviour
     bool groundActive;              // 是否需要脚底校正
     bool slideActive;               // 上一帧是否滑铲
     bool slideGrounded;             // 滑铲时是否在地面
+    bool rollHalfShown;             // 是否已定位后半段
+    float rollHalfStart;            // 翻滚后半起点
+    float rollHalfTime;             // 翻滚后半时长
     float slideGroundOffset;        // 滑铲贴地偏移
     Vector3 slideGroundNormal = Vector3.up; // 滑铲地面法线
     Vector3 slideGroundPoint;       // 滑铲地面接触点
 
     // 翻滚动画是否仍在播放
-    public bool Is_Rolling => animation.GetCurrentAnimatorStateInfo(0).shortNameHash
-        == Animator.StringToHash("翻滚");
+    public bool Is_Rolling
+    {
+        get
+        {
+            int stateHash = animation.GetCurrentAnimatorStateInfo(0).shortNameHash;
+            return stateHash == Animator.StringToHash("翻滚")
+                || stateHash == Animator.StringToHash("翻滚后半段");
+        }
+    }
+
+    public float Roll_Half_Time => rollHalfTime; //翻滚后半时长
 
     // 打包方向轴，每轴2位
     public static uint Pack_Move(Vector2 axis)
@@ -105,7 +136,9 @@ public class Player_animation : MonoBehaviour
     {
         bool walk = (state & BitWalk) != 0;
         bool reload = (state & BitReload) != 0;
-        bool rolling = (state & BitRoll) != 0 || Is_Rolling;
+        bool roll = (state & BitRoll) != 0;
+        bool rollHalf = (state & BitRollHalf) != 0;
+        bool rolling = roll || Is_Rolling;
         bool squat = (state & BitSquat) != 0 && !rolling;
         bool slide = (state & BitSlide) != 0 && !rolling;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
@@ -116,7 +149,11 @@ public class Player_animation : MonoBehaviour
         animation.SetBool("jump", (state & BitJump) != 0);
         animation.SetBool("IsGround", (state & BitGround) != 0);
         animation.SetBool("IsDeath", (state & BitDeath) != 0);
-        animation.SetBool("IsRoll", (state & BitRoll) != 0);
+        animation.SetBool("IsRoll", roll && !rollHalf);
+        animation.SetBool("IsRollHalf", rollHalf);
+        if (rollHalf && !rollHalfShown)
+            animation.Play("翻滚后半段", 0, rollHalfStart);
+        rollHalfShown = rollHalf;
         animation.SetBool("IsWeightLess", (state & BitWeightLess) != 0);
         animation.SetBool("IsReload", reload);
         animation.SetBool("Squat", squat);

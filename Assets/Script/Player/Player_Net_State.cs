@@ -54,7 +54,11 @@ public class Player_Net_State : NetworkBehaviour
         if (im.JumpDownHeld) state |= Player_animation.BitJump;
         bool dead = netRespawnWait.Value > 0f || netOut.Value;
         if (dead) state |= Player_animation.BitDeath;
-        if (mv.rollTimer > 0f) state |= Player_animation.BitRoll;
+        if (mv.rollTimer > 0f)
+        {
+            state |= Player_animation.BitRoll;
+            if (mv.Is_Roll_Half) state |= Player_animation.BitRollHalf;
+        }
         if (c.Con_gun_Control != null && c.Con_gun_Control.IsReloading) state |= Player_animation.BitReload;            //换弹
         if (mv.isWeightLess) state |= Player_animation.BitWeightLess;    //失重
         if (!dead && mv.Is_Slide) state |= Player_animation.BitSlide;
@@ -84,7 +88,11 @@ public class Player_Net_State : NetworkBehaviour
         if (mv.isOnGround) state |= Player_animation.BitGround;
         bool dead = c.Con_ObjectSystem.isDead || netOut.Value;
         if (dead) state |= Player_animation.BitDeath;
-        if (mv.rollTimer > 0f) state |= Player_animation.BitRoll;
+        if (mv.rollTimer > 0f)
+        {
+            state |= Player_animation.BitRoll;
+            if (mv.Is_Roll_Half) state |= Player_animation.BitRollHalf;
+        }
         if (c.Con_gun_Control != null && c.Con_gun_Control.IsReloading) state |= Player_animation.BitReload;            //换弹
         if (mv.isWeightLess) state |= Player_animation.BitWeightLess;    //失重
         if (!dead && mv.Is_Slide) state |= Player_animation.BitSlide;
