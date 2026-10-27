@@ -242,11 +242,25 @@ public class Player_Move_Date : MonoBehaviour
 
         body.Body_Fixed_Date(rollPhysicsTimer > 0f, slideTimer > 0f, speedOverride);   //动作期间保留速度
 
+        // 地面动作离地结束
+        if (!body.IsGrounded && !rollPending && !slidePending
+            && (rollTimer > 0f || slideTimer > 0f || slideExitTimer > 0f))
+        {
+            rollDelay = 0f;
+            rollPhysicsTimer = 0f;
+            rollTimer = 0f;
+            rollHalf = false;
+            slideTimer = 0f;
+            slideExitTimer = 0f;
+            body.Body_Air_Action_Exit_Date(body.runSpeed);
+        }
+
         // 起跳，每物理帧最多一次
         if (jumpRequest)
         {
             jumpRequest = false;
-            if (slideTimer <= 0f && !rollPending && !slidePending)
+            if (slideTimer <= 0f && slideExitTimer <= 0f
+                && !Is_Roll_Active && !slidePending)
             {
                 body.Body_Jump_Date();
                 if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();

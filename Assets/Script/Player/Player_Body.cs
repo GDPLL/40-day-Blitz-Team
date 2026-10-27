@@ -200,6 +200,18 @@ public class Player_Body : Character_Move
         rb.velocity = new Vector3(limitedHorizontal.x, rb.velocity.y, limitedHorizontal.z);
     }
 
+    // 地面动作离地限速
+    public void Body_Air_Action_Exit_Date(float limit)
+    {
+        if (rb == null)
+        {
+            Debug.LogError("Player_Body|Body_Air_Action_Exit_Date|刚体为空");
+            return;
+        }
+
+        Limit_Horizontal_Speed(limit);
+    }
+
     // 限斜面切线速度，limit为上限
     void Limit_Slide_Speed(float limit)
     {
