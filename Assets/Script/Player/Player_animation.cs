@@ -77,6 +77,7 @@ public class Player_animation : MonoBehaviour
     public float slideLiftTime = 0.2f;         // 滑铲高度调整时长
     public float slideGroundSmoothTime = 0.12f; // 滑铲贴地校准平滑
     public float slideSlopeSmoothTime = 0.08f; // 滑铲坡面法线平滑
+    public float slideJumpFadeTime = 0.08f; // 滑铲跳跃动作层退场时长
     public AnimationCurve rollLiftCurve = new AnimationCurve(
         new Keyframe(0f, -0.2f),
         new Keyframe(0.15f, -0.35f),
@@ -166,6 +167,7 @@ public class Player_animation : MonoBehaviour
         bool slide = (state & BitSlide) != 0 && !rolling;
         bool peek = (state & (BitPeekLeft | BitPeekRight)) != 0;
         bool grounded = (state & BitGround) != 0;
+        bool jumping = (state & BitJump) != 0;
 
         animation.SetBool("walk", walk);
         animation.SetBool("raiseGun", (state & BitGun) != 0);
@@ -203,11 +205,12 @@ public class Player_animation : MonoBehaviour
         // 蹲姿和滑铲使用独立全身层
         int nextAction;
         if (slide) nextAction = 3;
-        else nextAction = squat ? 2 : 0;
+        else nextAction = squat && !jumping ? 2 : 0;
         if (animation.layerCount > 1)
         {
             float actionTarget = nextAction > 0 ? 1f : 0f;
-            float actionTime = actionTarget > animation.GetLayerWeight(1) ? 0.18f : 0.15f;
+            float actionTime = actionTarget > animation.GetLayerWeight(1)
+                ? 0.18f : nextAction == 0 && jumping ? slideJumpFadeTime : 0.15f;
             animation.SetLayerWeight(1, Smooth_Weight(1, actionTarget, actionTime));
             if (nextAction != actionState)
             {

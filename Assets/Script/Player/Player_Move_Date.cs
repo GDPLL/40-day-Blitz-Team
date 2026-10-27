@@ -25,6 +25,8 @@ public class Player_Move_Date : MonoBehaviour
     public float slideTimer;    //滑铲剩余时间
     public float slideTime = 1.77f;    //滑铲时长
     public float slideExitTime = 0.5f; //滑铲起身过渡
+    public float slideJumpWindow = 0.22f; //滑铲末段跳跃窗口
+    public float slideJumpBufferTime = 0.12f; //滑铲跳跃输入缓存
 
     bool jumpRequest;           //本物理帧请求起跳
     bool rollRequest;           //本物理帧请求翻滚
@@ -43,6 +45,7 @@ public class Player_Move_Date : MonoBehaviour
     float slideExitTimer;       //起身过渡剩余时间
     float slideExitStartSpeed;  //起身初始速度
     float slideExitTargetSpeed; //起身目标速度
+    float slideJumpBufferTimer; //滑铲跳跃缓存剩余时间
 
     // 瞬移优先级
     public const int Priority_Reconcile = 0;   //纠偏
@@ -143,6 +146,7 @@ public class Player_Move_Date : MonoBehaviour
         slideRequestAir = false;
         slidePending = false;
         slideBefore = false;
+        slideJumpBufferTimer = 0f;
         isPeekLeft = false;
         isPeekRight = false;
         respawnSquatTimer = respawnSquatTime;
@@ -243,6 +247,13 @@ public class Player_Move_Date : MonoBehaviour
 
         body.Body_Fixed_Date(rollPhysicsTimer > 0f, slideTimer > 0f, speedOverride);   //动作期间保留速度
 
+        if (slideJumpBufferTimer > 0f
+            && slideTimer > slideJumpWindow + Time.fixedDeltaTime)
+        {
+            slideJumpBufferTimer -= Time.fixedDeltaTime;
+            if (slideJumpBufferTimer <= 0f) slideJumpBufferTimer = 0f;
+        }
+
         // 地面动作离地结束
         if (!body.IsGrounded && !rollPending && !slidePending
             && (rollTimer > 0f || slideTimer > 0f || slideExitTimer > 0f))
@@ -253,14 +264,32 @@ public class Player_Move_Date : MonoBehaviour
             rollHalf = false;
             slideTimer = 0f;
             slideExitTimer = 0f;
+            slideJumpBufferTimer = 0f;
             body.Body_Air_Action_Exit_Date(body.runSpeed);
         }
 
-        // 起跳，每物理帧最多一次
-        if (jumpRequest)
+        // 滑铲末段起跳
+        if ((slideJumpBufferTimer > 0f || jumpRequest) && slideTimer > 0f
+            && slideJumpWindow > 0f && slideTimer <= slideJumpWindow
+            && body.IsGrounded && !Is_Roll_Active && !slidePending)
         {
             jumpRequest = false;
-            if (slideTimer <= 0f && slideExitTimer <= 0f
+            slideJumpBufferTimer = 0f;
+            slideTimer = 0f;
+            slideExitTimer = 0f;
+            slideRequest = false;
+            slideRequestAir = false;
+            slidePending = false;
+            bodyScale = 1f;
+            body.Body_Size_Date(bodyScale);
+            body.Body_Jump_Date();
+            if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
+        }
+        // 起跳，每物理帧最多一次
+        else if (jumpRequest)
+        {
+            jumpRequest = false;
+            if (slideTimer <= 0f
                 && !Is_Roll_Active && !slidePending)
             {
                 body.Body_Jump_Date();
@@ -322,6 +351,7 @@ public class Player_Move_Date : MonoBehaviour
                 slidePending = false;
                 slideTimer = slideTime;
                 slideExitTimer = 0f;
+                slideJumpBufferTimer = 0f;
                 body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
             }
         }
@@ -334,6 +364,7 @@ public class Player_Move_Date : MonoBehaviour
             {
                 slideTimer = slideTime;
                 slideExitTimer = 0f;
+                slideJumpBufferTimer = 0f;
                 body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
             }
         }
@@ -477,7 +508,13 @@ public class Player_Move_Date : MonoBehaviour
         isPeekRight = packet.peekRight && !packet.peekLeft && slideTimer <= 0f;
 
         // 跳跃，只记按下边沿
-        if (packet.jump && !isJumpDown) jumpRequest = true;
+        if (packet.jump && !isJumpDown)
+        {
+            jumpRequest = true;
+            if (slideTimer > 0f && slideJumpWindow > 0f
+                && slideTimer <= slideJumpWindow + slideJumpBufferTime)
+                slideJumpBufferTimer = slideJumpBufferTime;
+        }
         isJumpDown = packet.jump;
 
         // 翻滚，只记按下边沿
