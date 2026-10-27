@@ -262,7 +262,7 @@ public class Player_Move_Date : MonoBehaviour
                 rollDelay = body.rollDelay;                 //第二段延迟
                 rollTimer = body.rollTime + rollDelay;
 
-                body.Body_Roll_Date(rollDir, packet.viewDir);   //第一段立即施力
+                body.Body_Roll_Date(rollDir, packet.viewDir, -body.rollBrake);   //起手减速
 
                 if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Roll_Show();
             }
@@ -272,7 +272,8 @@ public class Player_Move_Date : MonoBehaviour
         if (rollDelay > 0f)
         {
             rollDelay -= Time.fixedDeltaTime;
-            if (rollDelay <= 0f) body.Body_Roll_Date(rollDir, packet.viewDir);
+            if (rollDelay <= 0f)
+                body.Body_Roll_Date(rollDir, packet.viewDir, body.rollForce);   //第二段爆发
         }
 
         // 翻滚计时

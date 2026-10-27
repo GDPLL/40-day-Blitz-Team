@@ -1694,8 +1694,9 @@ MonoBehaviour:
   maxSlopeAngle: 50
   groundStopAccel: 30
   rb: {fileID: 6445952189836789830}
-  rollForce: 1000
-  rollSpeed: 12
+  rollBrake: 400
+  rollForce: 3000
+  rollSpeed: 50
   rollDelay: 0.8991
   rollTime: 0.5
   rollSquatScale: 0.5

@@ -32,8 +32,9 @@ public class Player_Body : Character_Move
     public Rigidbody rb;                            // 刚体
 
     // 翻滚
-    public float rollForce = 750f;          // 翻滚推力
-    public float rollSpeed = 9f;            // 翻滚最大速度
+    public float rollBrake = 400f;          // 翻滚起手减速冲量
+    public float rollForce = 1500f;         // 翻滚爆发冲量
+    public float rollSpeed = 15f;           // 翻滚最大速度
     public float rollDelay = 0.8991f;       // 翻滚施力延迟秒
     public float rollTime = 0.5f;           // 翻滚时长
     public float rollSquatScale = 0.5f;     // 翻滚碰撞体比例
@@ -331,13 +332,20 @@ public class Player_Body : Character_Move
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
 
-    // 翻滚，axis为输入轴，viewDir为视角方向
-    public void Body_Roll_Date(Vector2 axis, Vector3 viewDir)
+    // 翻滚施力，负值减速
+    public void Body_Roll_Date(Vector2 axis, Vector3 viewDir, float force)
     {
         // 无输入沿正前方翻
         Vector3 dir = axis.sqrMagnitude > 0.01f ? GetMoveDir(axis, viewDir) : transform.forward;
 
-        rb.AddForce(dir * rollForce, ForceMode.Impulse);
+        if (force < 0f)
+        {
+            Vector3 horizontalVelocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+            float forwardSpeed = Mathf.Max(0f, Vector3.Dot(horizontalVelocity, dir));
+            force = -Mathf.Min(-force, forwardSpeed * rb.mass);
+        }
+
+        rb.AddForce(dir * force, ForceMode.Impulse);
     }
 
     // 滑铲，axis为输入轴，viewDir为视角方向
