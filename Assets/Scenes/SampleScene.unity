@@ -20921,7 +20921,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 109, y: 104.22}
+  m_AnchoredPosition: {x: 94, y: 316}
   m_SizeDelta: {x: 100, y: 120}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &688325672
@@ -22971,6 +22971,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ammoImage: {fileID: 1275695788}
   healthImage: {fileID: 2117460052}
+  magazineUI: {fileID: 0}
 --- !u!114 &802451441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25593,7 +25594,23 @@ MonoBehaviour:
   cameraMinDistance: 0.3
   cameraPullInSpeed: 25
   cameraPushOutSpeed: 6
+  cameraDistanceSmoothTime: 0.08
+  cameraSnapDistance: 0.25
+  slideCameraHeight: 1.45
+  slideCameraSmoothTime: 0.12
+  slideCameraReleaseTime: 0.25
+  rollCameraHeight: 1.45
+  rollCameraSmoothTime: 0.12
+  followHeightSmoothTime: 0.08
+  runFovBoost: 6
+  rollFovBoost: 15
+  slideFovBoost: 12
+  actionFovAttackTime: 0.14
+  actionFovReleaseTime: 0.24
   modeSwitchSmoothTime: 0.15
+  peekCameraOffset: 0.55
+  peekCameraRoll: 2
+  peekSmoothTime: 0.12
   breakTime: 0.12
   holdTime: 0.2
   recoverTime: 0.5
@@ -50819,6 +50836,7 @@ MonoBehaviour:
   level_elevator: {fileID: 190338679}
   time3mObject: {fileID: 1942598111}
   gasDamage: 5
+  lateGasDamage: 3
   gameTime: 0
   testStop: 0
   gasParticle:

@@ -21,11 +21,9 @@ public class UI_Player : MonoBehaviour
             Debug.LogError("UI_Player|UI_Player_Init|血量图像为空");
             return;
         }
-        if (magazineUI == null)
-        {
-            Debug.LogError("UI_Player|UI_Player_Init|弹夹UI为空");
-            return;
-        }
+        // 场景合并后可能丢失弹夹组件引用，这里按需补回，避免再次覆盖场景改动
+        if (magazineUI == null) magazineUI = GetComponent<UI_Magazine>();
+        if (magazineUI == null) magazineUI = gameObject.AddComponent<UI_Magazine>();
 
         magazineUI.UI_Magazine_Init();
         Debug.Log("UI_Player|UI_Player_Init|完成初始化");
