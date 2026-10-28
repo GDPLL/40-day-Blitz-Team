@@ -174,7 +174,7 @@ GameObject:
   - component: {fileID: 2992186094725973075}
   - component: {fileID: 4872787091948237333}
   - component: {fileID: 3556678599063175773}
-  m_Layer: 0
+  m_Layer: 2
   m_HasEditorInfo: 1
   m_Name: "\u7D22\u9053\u7ED3\u6784"
   m_TagString: Untagged
@@ -245,7 +245,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 8115049865753790599}
   upForce: 1000
-  pushForce: 100
+  throwSpeed: 6
   audioSource: {fileID: 5762462779162781981}
   riseSource: {fileID: 3556678599063175773}
   startClip: {fileID: 8300000, guid: e99bd470780b0294fb02ccb888768dba, type: 3}

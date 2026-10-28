@@ -16,6 +16,8 @@ public class Player_Lock_Date : NetworkBehaviour
     readonly HashSet<ulong> lockDoneSources = new HashSet<ulong>();  //完成锁定的来源
     int lockSentStage;              //已下发阶段
     readonly RaycastHit[] hitBuffer = new RaycastHit[16];   //遮挡检测缓存
+    public ulong Current_Target_Id =>
+        lockTarget != null ? lockTarget.OwnerClientId : ulong.MaxValue;
 
     // 主机每帧搜索目标，结果由Control推给枪械
     public void Target_Date(Vector3 origin, Vector3 fwd, Vector3 aimPoint, float range, float outerAngle,
@@ -23,6 +25,7 @@ public class Player_Lock_Date : NetworkBehaviour
     {
         hasTarget = false;
         targetPos = Vector3.zero;
+        SetLockTarget(false, null);
 
         fwd = fwd.normalized;
 
@@ -36,9 +39,12 @@ public class Player_Lock_Date : NetworkBehaviour
         {
             if (col.transform.IsChildOf(self)) continue;
 
+            Player_Control target = col.GetComponentInParent<Player_Control>();
+            if (target == null) continue;
+
             hasTarget = true;
             targetPos = col.ClosestPoint(aimPoint);
-            SetLockTarget(true, col.GetComponentInParent<Player_Control>());
+            SetLockTarget(true, target);
             return;
         }
 
@@ -63,9 +69,12 @@ public class Player_Lock_Date : NetworkBehaviour
         if (nearest < float.MaxValue &&
             (enemyMask.value & (1 << closest.collider.gameObject.layer)) != 0)
         {
+            Player_Control target = closest.collider.GetComponentInParent<Player_Control>();
+            if (target == null) return;
+
             hasTarget = true;
             targetPos = closest.point;
-            SetLockTarget(true, closest.collider.GetComponentInParent<Player_Control>());
+            SetLockTarget(true, target);
             return;
         }
 
@@ -98,7 +107,7 @@ public class Player_Lock_Date : NetworkBehaviour
             bestTarget = col.GetComponentInParent<Player_Control>();
         }
 
-        if (bestAngle >= float.MaxValue) return;   //外圈内无目标
+        if (bestAngle >= float.MaxValue || bestTarget == null) return;   //外圈内无目标
 
         hasTarget = true;
         targetPos = bestPoint;
@@ -187,12 +196,14 @@ public class Player_Lock_Date : NetworkBehaviour
     void Lock_On_Send(int stage)
     {
         Player_Control c = Own_Control;
+        if (c == null)
+        {
+            Debug.LogError("Player_Lock_Date|Lock_On_Send|玩家控制为空");
+            return;
+        }
 
         if (c.IsOwner)
-        {
-            if (c.Con_lockOn_UI == null) Debug.LogError("Player_Lock_Date|Lock_On_Send|锁定提示UI 为空");
-            else c.Con_lockOn_UI.Lock_On_Performance_Local(stage);
-        }
+            Lock_On_Local_Performance(stage, Time.time);
 
         ClientRpcParams ps = new ClientRpcParams
         {
@@ -208,13 +219,28 @@ public class Player_Lock_Date : NetworkBehaviour
         if (IsServer) return;   //主机已显示
         if (!IsOwner) return;   //只本机显示
 
-        if (Own_Control.Con_lockOn_UI == null)
+        Lock_On_Local_Performance(stage, Time.time);
+    }
+
+    // 本机锁定表现，time为当前时刻
+    void Lock_On_Local_Performance(int stage, float time)
+    {
+        Player_Control c = Own_Control;
+        if (c == null)
         {
-            Debug.LogError("Player_Lock_Date|Lock_On_ClientRpc|锁定提示UI 为空");
+            Debug.LogError("Player_Lock_Date|Lock_On_Local_Performance|玩家控制为空");
             return;
         }
 
-        Own_Control.Con_lockOn_UI.Lock_On_Performance_Local(stage);
+        if (c.Con_lockOn_UI == null)
+            Debug.LogError("Player_Lock_Date|Lock_On_Local_Performance|锁定提示UI为空");
+        else
+            c.Con_lockOn_UI.Lock_On_Performance_Local(stage);
+
+        if (c.Con_player_Audio == null)
+            Debug.LogError("Player_Lock_Date|Lock_On_Local_Performance|玩家音效为空");
+        else
+            c.Con_player_Audio.Lock_Buzzer_Performance_Local(stage, time);
     }
 
     // 死亡清空锁定状态

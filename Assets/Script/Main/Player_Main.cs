@@ -87,7 +87,8 @@ public class Player_Main : NetworkBehaviour
             // 本机弹药血量
             if (uI_Player != null)
                 uI_Player.UI_Player_Show(oPlayer_Control.Con_gun_Control.ammo, oPlayer_Control.Con_gun_Control.maxAmmo,
-                    oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp);
+                    oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp,
+                    oPlayer_Control.MagazineCount, oPlayer_Control.Con_gun_Control.IsReloading);
 
             // 本机人形状态图
             if (uI_Body != null)
@@ -132,6 +133,23 @@ public class Player_Main : NetworkBehaviour
             if (IsServer) netGameTime.Value = Player_level.Instance.gameTime;
         }
 
+    }
+
+    // Animator更新后统一校正脚底
+    void LateUpdate()
+    {
+        if (!isInit) return;
+
+        for (int i = 0; i < oplayer_Controls.Count; i++)
+        {
+            Player_Control control = oplayer_Controls[i];
+            if (control == null || control.Con_player_Animation == null) continue;
+            control.Con_player_Animation.Player_animation_Ground_Performance();
+        }
+
+        // 动画更新后跟随本机相机
+        if (oPlayer_Control != null && oPlayer_Control.Con_player_camera != null)
+            oPlayer_Control.Con_player_camera.Camera_Follow_Performance_Local();
     }
 
     //订阅场景初始化

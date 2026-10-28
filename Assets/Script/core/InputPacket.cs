@@ -8,6 +8,8 @@ public struct InputPacket : INetworkSerializable
     public ulong clientId;          // 发送者网络ID
 
     // 输入状态
+    public uint inputSeq;           // 输入序号，用于瞄准纠偏和射击结果关联
+    public uint clientTick;         // 发送端逻辑帧号
     public Vector3 viewDir;         // 本机视角朝向
     public Vector3 viewPos;         // 本机相机位置
     public Vector3 aimPoint;        // 举枪瞄准落点
@@ -22,11 +24,15 @@ public struct InputPacket : INetworkSerializable
     public bool reload;             // 换弹
     public bool squat;              // 蹲下
     public bool roll;               // 翻滚
+    public bool peekLeft;           // 左探头
+    public bool peekRight;          // 右探头
 
     // 网络序列化
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
         serializer.SerializeValue(ref clientId);
+        serializer.SerializeValue(ref inputSeq);
+        serializer.SerializeValue(ref clientTick);
         serializer.SerializeValue(ref viewDir);
         serializer.SerializeValue(ref viewPos);
         serializer.SerializeValue(ref aimPoint);
@@ -41,5 +47,7 @@ public struct InputPacket : INetworkSerializable
         serializer.SerializeValue(ref reload);
         serializer.SerializeValue(ref squat);
         serializer.SerializeValue(ref roll);
+        serializer.SerializeValue(ref peekLeft);
+        serializer.SerializeValue(ref peekRight);
     }
 }

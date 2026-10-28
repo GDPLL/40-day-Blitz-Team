@@ -23,6 +23,8 @@ public class Object_System : MonoBehaviour , Idamage
     //坠落伤害
     public float fallAccel = 400f;          //触发加速度,米每二次方秒
     public float fallDamageRate = 0.05f;    //超出部分的伤害比例
+    [Range(0f, 1f)]
+    public float rollFallDamageScale = 0.5f;    //翻滚摔落伤害倍率
     float fallSpeed;                        //空中最大下落速度
     float physicsDelta = 0.02f;             //物理帧间隔，算致死速度用
 
@@ -72,7 +74,7 @@ public class Object_System : MonoBehaviour , Idamage
     }
 
     // 坠落伤害，velocityY为当前垂直速度，grounded为是否在地面
-    public void Fall_Damage_Date(float velocityY, bool grounded, float deltaTime)
+    public void Fall_Damage_Date(float velocityY, bool grounded, float deltaTime, bool rolling)
     {
         if (deltaTime <= 0f) return;    //防除零
 
@@ -86,8 +88,15 @@ public class Object_System : MonoBehaviour , Idamage
         }
 
         // 落地按空中峰值结算一次，换算成加速度
-        float accel = fallSpeed / deltaTime;
-        int damage = (int)((accel - fallAccel) * fallDamageRate);
+        int damage;
+        // 致死速度无视翻滚减伤
+        if (fallSpeed >= Fatal_Fall_Speed) damage = MaxHp;
+        else
+        {
+            float accel = fallSpeed / deltaTime;
+            float damageScale = rolling ? rollFallDamageScale : 1f;
+            damage = (int)((accel - fallAccel) * fallDamageRate * damageScale);
+        }
         if (damage > 0) Takedamage(damage, 999, new Vector3(), out _);
 
         fallSpeed = 0f;
@@ -197,13 +206,13 @@ public class Object_System : MonoBehaviour , Idamage
         if (c.Con_net_State.Is_Out) return true;   //已淘汰不再参与
 
         // 毒气，低于毒气高度每秒扣血
-        if (Player_level.Instance != null && c.transform.position.y < Player_level.Instance.Gas_Height)
+        if (Player_level.Instance != null && Player_level.Instance.Gas_Contains(c.transform.position))
         {
             gasTimer += Time.deltaTime;
             if (gasTimer >= 1f)
             {
                 gasTimer = 0f;
-                Takedamage(Player_level.Instance.gasDamage, 999, new Vector3(), out _);
+                Takedamage(Player_level.Instance.Gas_Damage, 999, new Vector3(), out _);
             }
         }
         else gasTimer = 0f;

@@ -26,6 +26,8 @@ public class Gun_Control : NetworkBehaviour
 
     public int ammo = 30;          // 弹药
     public int maxAmmo = 30;       // 弹匣容量
+    public int magazineCount = 6;      // 剩余弹夹数，含当前弹夹
+    public int maxMagazineCount = 6;   // 弹夹总数
     public float fireRate = 900f;   // 射速，发每分钟
     public float range = 100f;     // 射程
     public int damage = 34;        // 单发伤害
@@ -33,13 +35,31 @@ public class Gun_Control : NetworkBehaviour
     public RigBuilder armRig;      // 手臂IK构建器
     public int armRigLayer;        // 手臂IK所在的层序号
 
+    [Header("探头持枪")]
+    public float peekGunOffset = 0.30f;     // 右探头枪位到身体中心的横向距离
+    public float peekGunLeftTravelScale = 1f; // 左探头相对原枪位的移动比例
+    public float peekGunSmoothTime = 0.12f;  // 探头持枪平滑时间
+    Vector3 gunBaseLocalPosition;            // 枪根原始局部位置
+    float gunBaseLateral;                    // 枪根原始姿态相对身体中心的横向位置
+    float currentPeekGunOffset;               // 当前探头持枪修正量
+    float peekGunVelocity;                    // 持枪横移平滑速度缓存
+
     // 两发之间的最小间隔
     public float FireInterval => 60f / fireRate;
 
     public GameObject hitEffect;   // 命中特效
     public GameObject fireEffect;  // 枪口特效
 
+    [Header("枪口特效对象池")]
+    public int fireEffectPrewarm = 12;      // 预热数量
+    public float fireEffectLife = 2f;       // 存活时长
+
+    [Header("命中特效对象池")]
+    public int hitEffectPrewarm = 8;        // 预热数量
+    public float hitEffectLife = 2f;        // 存活时长
+
     [Header("命中爆浆")]
+    public int bloodPrewarm = 8;            // 预热数量
     public int bloodCount = 26;             // 每次命中粒子数
     public float bloodLife = 1.2f;          // 粒子存活时长，秒
     public float bloodSpeed = 4.5f;         // 喷射速度，米每秒
@@ -56,6 +76,7 @@ public class Gun_Control : NetworkBehaviour
     float fireTimer;               // 射速计时
     float lineTimer;               // 射线显示计时
     float reloadTimer;             // 换弹计时
+    bool reloadMagazineSpent;      // 本次换弹已消耗弹夹
     bool isRaised;                 // 举枪中
 
     public bool IsReloading => reloadTimer > 0f;   // 换弹中
@@ -72,9 +93,10 @@ public class Gun_Control : NetworkBehaviour
         public float farDistance = 40f;   // 最远参考距离
         public float farFactor = 0.15f;   // 远距离系数
         public int stableShots = 16;      // 稳定弹药数
+        public float bloomHold = 0.05f;   // 单发扩圈保持时间
 
         public AimProfile(float outer, float inner, float speed,
-            float near, float far, float factor, int stable)
+            float near, float far, float factor, int stable, float hold)
         {
             outerAngle = outer;
             innerAngle = inner;
@@ -83,13 +105,14 @@ public class Gun_Control : NetworkBehaviour
             farDistance = far;
             farFactor = factor;
             stableShots = stable;
+            bloomHold = hold;
         }
     }
 
     [Header("精度：各姿态参数")]
-    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f, 16);       // 腰射
-    public AimProfile shoulderAim = new AimProfile(10f, 4f, 15f, 6f, 35f, 1f, 5);   // 据枪
-    public AimProfile adsAim = new AimProfile(15f, 2f, 10f, 100f, 500f, 1f, 2);       // 开镜
+    public AimProfile hipAim = new AimProfile(30f, 7f, 60f, 2f, 15f, 1f, 16, 0.12f);       // 腰射
+    public AimProfile shoulderAim = new AimProfile(10f, 4f, 18f, 6f, 35f, 1f, 5, 0.03f);   // 据枪
+    public AimProfile adsAim = new AimProfile(15f, 2f, 7f, 100f, 500f, 1f, 2, 0f);         // 开镜
 
     [Header("精度：开火消耗")]
     public float stableCost = 0.30f;   // 稳定段总消耗比例
@@ -111,17 +134,20 @@ public class Gun_Control : NetworkBehaviour
     bool hasTarget;          // 是否有目标
     bool targetInRing;       // 目标是否在准星范围
     Vector3 targetPos;       // 目标世界坐标
+    ulong currentTargetId = ulong.MaxValue;   // 当前锁定目标编号
     Vector3 aimDirection;    // 准星方向
     ulong ownerId;           // 持有者编号
     Vector3 aimOrigin;       // 准星射线起点
 
     float currentAngle;                                       // 当前精度圈
     int shotCount;                                            // 本次连发已射发数
+    float accuracyHoldTimer;                                  // 开火扩圈保持计时
     public float CurrentAngle => currentAngle;                // 对外读取
     public float OuterAngle => CurrentProfile().outerAngle;   // 当前姿态外圈
     public float InnerAngle => CurrentProfile().innerAngle;   // 当前姿态内圈
     public bool HasTarget => hasTarget;                       // 是否锁定
     public Vector3 TargetPos => targetPos;                    // 锁定点
+    public ulong TargetId => currentTargetId;                  // 锁定目标编号
 
     // 位置绑定兜底，未拖拽时取自身
     Transform Gun_Root => gunRoot != null ? gunRoot : transform;
@@ -144,6 +170,9 @@ public class Gun_Control : NetworkBehaviour
         if (c == null) return;
         if (!c.IsServer && !c.IsOwner) return;      //客机只看别人表现
         if (c.Con_player_HostNetworkEvent == null) return;
+        if (c.Con_ObjectSystem != null && c.Con_ObjectSystem.isDead) return;
+        if (c.Con_net_State != null &&
+            (c.Con_net_State.RespawnWait > 0f || c.Con_net_State.Is_Out)) return;
 
         // 主机取网络包，客机本机取本地包
         InputPacket packet = c.IsServer
@@ -208,6 +237,7 @@ public class Gun_Control : NetworkBehaviour
         aimingAds = adsOn;
         currentAngle = CurrentProfile().outerAngle;   //立刻重置到新外圈
         shotCount = 0;                                //换姿态重新计稳定
+        accuracyHoldTimer = 0f;
     }
 
     // 设置移动状态
@@ -219,18 +249,20 @@ public class Gun_Control : NetworkBehaviour
     }
 
     // 注入锁定目标，由锁定模块推送
-    public void Target_Push(bool has, Vector3 worldPosition)
+    public void Target_Push(bool has, Vector3 worldPosition, ulong id = ulong.MaxValue)
     {
         hasTarget = has;
         targetPos = worldPosition;
+        currentTargetId = has ? id : ulong.MaxValue;
     }
 
     // 注入锁定与精度圈，客户端显示用
-    public void SetAimShow(bool has, Vector3 worldPosition, float angle)
+    public void SetAimShow(bool has, Vector3 worldPosition, float angle, ulong id = ulong.MaxValue)
     {
         hasTarget = has;
         targetPos = worldPosition;
         currentAngle = angle;
+        currentTargetId = has ? id : ulong.MaxValue;
     }
 
     // 注入完成
@@ -242,9 +274,23 @@ public class Gun_Control : NetworkBehaviour
         ownerId = id;
         shotCount = 0;
         currentAngle = hipAim.outerAngle;               //初始为腰射外圈
+        gunBaseLocalPosition = Gun_Root.localPosition;  // 记录枪根原始位置
+        gunBaseLateral = Vector3.Dot(
+            Gun_Root.position - Body_Root.position, Body_Root.right);
         originalLocalRot = Gun_Root.localRotation;      // 记录初始旋转
 
+        // 旧实例缺字段时补默认弹夹数
+        if (maxMagazineCount <= 0) maxMagazineCount = 6;
+        if (magazineCount <= 0) magazineCount = maxMagazineCount;
+        magazineCount = Mathf.Clamp(magazineCount, 1, maxMagazineCount);
+        reloadMagazineSpent = false;
+
         Blood_Template_Init();
+
+        // 提前建好射击特效，避免第一次生成时集中实例化
+        if (bloodTemplate != null) Object_Pool_Manager.Prewarm(bloodTemplate.gameObject, bloodPrewarm);
+        if (fireEffect != null) Object_Pool_Manager.Prewarm(fireEffect, fireEffectPrewarm);
+        if (hitEffect != null) Object_Pool_Manager.Prewarm(hitEffect, hitEffectPrewarm);
 
         Debug.Log("Gun_Control|Gun_Control_Init|完成初始化");
     }
@@ -301,13 +347,32 @@ public class Gun_Control : NetworkBehaviour
             return;
         }
 
-        GameObject go = Instantiate(bloodTemplate.gameObject, hitPoint, Quaternion.LookRotation(-dir));
-        go.SetActive(true);
+        GameObject go = Object_Pool_Manager.Spawn(
+            bloodTemplate.gameObject,
+            hitPoint,
+            Quaternion.LookRotation(-dir),
+            bloodLife + 0.3f);
+        if (go == null) return;
 
+        // 复用对象时清除上一轮残留粒子，再手动发射本轮爆浆
         ParticleSystem ps = go.GetComponent<ParticleSystem>();
-        ps.Emit(bloodCount);
+        if (ps == null)
+        {
+            Object_Pool_Manager.Despawn(go);
+            return;
+        }
 
-        Destroy(go, bloodLife + 0.3f);
+        ps.Clear(true);
+        ps.Emit(bloodCount);
+    }
+
+    // 枪体销毁时释放运行时爆浆模板对应的池
+    public override void OnDestroy()
+    {
+        if (bloodTemplate != null)
+            Object_Pool_Manager.Release_Pool(bloodTemplate.gameObject);
+
+        base.OnDestroy();
     }
 
     // 物理帧逻辑，射速计时与精度更新
@@ -319,10 +384,20 @@ public class Gun_Control : NetworkBehaviour
         if (reloadTimer > 0f)
         {
             Gun_Reload_Tick(Time.deltaTime);
-            if (reloadTimer <= 0f) ammo = maxAmmo;
+            if (reloadTimer <= 0f)
+            {
+                ammo = maxAmmo;
+                reloadMagazineSpent = false;
+            }
         }
 
         UpdateAimAccuracy(Time.deltaTime);   // 更新精度
+    }
+
+    // 客机本机精度预测，固定帧推进
+    public void Gun_Aim_Predict_Fixed(float dt)
+    {
+        UpdateAimAccuracy(dt);
     }
 
     // 换弹计时推进，客机本机预测用
@@ -331,6 +406,7 @@ public class Gun_Control : NetworkBehaviour
         if (reloadTimer <= 0f) return;
 
         reloadTimer -= dt;
+        if (reloadTimer <= 0f) reloadMagazineSpent = false;
     }
 
     // 物理帧表现，射线显示计时
@@ -359,6 +435,13 @@ public class Gun_Control : NetworkBehaviour
             return;
         }
 
+        // 开火后短暂保持扩圈，避免下一物理帧立即缩回
+        if (accuracyHoldTimer > 0f)
+        {
+            accuracyHoldTimer -= dt;
+            return;
+        }
+
         float speed = p.growSpeed * MoveFactor() * DistanceFactor(distance, p);
         currentAngle = Mathf.MoveTowards(currentAngle, p.innerAngle, speed * dt);   // 收缩到内圈
 
@@ -378,6 +461,7 @@ public class Gun_Control : NetworkBehaviour
 
         currentAngle = Mathf.Min(currentAngle + cost, p.outerAngle);
         shotCount++;
+        accuracyHoldTimer = Mathf.Max(accuracyHoldTimer, p.bloomHold);
     }
 
     // 移动姿态系数
@@ -465,8 +549,9 @@ public class Gun_Control : NetworkBehaviour
         // 通知外部播放表现，音效等
         Shoot_event?.Invoke();
 
-        // 在开火点生成对象
-        if (fireEffect != null) Instantiate(fireEffect, origin, Quaternion.LookRotation(dir));
+        // 枪口特效走对象池
+        if (fireEffect != null)
+            Object_Pool_Manager.Spawn(fireEffect, origin, Quaternion.LookRotation(dir), fireEffectLife);
     }
 
     // 弹道与命中表现
@@ -477,12 +562,12 @@ public class Gun_Control : NetworkBehaviour
         {
             end = hitPoint;                    // 命中落点
 
-            // 在落点生成对象
+            // 命中特效走对象池
             if (hitEffect != null)
             {
                 Vector3 bounceDir = Vector3.Reflect(dir, hitNormal);
                 if (bounceDir.sqrMagnitude <= 0.001f) bounceDir = -hitNormal;   // 极端角度兜底
-                Instantiate(hitEffect, hitPoint, Quaternion.LookRotation(bounceDir));
+                Object_Pool_Manager.Spawn(hitEffect, hitPoint, Quaternion.LookRotation(bounceDir), hitEffectLife);
             }
         }
 
@@ -497,12 +582,15 @@ public class Gun_Control : NetworkBehaviour
         }
     }
 
-    // 换弹，起换弹计时，装填在计时结束
+    // 换弹，起换弹计时并丢弃当前弹夹，装填在计时结束
     public void Gun_Reload_Date()
     {
         if (IsReloading) return;        //换弹中不重复触发
         if (ammo == maxAmmo) return;    //满弹不换
+        if (magazineCount <= 1) return; //没有备用弹夹
 
+        magazineCount--;
+        reloadMagazineSpent = true;
         reloadTimer = reloadTime;
         Reload_event?.Invoke();     //换弹音效
     }
@@ -510,7 +598,23 @@ public class Gun_Control : NetworkBehaviour
     // 取消换弹
     public void Gun_Reload_Cancel()
     {
+        // 换弹中断时归还已丢掉的弹夹
+        if (reloadMagazineSpent)
+        {
+            magazineCount = Mathf.Min(magazineCount + 1, maxMagazineCount);
+            reloadMagazineSpent = false;
+        }
+
         reloadTimer = 0f;
+    }
+
+    // 复活恢复满弹夹与满弹匣
+    public void Gun_Respawn_Reset()
+    {
+        ammo = maxAmmo;
+        magazineCount = maxMagazineCount;
+        reloadTimer = 0f;
+        reloadMagazineSpent = false;
     }
 
     // 手臂IK开关，on为启用，按层序号取
@@ -522,6 +626,30 @@ public class Gun_Control : NetworkBehaviour
 
         armRig.layers[armRigLayer].active = on;
         armRig.Build();     //改层开关后重建图
+    }
+
+    // 探头时让枪根带动双手与枪口向同侧偏出，state 为同步表现状态
+    public void Gun_Peek_Performance(uint state)
+    {
+        float peekSide = 0f;
+        if ((state & Player_animation.BitPeekLeft) != 0) peekSide = -1f;
+        else if ((state & Player_animation.BitPeekRight) != 0) peekSide = 1f;
+        if ((state & Player_animation.BitReload) != 0) peekSide = 0f;   // 换弹动作优先
+
+        // 右探头以目标枪位为准，左探头按右探头的移动量反向补偿，
+        // 避免右手持枪时为了跨到身体中心另一侧而拉脱双手
+        float rightTravel = peekGunOffset - gunBaseLateral;
+        float targetOffset = peekSide > 0f
+            ? rightTravel
+            : peekSide < 0f ? -rightTravel * peekGunLeftTravelScale : 0f;
+        currentPeekGunOffset = Mathf.SmoothDamp(currentPeekGunOffset, targetOffset,
+            ref peekGunVelocity, peekGunSmoothTime);
+
+        Vector3 worldOffset = Body_Root.right * currentPeekGunOffset;
+        Vector3 localOffset = Gun_Root.parent != null
+            ? Gun_Root.parent.InverseTransformVector(worldOffset)
+            : worldOffset;
+        Gun_Root.localPosition = gunBaseLocalPosition + localOffset;
     }
 
     // 是否有弹药
@@ -582,6 +710,7 @@ public class Gun_Control : NetworkBehaviour
 
         fireTime = Time.time;
 
+        Aim_Cost_Date();     // 本机预测本次开火的精度消耗
         Gun_Shoot_Local_Performance(MuzzlePosition, Gun_Root.forward);
 
         if (Own_Control.Con_player_camera != null)

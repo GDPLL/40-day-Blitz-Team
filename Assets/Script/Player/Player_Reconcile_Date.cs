@@ -75,11 +75,11 @@ public class Player_Reconcile_Date : NetworkBehaviour
     void Player_TeleportClientRpc(Vector3 position, Quaternion rotation, ClientRpcParams ps = default)
     {
         if (IsServer) return;
+        if (Own_Control == null || Own_Control.Con_move == null) return;   //初始化未完成
 
         authPos = position;    //同步纠偏基准，防止被拉回
 
-        if (Own_Control.Con_move != null)
-            Own_Control.Con_move.Teleport_Request(position, rotation, Player_Move_Date.Priority_Respawn);
+        Own_Control.Con_move.Teleport_Request(position, rotation, Player_Move_Date.Priority_Respawn);
     }
 
     // 回传权威位置

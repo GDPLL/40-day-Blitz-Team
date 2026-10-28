@@ -7,8 +7,6 @@ public class Player_Move_Date : MonoBehaviour
     public void Owner_Init(Player_Control _Control) => Own_Control = _Control;
 
     // 移动数据
-    [Header("落地检测")]
-    public float groundCheckDistance = 0.2f;    //落地检测距离
     [Header("复活倒地")]
     public float respawnSquatTime = 0.23f;      //复活倒地碰撞体保持秒
     [Header("位置纠偏")]
@@ -22,13 +20,32 @@ public class Player_Move_Date : MonoBehaviour
     public bool isJumpDown;     //跳跃空格
     public bool isRollDown;     //翻滚输入
     public float rollTimer;     //翻滚剩余时间
+    public bool isPeekLeft;     //左探头
+    public bool isPeekRight;    //右探头
+    public float slideTimer;    //滑铲剩余时间
+    public float slideTime = 1.77f;    //滑铲时长
+    public float slideExitTime = 0.5f; //滑铲起身过渡
+    public float slideJumpWindow = 0.22f; //滑铲末段跳跃窗口
+    public float slideJumpBufferTime = 0.12f; //滑铲跳跃输入缓存
 
     bool jumpRequest;           //本物理帧请求起跳
     bool rollRequest;           //本物理帧请求翻滚
+    bool rollRequestAir;        //翻滚请求时空中
+    bool slideRequest;          //本物理帧请求滑铲
+    bool slideRequestAir;       //滑铲请求时空中
+    bool slideBefore;           //滑铲按键上一帧状态
     float rollDelay;            //翻滚施力延迟
+    float rollPhysicsTimer;     //翻滚物理剩余时间
     Vector2 rollDir;            //翻滚方向
+    bool rollPending;           //空中翻滚待落地
+    bool rollHalf;              //翻滚后半段
+    bool slidePending;          //空中滑铲待落地
     float bodyScale = 1f;       //碰撞体当前比例
     float respawnSquatTimer;    //复活倒地保持计时
+    float slideExitTimer;       //起身过渡剩余时间
+    float slideExitStartSpeed;  //起身初始速度
+    float slideExitTargetSpeed; //起身目标速度
+    float slideJumpBufferTimer; //滑铲跳跃缓存剩余时间
 
     // 瞬移优先级
     public const int Priority_Reconcile = 0;   //纠偏
@@ -42,6 +59,10 @@ public class Player_Move_Date : MonoBehaviour
     bool hasRequest;            //有待处理申请
 
     public bool Teleported { get; private set; }   //本物理帧是否瞬移
+    public bool Is_Slide => slideTimer > 0f || slideRequest; //是否滑铲
+    public bool Is_Roll_Active => rollTimer > 0f || rollPending; //是否翻滚占用
+    public bool Is_Roll_Push => rollTimer > 0f && rollDelay <= 0f; //是否二段翻滚
+    public bool Is_Roll_Half => rollTimer > 0f && rollHalf; //是否后半段
 
     // 瞬移申请，高优先级覆盖低优先级
     public void Teleport_Request(Vector3 position, Quaternion rotation, int priority)
@@ -115,6 +136,19 @@ public class Player_Move_Date : MonoBehaviour
         // 复活重置翻滚，碰撞体保持倒地
         rollTimer = 0f;
         rollDelay = 0f;
+        rollPhysicsTimer = 0f;
+        rollPending = false;
+        rollHalf = false;
+        rollRequestAir = false;
+        slideTimer = 0f;
+        slideExitTimer = 0f;
+        slideRequest = false;
+        slideRequestAir = false;
+        slidePending = false;
+        slideBefore = false;
+        slideJumpBufferTimer = 0f;
+        isPeekLeft = false;
+        isPeekRight = false;
         respawnSquatTimer = respawnSquatTime;
 
         Player_Body body = Own_Control.Con_body;
@@ -131,23 +165,28 @@ public class Player_Move_Date : MonoBehaviour
     // 落地检测并缓存
     public void Ground_Date()
     {
-        isOnGround = IsGrounded();
+        Player_Body body = Own_Control != null ? Own_Control.Con_body : null;
+        if (body == null)
+        {
+            Debug.LogError("Player_Move_Date|Ground_Date|未找到 Player_Body");
+            isOnGround = false;
+            return;
+        }
+
+        isOnGround = body.Body_Ground_Date();
     }
 
     // 落地检测
     public bool IsGrounded()
     {
-        Collider col = Own_Control.GetComponent<Collider>();
-        if (col == null) col = Own_Control.GetComponentInChildren<Collider>();
-        if (col == null)
+        Player_Body body = Own_Control != null ? Own_Control.Con_body : null;
+        if (body == null)
         {
-            Debug.LogError("Player_Move_Date|IsGrounded|未找到 Collider");
+            Debug.LogError("Player_Move_Date|IsGrounded|未找到 Player_Body");
             return false;
         }
 
-        Vector3 origin = col.bounds.center;
-        float rayDistance = col.bounds.extents.y + groundCheckDistance;
-        return Physics.Raycast(origin, Vector3.down, rayDistance);
+        return body.Body_Ground_Date();
     }
 
     // 主机每物理帧移动驱动
@@ -161,7 +200,8 @@ public class Player_Move_Date : MonoBehaviour
         if (body == null || rb == null || c.Con_ObjectSystem == null) return;
 
         // 坠落伤害，按空中最大下落速度算
-        c.Con_ObjectSystem.Fall_Damage_Date(rb.velocity.y, body.IsGrounded, Time.fixedDeltaTime);
+        c.Con_ObjectSystem.Fall_Damage_Date(rb.velocity.y, body.IsGrounded,
+            Time.fixedDeltaTime, Is_Roll_Active);
     }
 
     // 客机本机物理帧移动驱动
@@ -195,16 +235,66 @@ public class Player_Move_Date : MonoBehaviour
         Player_Body body = c.Con_body;
         if (body == null) return;
 
-        // 计算移动数据
         body.Body_Move_Date(packet.move, packet.viewDir, isRuning && !reload, isSquat);   //换弹只能走路
-        body.Body_Fixed_Date(rollTimer > 0f);   //翻滚中不限速，含落地检测
 
-        // 起跳，每物理帧最多一次
-        if (jumpRequest)
+        float speedOverride = 0f;
+        if (slideExitTimer > 0f && slideExitTime > 0f)
+        {
+            float progress = 1f - slideExitTimer / slideExitTime;
+            speedOverride = Mathf.Lerp(slideExitStartSpeed, slideExitTargetSpeed,
+                Mathf.Clamp01(progress));
+        }
+
+        body.Body_Fixed_Date(rollPhysicsTimer > 0f, slideTimer > 0f, speedOverride);   //动作期间保留速度
+
+        if (slideJumpBufferTimer > 0f
+            && slideTimer > slideJumpWindow + Time.fixedDeltaTime)
+        {
+            slideJumpBufferTimer -= Time.fixedDeltaTime;
+            if (slideJumpBufferTimer <= 0f) slideJumpBufferTimer = 0f;
+        }
+
+        // 地面动作离地结束
+        if (!body.IsGrounded && !rollPending && !slidePending
+            && (rollTimer > 0f || slideTimer > 0f || slideExitTimer > 0f))
+        {
+            rollDelay = 0f;
+            rollPhysicsTimer = 0f;
+            rollTimer = 0f;
+            rollHalf = false;
+            slideTimer = 0f;
+            slideExitTimer = 0f;
+            slideJumpBufferTimer = 0f;
+            body.Body_Air_Action_Exit_Date(body.runSpeed);
+        }
+
+        // 滑铲末段起跳
+        if ((slideJumpBufferTimer > 0f || jumpRequest) && slideTimer > 0f
+            && slideJumpWindow > 0f && slideTimer <= slideJumpWindow
+            && body.IsGrounded && !Is_Roll_Active && !slidePending)
         {
             jumpRequest = false;
+            slideJumpBufferTimer = 0f;
+            slideTimer = 0f;
+            slideExitTimer = 0f;
+            slideRequest = false;
+            slideRequestAir = false;
+            slidePending = false;
+            bodyScale = 1f;
+            body.Body_Size_Date(bodyScale);
             body.Body_Jump_Date();
             if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
+        }
+        // 起跳，每物理帧最多一次
+        else if (jumpRequest)
+        {
+            jumpRequest = false;
+            if (slideTimer <= 0f
+                && !Is_Roll_Active && !slidePending)
+            {
+                body.Body_Jump_Date();
+                if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
+            }
         }
 
         // 翻滚，每物理帧最多一次，翻滚中不重复
@@ -212,15 +302,70 @@ public class Player_Move_Date : MonoBehaviour
         {
             rollRequest = false;
 
-            if (rollTimer <= 0f)
+            if (!Is_Roll_Active && slideTimer <= 0f)
             {
+                bool requestAir = rollRequestAir || !body.IsGrounded;
+                rollRequestAir = false;
+                slideRequest = false;
+                slideRequestAir = false;
+                slidePending = false;
                 rollDir = packet.move;                      //记下方向，延迟后用
-                rollDelay = body.rollDelay;                 //第二段延迟
-                rollTimer = body.rollTime + rollDelay;
+                rollDelay = 0f;
+                rollHalf = false;
 
-                body.Body_Roll_Date(rollDir, packet.viewDir);   //第一段立即施力
+                if (!requestAir)
+                {
+                    rollDelay = body.rollDelay;             //第二段延迟
+                    rollTimer = body.rollTime + rollDelay;
+                    rollPhysicsTimer = rollTimer;
+                    body.Body_Roll_Date(rollDir, packet.viewDir, -body.rollBrake);   //起手减速
+                    if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Roll_Show();
+                }
+                else rollPending = true;
+            }
+        }
 
-                if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Roll_Show();
+        // 空中翻滚落地启动
+        if (rollPending && body.IsGrounded)
+        {
+            rollPending = false;
+            rollHalf = true;
+            rollTimer = c.Con_player_Animation != null
+                ? c.Con_player_Animation.Roll_Half_Time : body.rollTime;
+            rollPhysicsTimer = body.rollTime;
+            body.Body_Roll_Date(rollDir, packet.viewDir, body.rollForce);
+            if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Roll_Show();
+        }
+
+        // 翻滚优先执行滑铲
+        if (slideRequest)
+        {
+            slideRequest = false;
+            bool requestAir = slideRequestAir || !body.IsGrounded;
+            slideRequestAir = false;
+
+            if (requestAir && slideTimer <= 0f && !Is_Roll_Active)
+                slidePending = true;
+            else if (!requestAir && slideTimer <= 0f && !Is_Roll_Active && body.IsGrounded)
+            {
+                slidePending = false;
+                slideTimer = slideTime;
+                slideExitTimer = 0f;
+                slideJumpBufferTimer = 0f;
+                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
+            }
+        }
+
+        // 空中滑铲落地启动
+        if (slidePending && body.IsGrounded)
+        {
+            slidePending = false;
+            if (slideTimer <= 0f && !Is_Roll_Active)
+            {
+                slideTimer = slideTime;
+                slideExitTimer = 0f;
+                slideJumpBufferTimer = 0f;
+                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
             }
         }
 
@@ -228,14 +373,69 @@ public class Player_Move_Date : MonoBehaviour
         if (rollDelay > 0f)
         {
             rollDelay -= Time.fixedDeltaTime;
-            if (rollDelay <= 0f) body.Body_Roll_Date(rollDir, packet.viewDir);
+            if (rollDelay <= 0f)
+                body.Body_Roll_Date(rollDir, packet.viewDir, body.rollForce);   //第二段爆发
         }
 
         // 翻滚计时
-        if (rollTimer > 0f) rollTimer -= Time.fixedDeltaTime;
+        if (rollTimer > 0f)
+        {
+            rollTimer -= Time.fixedDeltaTime;
+            if (rollTimer <= 0f)
+            {
+                rollTimer = 0f;
+                rollHalf = false;
+            }
+        }
 
+        // 翻滚物理计时
+        if (rollPhysicsTimer > 0f)
+        {
+            rollPhysicsTimer -= Time.fixedDeltaTime;
+            if (rollPhysicsTimer <= 0f) rollPhysicsTimer = 0f;
+        }
+
+        // 滑铲计时
+        if (slideTimer > 0f)
+        {
+            slideTimer -= Time.fixedDeltaTime;
+            if (slideTimer <= 0f)
+            {
+                slideTimer = 0f;
+                Slide_Exit_Date(packet);
+            }
+        }
+
+        if (slideExitTimer > 0f)
+        {
+            slideExitTimer -= Time.fixedDeltaTime;
+            if (slideExitTimer <= 0f) slideExitTimer = 0f;
+        }
         // 输入施推力
-        if (isWASDDowm && rollTimer <= 0f) body.Body_Move();   //翻滚中不给移动力
+        if (isWASDDowm && rollPhysicsTimer <= 0f && slideTimer <= 0f)
+            body.Body_Move();
+    }
+
+    // 计算滑铲起身惯性
+    void Slide_Exit_Date(InputPacket packet)
+    {
+        Player_Control c = Own_Control;
+        Player_Body body = c.Con_body;
+        Rigidbody rb = c.rigidbody;
+        if (body == null || rb == null || slideExitTime <= 0f) return;
+
+        Vector3 normal = body.IsGrounded ? body.GroundNormal : Vector3.up;
+        float normalSpeed = Vector3.Dot(rb.velocity, normal);
+        float tangentSpeed = (rb.velocity - normal * normalSpeed).magnitude;
+        bool moveHeld = packet.move.sqrMagnitude >= 0.01f;
+        bool runExit = moveHeld && isRuning && !isSquat;
+
+        slideExitStartSpeed = tangentSpeed;
+        if (!moveHeld) slideExitTargetSpeed = 0f;
+        else if (runExit) slideExitTargetSpeed = body.runSpeed;
+        else if (isSquat) slideExitTargetSpeed = body.squatSpeed;
+        else slideExitTargetSpeed = body.walkSpeed;
+        slideExitTimer = slideExitTime;
     }
 
     // 翻滚死亡失重共用碰撞体缩放
@@ -245,7 +445,9 @@ public class Player_Move_Date : MonoBehaviour
         if (body == null) return;
 
         // 翻滚用翻滚比例，死亡失重倒地取更小比例
-        float scale = rollTimer > 0f ? body.rollSquatScale : 1f;
+        float scale = 1f;
+        if (slideTimer > 0f) scale = body.slideSquatScale;
+        if (rollTimer > 0f) scale = body.rollSquatScale;
         if (dead || isWeightLess || respawnSquatTimer > 0f) scale = body.deadSquatScale;
 
         // 复活倒地保持计时
@@ -284,16 +486,43 @@ public class Player_Move_Date : MonoBehaviour
         else if (isWASDDowm && isOnGround && c.Con_body != null)
             c.Con_body.Body_Rotation_Performance();
 
+        // 翻滚动画结束前屏蔽蹲下
+        bool rolling = Is_Roll_Active
+            || (c.Con_player_Animation != null && c.Con_player_Animation.Is_Rolling);
+
         // 奔跑与蹲下
         isRuning = packet.run;
-        isSquat = packet.squat;
+        isSquat = packet.squat && !rolling;
+
+        // 滑铲按键边沿
+        bool slideKeys = isRuning && packet.squat && isWASDDowm;
+        if (slideKeys && !slideBefore && !rolling)
+        {
+            slideRequest = true;
+            slideRequestAir = !isOnGround;
+        }
+        slideBefore = slideKeys;
+
+        // 探头互斥
+        isPeekLeft = packet.peekLeft && !packet.peekRight && slideTimer <= 0f;
+        isPeekRight = packet.peekRight && !packet.peekLeft && slideTimer <= 0f;
 
         // 跳跃，只记按下边沿
-        if (packet.jump && !isJumpDown) jumpRequest = true;
+        if (packet.jump && !isJumpDown)
+        {
+            jumpRequest = true;
+            if (slideTimer > 0f && slideJumpWindow > 0f
+                && slideTimer <= slideJumpWindow + slideJumpBufferTime)
+                slideJumpBufferTimer = slideJumpBufferTime;
+        }
         isJumpDown = packet.jump;
 
         // 翻滚，只记按下边沿
-        if (packet.roll && !isRollDown) rollRequest = true;
+        if (packet.roll && !isRollDown)
+        {
+            rollRequest = true;
+            rollRequestAir = !isOnGround;
+        }
         isRollDown = packet.roll;
     }
 }

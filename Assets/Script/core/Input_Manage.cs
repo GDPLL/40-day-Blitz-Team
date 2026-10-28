@@ -16,6 +16,8 @@ public class Input_Manage : NetworkBehaviour
     [Header("网络输入")]
     public float sendRate = 60f;    // 发送频率
     float sendTimer;                // 发送计时
+    uint inputSeq;                  // 输入序号
+    uint clientTick;                // 已采样逻辑帧
 
     // 翻滚双击检测
     readonly KeyCode[] rollKeys = { KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D };
@@ -55,6 +57,7 @@ public class Input_Manage : NetworkBehaviour
     void Update()
     {
         if (Player_Main.player_Main == null || !Player_Main.player_Main.isInit) return;  // 等待关卡初始化完成
+        clientTick++;
         Input_get();
 
         DebugE(DebugKey);
@@ -73,7 +76,10 @@ public class Input_Manage : NetworkBehaviour
         if (sendTimer < 1f / sendRate) return;
 
         sendTimer = 0f;
-        LastPacket = GetPacket();               //本机预测共用这个包
+        InputPacket packet = GetPacket();
+        packet.inputSeq = ++inputSeq;
+        packet.clientTick = clientTick;
+        LastPacket = packet;                    //本机预测共用这个包
         SubmitInputServerRpc(LastPacket);
     }
 
@@ -110,6 +116,8 @@ public class Input_Manage : NetworkBehaviour
         packet.reload = ReloadHeld;
         packet.squat = SquatHeld;
         packet.roll = RollDown;
+        packet.peekLeft = PeekLeftHeld;
+        packet.peekRight = PeekRightHeld;
         return packet;
     }
 
@@ -163,6 +171,8 @@ public class Input_Manage : NetworkBehaviour
     public bool RunHeld;            //奔跑输入
     public bool ReloadHeld;         //换弹输入
     public bool SquatHeld;          //蹲下输入
+    public bool PeekLeftHeld;       //左探头输入
+    public bool PeekRightHeld;      //右探头输入
     public bool ShoulderHeld;       //肩射输入
     public bool AdsHeld;            //开镜输入
     public bool RollDown;           //翻滚请求
@@ -182,6 +192,8 @@ public class Input_Manage : NetworkBehaviour
         RunHeld = Input.GetKey(KeyCode.LeftShift) && !ShoulderHeld && !AdsHeld;       //奔跑输入
         ReloadHeld = Input.GetKey(KeyCode.R);            //换弹输入 
         SquatHeld = Input.GetKey(KeyCode.LeftControl);       //蹲下输入
+        PeekLeftHeld = Input.GetKey(KeyCode.Q);             //左探头
+        PeekRightHeld = Input.GetKey(KeyCode.E);            //右探头
         DebugKey = Input.GetKey(KeyCode.BackQuote);         //调试输入按钮
 
         GetAimPoint();      // 瞄准落点

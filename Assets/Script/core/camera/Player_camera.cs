@@ -61,14 +61,43 @@ public class Player_camera : MonoBehaviour
     public float cameraMinDistance = 0.3f;   // 相机最近距离
     public float cameraPullInSpeed = 25f;    // 拉近速度
     public float cameraPushOutSpeed = 6f;    // 推远速度
+    public float cameraDistanceSmoothTime = 0.08f;   // 遮挡距离平滑
+    public float cameraSnapDistance = 0.25f; // 突变拉近距离
+
+    [Header("滑铲跟随")]
+    public float slideCameraHeight = 1.45f;      // 滑铲相机高度
+    public float slideCameraSmoothTime = 0.12f;  // 滑铲跟随平滑
+    public float slideCameraReleaseTime = 0.25f;  // 滑铲高度提前恢复
+    public float rollCameraHeight = 1.45f;       // 翻滚相机高度
+    public float rollCameraSmoothTime = 0.12f;   // 翻滚跟随平滑
+
+    [Header("高度跟随")]
+    public float followHeightSmoothTime = 0.08f; // 头部高度平滑
 
     float cameraDistance;                     // 当前遮挡距离
+    float cameraDistanceVelocity;             // 遮挡距离速度
+    Vector3 targetVelocity;                   // 跟随速度缓存
+    float heightVelocity;                     // 高度速度缓存
     readonly RaycastHit[] cameraHitBuffer = new RaycastHit[8];   // 遮挡检测缓存
+
+    [Header("动作视角")]
+    public float runFovBoost = 6f;               // 奔跑视野增量
+    public float rollFovBoost = 15f;             // 翻滚视野增量
+    public float slideFovBoost = 12f;            // 滑铲视野增量
+    public float actionFovAttackTime = 0.14f;    // 视野展开时长
+    public float actionFovReleaseTime = 0.24f;   // 视野恢复时长
 
     [Header("视角切换平滑")]
     public float modeSwitchSmoothTime = 0.15f;   // 平滑时间
     Vector3 currentLocalOffset;                  // 当前局部偏移
     Vector3 localVelocity;                       // 平滑速度缓存
+
+    [Header("探头镜头")]
+    public float peekCameraOffset = 0.55f;       // 探头横向镜头偏移
+    public float peekCameraRoll = 2f;            // 探头镜头滚转角度
+    public float peekSmoothTime = 0.12f;         // 探头横移与滚转平滑
+    float currentPeekRoll;                       // 当前探头滚转
+    float peekRollVelocity;                      // 滚转平滑速度缓存
 
     [Header("信号花屏")]
     public float breakTime = 0.12f;          // 断裂段时长
@@ -107,11 +136,14 @@ public class Player_camera : MonoBehaviour
     enum Signal_Phase { None, Break, Hold, Recover, Out }
 
     NetworkObject pNet;   // 联网对象
+    Player_Control ownControl; // 玩家控制
     Camera cam;           // 相机组件
 
     float startFov;       // 常规视角
     float currentFov;     // 当前视角
     float fovVelocity;    // 视角平滑缓存
+    float actionFovOffset;    // 当前动作视野
+    float actionFovVelocity;  // 动作视野速度
 
     // 记录初始视角与偏移
     public void Player_camera_Start(Transform _PlayerHeadTransform)
@@ -142,6 +174,18 @@ public class Player_camera : MonoBehaviour
 
         PlayerHeadTransform = _PlayerHeadTransform;
         pNet = PlayerHeadTransform.GetComponentInParent<NetworkObject>();
+        ownControl = PlayerHeadTransform.GetComponentInParent<Player_Control>();
+        if (ownControl == null && pNet != null) ownControl = pNet.GetComponent<Player_Control>();
+        if (ownControl == null)
+        {
+            Debug.LogError("Player_camera|Player_camera_Start|未找到 Player_Control");
+            return;
+        }
+        if (ownControl.Con_gun_Control == null)
+            Debug.LogError("Player_camera|Player_camera_Start|Con_gun_Control 为空");
+
+        Target_Object.position = PlayerHeadTransform.position;
+        heightVelocity = 0f;
 
         startFov = cam.fieldOfView;                                      // 记录常规视角
         currentFov = startFov;
@@ -165,14 +209,18 @@ public class Player_camera : MonoBehaviour
         Debug.Log("Player_camera|Player_camera_Start|完成初始化");
     }
 
-    // 按当前姿态取相机偏移
-    Vector3 PoseOffset()
+    // 按当前姿态取相机偏移，peekSide 为 -1 左、1 右、0 无探头
+    Vector3 PoseOffset(float peekSide)
     {
-        if (isAds) return new Vector3(0, 0, -adsRadius) + adsStartOffset;   // 开镜优先
+        Vector3 offset;
+        if (isAds) offset = new Vector3(0, 0, -adsRadius) + adsStartOffset;   // 开镜优先
+        else if (isShoulderAim)
+            offset = new Vector3(0, 0, -shoulderRadius) + shoulderStartOffset;
+        else offset = new Vector3(0, 0, -radius) + startOffset;
 
-        return isShoulderAim
-            ? new Vector3(0, 0, -shoulderRadius) + shoulderStartOffset
-            : new Vector3(0, 0, -radius) + startOffset;
+        // 探头时用目标横移覆盖肩射自带的单侧偏移，保证左右对称
+        if (peekSide != 0f) offset.x = peekSide * peekCameraOffset;
+        return offset;
     }
 
     // 视角旋转与相机跟随
@@ -184,10 +232,13 @@ public class Player_camera : MonoBehaviour
 
         // 本机据枪与开镜输入，自行判断
         Input_Manage im = Input_Manage.Instance;
+        float peekSide = 0f;
         if (im != null)
         {
             isShoulderAim = im.ShoulderHeld;
             isAds = im.AdsHeld;
+            if (im.PeekLeftHeld != im.PeekRightHeld)
+                peekSide = im.PeekLeftHeld ? -1f : 1f;
         }
 
         // 引用为空或已销毁
@@ -213,17 +264,51 @@ public class Player_camera : MonoBehaviour
         Quaternion position_quat = transform.rotation;
 
         // 目标局部偏移
-        Vector3 targetLocalOffset = PoseOffset();
+        Vector3 targetLocalOffset = PoseOffset(peekSide);
 
-        currentLocalOffset = Vector3.SmoothDamp(currentLocalOffset, targetLocalOffset, ref localVelocity, modeSwitchSmoothTime);
+        float offsetSmoothTime = peekSide != 0f ? peekSmoothTime : modeSwitchSmoothTime;
+        currentLocalOffset = Vector3.SmoothDamp(currentLocalOffset, targetLocalOffset,
+            ref localVelocity, offsetSmoothTime);
         worldOffset = position_quat * currentLocalOffset;
 
         // 压制抖动
         SuppressOffset(Time.deltaTime);
 
-        // 开镜视角插值
-        currentFov = Mathf.SmoothDamp(currentFov, isAds ? adsFov : startFov, ref fovVelocity, modeSwitchSmoothTime);
-        cam.fieldOfView = currentFov + suppressFovOffset;
+        // 当前动作状态
+        bool sliding = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.Is_Slide;
+        bool rolling = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_player_Animation != null
+            && (ownControl.Con_move.Is_Roll_Active
+                || ownControl.Con_player_Animation.Is_Rolling);
+        bool rollPushing = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.Is_Roll_Push;
+        bool running = ownControl != null && ownControl.Con_move != null
+            && ownControl.Con_move.isRuning
+            && ownControl.Con_move.isWASDDowm
+            && !ownControl.Con_move.isSquat
+            && ownControl.Con_gun_Control != null
+            && !ownControl.Con_gun_Control.IsReloading;
+
+        // 按动作取视野增量
+        float targetActionFov = 0f;
+        if (!isAds)
+        {
+            if (sliding) targetActionFov = slideFovBoost;
+            else if (rollPushing) targetActionFov = rollFovBoost;
+            else if (running) targetActionFov = runFovBoost;
+        }
+
+        float actionSmoothTime = targetActionFov > actionFovOffset
+            ? actionFovAttackTime : actionFovReleaseTime;
+        actionFovOffset = Mathf.SmoothDamp(actionFovOffset, targetActionFov,
+            ref actionFovVelocity, actionSmoothTime);
+
+        // 开镜与动作视野插值
+        currentFov = Mathf.SmoothDamp(currentFov, isAds ? adsFov : startFov,
+            ref fovVelocity, modeSwitchSmoothTime);
+        cam.fieldOfView = Mathf.Clamp(
+            currentFov + actionFovOffset + suppressFovOffset, 1f, 179f);
 
         // 震动计时
         if (isShaking)
@@ -236,13 +321,46 @@ public class Player_camera : MonoBehaviour
             }
         }
 
-        // 应用位置
-        Target_Object.position = PlayerHeadTransform.position;
+        // 滑铲时保持固定相机高度
+        if (sliding || rolling)
+        {
+            // 水平方向锁住插值后的角色根节点，避免角色与平滑相机产生相对抖动
+            Vector3 actionAnchor = ownControl.transform.position;
+            float cameraHeight = sliding ? slideCameraHeight : rollCameraHeight;
+            float cameraSmoothTime = sliding
+                ? slideCameraSmoothTime : rollCameraSmoothTime;
+            float targetHeight = actionAnchor.y + cameraHeight;
+            if (sliding && ownControl.Con_move.slideTimer <= slideCameraReleaseTime)
+                targetHeight = PlayerHeadTransform.position.y;
+
+            float actionY = Mathf.SmoothDamp(Target_Object.position.y, targetHeight,
+                ref heightVelocity, cameraSmoothTime);
+            Target_Object.position = new Vector3(actionAnchor.x, actionY, actionAnchor.z);
+            targetVelocity = Vector3.zero;
+        }
+        else
+        {
+            Vector3 headPosition = PlayerHeadTransform.position;
+            float cameraY = Mathf.SmoothDamp(Target_Object.position.y, headPosition.y,
+                ref heightVelocity, followHeightSmoothTime);
+
+            // 横向使用稳定的角色根节点，避免左右探头动画的头部姿态叠出不同横移量
+            Vector3 horizontalAnchor = ownControl != null
+                ? ownControl.transform.position : headPosition;
+            Target_Object.position = new Vector3(horizontalAnchor.x, cameraY, horizontalAnchor.z);
+            targetVelocity = Vector3.zero;
+        }
         Camera_Object.transform.position = CameraBlockPosition(Target_Object.position, worldOffset)
             + shakeOffset + suppressPosOffset;
 
-        // 压制抖动叠加到朝向
-        transform.localRotation = quat * Quaternion.Euler(suppressRotOffset);
+        // 探头滚转只改变画面倾斜，不参与横移和射击方向计算
+        float targetPeekRoll = peekSide * peekCameraRoll;
+        currentPeekRoll = Mathf.SmoothDampAngle(currentPeekRoll, targetPeekRoll,
+            ref peekRollVelocity, peekSmoothTime, Mathf.Infinity, Time.deltaTime);
+
+        // 压制抖动与探头滚转叠加到朝向
+        transform.localRotation = quat * Quaternion.Euler(suppressRotOffset)
+            * Quaternion.Euler(0f, 0f, currentPeekRoll);
     }
 
     // 触发一次震动偏移，scale 为幅度倍数
@@ -320,13 +438,17 @@ public class Player_camera : MonoBehaviour
         Vector3 dir = offset / want;
         float limit = want;
 
-        int count = Physics.SphereCastNonAlloc(pivot, cameraRadius, dir,
-            cameraHitBuffer, want, cameraBlockMask, QueryTriggerInteraction.Ignore);
+        // 从头部向后发射细射线，避免贴身正面墙体与检测球初始重叠导致零距离误判
+        int count = Physics.RaycastNonAlloc(pivot, dir, cameraHitBuffer, want,
+            cameraBlockMask, QueryTriggerInteraction.Ignore);
 
         for (int i = 0; i < count; i++)
         {
             if (cameraHitBuffer[i].collider.transform.IsChildOf(PlayerHeadTransform.root)) continue;   // 忽略自身
-            if (cameraHitBuffer[i].distance < limit) limit = cameraHitBuffer[i].distance;
+
+            // 命中距离扣除相机半径，保留镜头与背后墙体之间的安全间距
+            float hitLimit = Mathf.Max(0f, cameraHitBuffer[i].distance - cameraRadius);
+            if (hitLimit < limit) limit = hitLimit;
         }
 
         // 距离限制在最近与期望之间
@@ -334,7 +456,17 @@ public class Player_camera : MonoBehaviour
         limit = Mathf.Max(limit, Mathf.Min(cameraMinDistance, want));
 
         float speed = limit < cameraDistance ? cameraPullInSpeed : cameraPushOutSpeed;   // 拉近快推远慢
-        cameraDistance = Mathf.MoveTowards(cameraDistance, limit, speed * Time.deltaTime);
+        if (limit < cameraDistance - cameraSnapDistance)
+        {
+            cameraDistance = limit;
+            cameraDistanceVelocity = 0f;
+        }
+        else
+        {
+            cameraDistance = Mathf.SmoothDamp(cameraDistance, limit,
+                ref cameraDistanceVelocity, cameraDistanceSmoothTime,
+                speed, Time.deltaTime);
+        }
 
         return pivot + dir * cameraDistance;
     }

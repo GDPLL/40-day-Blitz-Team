@@ -1437,6 +1437,7 @@ GameObject:
   - component: {fileID: 7914971046313913987}
   - component: {fileID: 1326813372226240841}
   - component: {fileID: 622760688168328977}
+  - component: {fileID: 7075731802248219611}
   m_Layer: 8
   m_HasEditorInfo: 1
   m_Name: Player
@@ -1504,6 +1505,7 @@ MonoBehaviour:
   healSpeed: 10
   fallAccel: 400
   fallDamageRate: 0.1
+  rollFallDamageScale: 0.5
   respawnIndex: 0
   isDead: 0
 --- !u!114 &-8760748900487357536
@@ -1518,7 +1520,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3580946079
+  GlobalObjectIdHash: 815433573
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -1580,6 +1582,70 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animation: {fileID: 3216577502545468986}
+  crouchModelLift: 0.19
+  crouchLiftRiseTime: 0.82
+  crouchLiftFallTime: 0.15
+  crouchHoldOffset: 2.44
+  crouchActionSmoothTime: 0.32
+  slideTurnTime: 0.12
+  footGroundHeight: 0.02
+  footGroundSpeed: 12
+  slideModelLift: -0.6
+  slideLiftTime: 0.2
+  slideGroundSmoothTime: 0.12
+  slideSlopeSmoothTime: 0.08
+  rollLiftCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: -0.2
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.15
+      value: -0.35
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.5
+      value: -0.8
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.85
+      value: -0.35
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: -0.2
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  rollSlopeSmoothTime: 0.08
 --- !u!54 &6445952189836789830
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -1665,19 +1731,33 @@ MonoBehaviour:
   turnSpeed: 360
   walkSpeed: 5
   runSpeed: 8
-  squatSpeed: 1
+  squatSpeed: 2
   walkForce: 1000
   runForce: 3000
-  squatForce: 100
+  squatForce: 900
   walkInterval: 0.7755
   runInterval: 0.14
+  squatInterval: 0.2
   jumpForce: 400
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckDistance: 0.2
+  maxSlopeAngle: 50
+  groundStopAccel: 30
   rb: {fileID: 6445952189836789830}
-  rollForce: 1000
-  rollSpeed: 12
+  rollBrake: 400
+  rollForce: 2500
+  rollSpeed: 30
   rollDelay: 0.8991
   rollTime: 0.5
   rollSquatScale: 0.5
+  slideSpeed: 10
+  slideForce: 900
+  slideUphillLoss: 0.5
+  slideDownhillBonus: 2.5
+  slideMaintainAccel: 30
+  slideSquatScale: 0.5
   deadSquatScale: 0.23
 --- !u!114 &2084833044355557849
 MonoBehaviour:
@@ -1817,6 +1897,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 164f3b5685eedad47a92a2a78b6432fa, type: 3}
   - {fileID: 8300000, guid: b8735379de7759c4e8f55e1ab82dde40, type: 3}
   - {fileID: 8300000, guid: 293533feaeb98164e85395ce0e7f423a, type: 3}
+  - {fileID: 0}
+  - {fileID: 8300000, guid: 3c71a20d36c645b49ea12a7b84a65f10, type: 3}
   shotSource: {fileID: 8448340592767103017}
   loopSource: {fileID: 1293818048992969774}
   dropSource: {fileID: 5978881978128264792}
@@ -1827,6 +1909,7 @@ MonoBehaviour:
   breathSource: {fileID: 5829569019940220665}
   coughSource: {fileID: 3808929648953842536}
   windSource: {fileID: 4362577515952290951}
+  lockBuzzerSource: {fileID: 7075731802248219611}
   tailDelay: 0.2
   gunMinInterval: 0.1
   volumeMin: 0.9
@@ -1835,6 +1918,7 @@ MonoBehaviour:
   windMinSpeed: 8
   windMaxSpeed: 20
   landSpeed: 6
+  lockBuzzerInterval: 0.5
 --- !u!114 &1510269724543673231
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1853,14 +1937,24 @@ MonoBehaviour:
   bodyRoot: {fileID: 4678201328113845342}
   ammo: 30
   maxAmmo: 30
+  magazineCount: 6
+  maxMagazineCount: 6
   fireRate: 900
   range: 1000
   damage: 34
   reloadTime: 3.06
   armRig: {fileID: 7373796111577540768}
   armRigLayer: 0
+  peekGunOffset: 0.4
+  peekGunLeftTravelScale: 1.2
+  peekGunSmoothTime: 0.12
   hitEffect: {fileID: 4015259995318076048, guid: 5ba040b8213866147a03bf9330ad54ae, type: 3}
   fireEffect: {fileID: 2654986424484326109, guid: 1dc1100dd1826c749a3d423464c7488f, type: 3}
+  fireEffectPrewarm: 12
+  fireEffectLife: 2
+  hitEffectPrewarm: 8
+  hitEffectLife: 2
+  bloodPrewarm: 8
   bloodCount: 26
   bloodLife: 1.2
   bloodSpeed: 4.5
@@ -1876,22 +1970,25 @@ MonoBehaviour:
     farDistance: 15
     farFactor: 1
     stableShots: 16
+    bloomHold: 0.12
   shoulderAim:
     outerAngle: 16
     innerAngle: 2
-    growSpeed: 15
+    growSpeed: 25
     nearDistance: 6
     farDistance: 35
     farFactor: 1
     stableShots: 5
+    bloomHold: 0.03
   adsAim:
     outerAngle: 10
     innerAngle: 0.2
-    growSpeed: 5
+    growSpeed: 12
     nearDistance: 60
     farDistance: 500
     farFactor: 1
     stableShots: 4
+    bloomHold: 0
   stableCost: 0.3
   burstCost: 0.35
   moveFactorSquatStand: 1.3
@@ -1996,7 +2093,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f73acdf0ebedc294cac6c4f4ceb2b8e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  groundCheckDistance: 0.2
   respawnSquatTime: 0.23
   reconcileSpeed: 5
   isOnGround: 0
@@ -2007,6 +2103,107 @@ MonoBehaviour:
   isJumpDown: 0
   isRollDown: 0
   rollTimer: 0
+  isPeekLeft: 0
+  isPeekRight: 0
+  slideTimer: 0
+  slideTime: 1.77
+  slideExitTime: 0.5
+--- !u!82 &7075731802248219611
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 8300000, guid: 3c71a20d36c645b49ea12a7b84a65f10, type: 3}
+  m_PlayOnAwake: 0
+  m_Volume: 0.65
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &7746808583437207710
 GameObject:
   m_ObjectHideFlags: 0
@@ -2096,7 +2293,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 1
+      value: 0
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -4336,15 +4533,7 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
-  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
-    are already bound by a Humanoid avatar. These transforms can only be changed
-    by Humanoid clips.\n\tTransform 'mixamorig:Hips'\n\tTransform 'mixamorig:RightFoot'\n\tTransform
-    'mixamorig:LeftLeg'\n\tTransform 'mixamorig:LeftHand'\n\tTransform 'mixamorig:LeftToeBase'\n\tTransform
-    'mixamorig:Spine1'\n\tTransform 'mixamorig:Spine2'\n\tTransform 'mixamorig:LeftHandPinky3'\n\tTransform
-    'mixamorig:LeftHandThumb1'\n\tTransform 'mixamorig:RightHandPinky3'\n\tand more
-    ...\n\tFrom animation clip 'squat foeword'\n\tFrom animation clip 'squat to the
-    right'\n\tFrom animation clip 'squat back'\n\tFrom animation clip 'squat to the
-    left'\n\tFrom animation clip 'Probe back'\n\tFrom animation clip 'Probe out'"
+  m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -4364,7 +4553,15 @@ MonoBehaviour:
   m_RigLayers:
   - m_Rig: {fileID: 5173853234409128208}
     m_Active: 1
-  m_Effectors: []
+  m_Effectors:
+  - m_Transform: {fileID: 7716673261367819362}
+    m_Style:
+      shape: {fileID: 4300000, guid: c6793350c150f456688e39a81f97364a, type: 2}
+      color: {r: 1, g: 0, b: 0, a: 0.5}
+      size: 0.1
+      position: {x: 0, y: 0, z: 0}
+      rotation: {x: 0, y: 0, z: 0}
+    m_Visible: 1
 --- !u!4 &5075539921238429896 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8142028300753827730, guid: 93d97806ba2134943ac50e9dd500eb5d, type: 3}
@@ -4458,6 +4655,11 @@ Transform:
 --- !u!4 &7652066818745528251 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2549001063973680925, guid: 93d97806ba2134943ac50e9dd500eb5d, type: 3}
+  m_PrefabInstance: {fileID: 5291242258775873702}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7716673261367819362 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2484128538761520324, guid: 93d97806ba2134943ac50e9dd500eb5d, type: 3}
   m_PrefabInstance: {fileID: 5291242258775873702}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &7930197992931159091 stripped
