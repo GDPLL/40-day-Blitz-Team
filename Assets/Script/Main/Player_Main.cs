@@ -36,6 +36,8 @@ public class Player_Main : NetworkBehaviour
     public Transform[] Num1respawnPoints;   // 复活点，按玩家编号
     public Transform[] Num2respawnPoints;   // 复活点，按玩家编号
     public Transform[] Num3respawnPoints;   // 复活点，按玩家编号
+    public Transform[] Num4respawnPoints;   // 复活点，按玩家编号
+    public Transform[] Num5respawnPoints;   // 复活点，按玩家编号
     public bool isInit { get; private set; }                //初始化准备完成
 
     NetworkVariable<float> netGameTime = new NetworkVariable<float>();   //关卡时间，同步显示
@@ -490,16 +492,22 @@ public class Player_Main : NetworkBehaviour
     // 按编号取复活点，十位为楼层个位为点序号
     Transform Respawn_Point(int index)
     {
+        Transform[] points;
         switch (index / 10)
         {
-            case 0:
-                return Num1respawnPoints[index % Num1respawnPoints.Length];
-            case 1:
-                return Num2respawnPoints[UnityEngine.Random.Range(0, Num2respawnPoints.Length)];
-            case 2:
-                return Num3respawnPoints[UnityEngine.Random.Range(0, Num3respawnPoints.Length)];
+            case 0: points = Num1respawnPoints; break;
+            case 1: points = Num2respawnPoints; break;
+            case 2: points = Num3respawnPoints; break;
+            case 3: points = Num4respawnPoints; break;
+            case 4: points = Num5respawnPoints; break;
+            default: return null;
         }
-        return null;
+
+        if (points == null || points.Length == 0) return null;
+
+        // 一楼按编号固定点，其余随机
+        if (index / 10 == 0) return points[index % points.Length];
+        return points[UnityEngine.Random.Range(0, points.Length)];
     }
 
     // 结算积分榜，游戏结束才显示

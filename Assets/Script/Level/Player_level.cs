@@ -33,7 +33,7 @@ public class Player_level : MonoBehaviour
     //节点时刻 30s 3m 3m10s 4m 5m 5m30s 9m
     readonly float[] nodeTime = { 30f, 180f, 190f, 240f, 300f, 330f, 540f };
     //节点毒气高度，0为不变
-    readonly float[] nodeGasY = { -10f, 45f, 0f, 95f, 120f, 165f, 0f };
+    readonly float[] nodeGasY = { -100f, 45f, 0f, 95f, 120f, 165f, 0f };
     //毒气粒子1-4
     public ParticleSystem[] gasParticle = new ParticleSystem[4];
     float gasHeight;                        //当前毒气高度
@@ -59,8 +59,8 @@ public class Player_level : MonoBehaviour
     public float battleTime = 510f;         //决战音乐时刻，8分30秒
     bool battleOn;                          //决战音乐已播
 
-    //复活楼层，3m10s二楼 4m三楼
-    public int Respawn_Floor => gameTime >= 240f ? 2 : gameTime >= 190f ? 1 : 0;
+    //复活楼层，3m10s二楼 5m三楼 5m30s四楼，一层毒气不管
+    public int Respawn_Floor => gameTime >= 330f ? 3 : gameTime >= 300f ? 2 : gameTime >= 190f ? 1 : 0;
 
     //9分钟关闭复活
     public bool Respawn_Off => gameTime >= 540f;
@@ -234,8 +234,8 @@ public class Player_level : MonoBehaviour
             return;
         }
 
-        // 毒气逐层抬升，只放当前层
-        if (nodeGasY[index] > 0f)
+        // 毒气逐层抬升，只在毒气节点释放
+        if (Array.IndexOf(gasNode, index) >= 0)
         {
             gasHeight = nodeGasY[index];
 

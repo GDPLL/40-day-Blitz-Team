@@ -8,8 +8,12 @@ public class Level_elevator : MonoBehaviour
     // 部件
     public Transform floor;         // 电梯地板
     public Rigidbody floorBody;     // 地板刚体，带人
-    public Transform door1;         // 一楼门
-    public Transform door2;         // 二楼门
+    public Transform door1Left;     // 一楼左门
+    public Transform door1Right;    // 一楼右门
+    public Transform door2Left;     // 二楼左门
+    public Transform door2Right;    // 二楼右门
+    public Transform cabLeft;       // 电梯间左门
+    public Transform cabRight;      // 电梯间右门
 
     // 音效
     public AudioSource audioSource;     // 一次性音源
@@ -19,15 +23,19 @@ public class Level_elevator : MonoBehaviour
     public AudioClip riseClip;          // 运行声
 
     // 行程
-    float doorUp = 5f;       // 开门上移
+    public float doorSlide = 1.5f;  // 单扇门左右开合距离
     float floorUp = 48.2f;     // 地板升高
     float floorDown = 0.3f;  // 先行下沉托人
     float moveSpeed = 5f;    // 移动速度
 
     // 初始位置
     Vector3 floorBase;      // 地板初始位置
-    Vector3 door1Base;      // 一楼门初始位置
-    Vector3 door2Base;      // 二楼门初始位置
+    Vector3 door1LBase;     // 一楼左门初始位置
+    Vector3 door1RBase;     // 一楼右门初始位置
+    Vector3 door2LBase;     // 二楼左门初始位置
+    Vector3 door2RBase;     // 二楼右门初始位置
+    Vector3 cabLBase;       // 电梯间左门初始位置
+    Vector3 cabRBase;       // 电梯间右门初始位置
     Vector3 floorNow;       // 地板当前位置
     int stage;              // 运行阶段
     bool startup;           // 开局下行中
@@ -35,7 +43,9 @@ public class Level_elevator : MonoBehaviour
     // 初始化，重置所有位置
     public void Level_elevator_Init()
     {
-        if (floor == null || floorBody == null || door1 == null || door2 == null)
+        if (floor == null || floorBody == null ||
+            door1Left == null || door1Right == null ||
+            door2Left == null || door2Right == null)
         {
             Debug.LogError("Level_elevator|Level_elevator_Init|部件未绑定");
             return;
@@ -43,8 +53,14 @@ public class Level_elevator : MonoBehaviour
 
         // 记录部件初始位置
         floorBase = floor.position;
-        door1Base = door1.position;
-        door2Base = door2.position;
+        door1LBase = door1Left.position;
+        door1RBase = door1Right.position;
+        door2LBase = door2Left.position;
+        door2RBase = door2Right.position;
+
+        // 电梯间门取局部坐标，随轿厢移动
+        if (cabLeft != null) cabLBase = cabLeft.localPosition;
+        if (cabRight != null) cabRBase = cabRight.localPosition;
 
         // 运行循环音
         if (riseSource != null)
@@ -59,8 +75,14 @@ public class Level_elevator : MonoBehaviour
         floorNow = floorBase + Vector3.up * floorUp;
         floorBody.position = floorNow;
         floor.position = floorNow;
-        door1.position = door1Base;
-        door2.position = door2Base + Vector3.up * doorUp;
+        door1Left.position = door1LBase;
+        door1Right.position = door1RBase;
+        door2Left.position = door2LBase + Vector3.left * doorSlide;
+        door2Right.position = door2RBase + Vector3.right * doorSlide;
+
+        // 电梯间门与二楼门同为打开
+        if (cabLeft != null) cabLeft.localPosition = cabLBase + Vector3.left * doorSlide;
+        if (cabRight != null) cabRight.localPosition = cabRBase + Vector3.right * doorSlide;
 
         startup = true;
         stage = 7;      // 关二楼门下行开一楼门
@@ -87,7 +109,9 @@ public class Level_elevator : MonoBehaviour
     // 每物理帧驱动电梯运行
     public void Level_elevator_FixUpdate()
     {
-        if (floor == null || floorBody == null || door1 == null || door2 == null)
+        if (floor == null || floorBody == null ||
+            door1Left == null || door1Right == null ||
+            door2Left == null || door2Right == null)
         {
             Debug.LogError("Level_elevator|Level_elevator_FixUpdate|部件未绑定");
             return;
@@ -95,8 +119,6 @@ public class Level_elevator : MonoBehaviour
         if (stage == 1) return;     // 待机，等启动
 
         float step = moveSpeed * Time.fixedDeltaTime;    // 匀速步长
-        Vector3 door1Open = door1Base + Vector3.up * doorUp;
-        Vector3 door2Open = door2Base + Vector3.up * doorUp;
         Vector3 floorTop = floorBase + Vector3.up * floorUp;
         Vector3 floorDip = floorBase - Vector3.up * floorDown;
 
@@ -110,13 +132,11 @@ public class Level_elevator : MonoBehaviour
 
         switch (stage)
         {
-            case 0:     // 一楼门升起
-                door1.position = Vector3.MoveTowards(door1.position, door1Open, step);
-                if (door1.position == door1Open) stage = 1;
+            case 0:     // 一楼门左右打开
+                if (Door_Date(door1Left, door1LBase, door1Right, door1RBase, true, step)) stage = 1;
                 break;
             case 2:     // 关一楼门
-                door1.position = Vector3.MoveTowards(door1.position, door1Base, step);
-                if (door1.position == door1Base) stage = 3;
+                if (Door_Date(door1Left, door1LBase, door1Right, door1RBase, false, step)) stage = 3;
                 break;
             case 3:     // 地板下沉托人
                 floorNow = Vector3.MoveTowards(floorNow, floorDip, step);
@@ -132,12 +152,10 @@ public class Level_elevator : MonoBehaviour
                 Play_Once(arriveClip);      // 到达铃声
                 break;
             case 5:     // 开二楼门
-                door2.position = Vector3.MoveTowards(door2.position, door2Open, step);
-                if (door2.position == door2Open) stage = 6;
+                if (Door_Date(door2Left, door2LBase, door2Right, door2RBase, true, step)) stage = 6;
                 break;
             case 7:     // 关二楼门
-                door2.position = Vector3.MoveTowards(door2.position, door2Base, step);
-                if (door2.position == door2Base) stage = 8;
+                if (Door_Date(door2Left, door2LBase, door2Right, door2RBase, false, step)) stage = 8;
                 break;
             case 8:     // 地板下行
                 floorNow = Vector3.MoveTowards(floorNow, floorBase, step);
@@ -148,8 +166,7 @@ public class Level_elevator : MonoBehaviour
                 Play_Once(arriveClip);      // 到达铃声
                 break;
             case 9:     // 开一楼门
-                door1.position = Vector3.MoveTowards(door1.position, door1Open, step);
-                if (door1.position != door1Open) break;
+                if (!Door_Date(door1Left, door1LBase, door1Right, door1RBase, true, step)) break;
 
                 // 开局下行回到待机，其余回到结束
                 stage = startup ? 1 : 10;
@@ -157,6 +174,37 @@ public class Level_elevator : MonoBehaviour
                 break;
             default: return;    // 运行结束
         }
+    }
+
+    // 左右门开合，场景门用世界坐标，电梯间门用局部坐标，全部到位返回true
+    bool Door_Date(Transform left, Vector3 lBase, Transform right, Vector3 rBase, bool open, float step)
+    {
+        Vector3 lTarget = open ? lBase + Vector3.left * doorSlide : lBase;
+        Vector3 rTarget = open ? rBase + Vector3.right * doorSlide : rBase;
+
+        left.position = Vector3.MoveTowards(left.position, lTarget, step);
+        right.position = Vector3.MoveTowards(right.position, rTarget, step);
+
+        bool sceneDone = left.position == lTarget && right.position == rTarget;
+
+        // 电梯间门同步开合
+        bool cabDone = Cab_Door_Date(open, step);
+
+        return sceneDone && cabDone;
+    }
+
+    // 电梯间门开合，未绑定视为到位
+    bool Cab_Door_Date(bool open, float step)
+    {
+        if (cabLeft == null || cabRight == null) return true;
+
+        Vector3 lTarget = open ? cabLBase + Vector3.left * doorSlide : cabLBase;
+        Vector3 rTarget = open ? cabRBase + Vector3.right * doorSlide : cabRBase;
+
+        cabLeft.localPosition = Vector3.MoveTowards(cabLeft.localPosition, lTarget, step);
+        cabRight.localPosition = Vector3.MoveTowards(cabRight.localPosition, rTarget, step);
+
+        return cabLeft.localPosition == lTarget && cabRight.localPosition == rTarget;
     }
 
     // 播一次音效

@@ -116,6 +116,12 @@ public class Player_camera : MonoBehaviour
     // 记录初始视角与偏移
     public void Player_camera_Start(Transform _PlayerHeadTransform)
     {
+        cam = GetComponent<Camera>();
+        if (cam != null)
+        {
+            // 强制关闭深度纹理生成
+            cam.depthTextureMode = DepthTextureMode.None;
+        }
         if (_PlayerHeadTransform == null)
         {
             Debug.LogError("Player_camera|Player_camera_Start|PlayerHeadTransform 为空");
@@ -172,7 +178,7 @@ public class Player_camera : MonoBehaviour
     // 视角旋转与相机跟随
     public void Camera_Follow_Performance_Local()
     {
-        if(!Player_Main.player_Main.isInit) return;     //等待关卡初始化
+        if (!Player_Main.player_Main.isInit) return;     //等待关卡初始化
 
         if (pNet != null && !pNet.IsOwner) return;      // 非本地玩家不更新
 
