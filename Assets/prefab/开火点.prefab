@@ -4952,9 +4952,10 @@ MonoBehaviour:
   - {fileID: 970687110298216251}
   - {fileID: 6478668832671096114}
   audioSource: {fileID: 0}
+  ricochetSource: {fileID: 0}
   hitClip: {fileID: 0}
   ricochetClip: {fileID: 0}
-  time: 2
+  time: 0.1
   ricochetRate: 0.1
   volumeMin: 0.8
   volumeMax: 1.2

@@ -1,9 +1,59 @@
 fileFormatVersion: 2
-guid: 30cbf4168a407da46ab76ecb986f618f
+guid: CSlMsH/+UipebkKMq2UmolCS6l0Pb7G0H/vJdFuL+qRAMSAipi/Bifw=
 ModelImporter:
-  serializedVersion: 22200
+  serializedVersion: 22361
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: AR15
+    second: {fileID: 2100000, guid: db8245968367e1f43bf73d54155f36dd, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Front Grip
+    second: {fileID: 2100000, guid: d37da03fb4daee84f9ecb60ffcc295e1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Magazine
+    second: {fileID: 2100000, guid: 2bee14e4b51e16246bbb7e17c9862a91, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: acog
+    second: {fileID: 2100000, guid: e901106544752b54aa1d9ec7b07545bf, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: glow stick
+    second: {fileID: 2100000, guid: ea3d523f1cdca294c8ec8744d4cd45bf, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: kill flash
+    second: {fileID: 2100000, guid: 1302e31d1c1d3da41a2539b7d276e438, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: laser
+    second: {fileID: 2100000, guid: d960d57b57ad72b4983453889fde551e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: rail
+    second: {fileID: 2100000, guid: 2e5f53cedaa20ea4ba138e550364b9a6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: suppresor
+    second: {fileID: 2100000, guid: 3d76bffec3ebab3478f93b16a65f3169, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: tape
+    second: {fileID: 2100000, guid: 43d5b0ee1bd62724cb3ed89aa0d4b057, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -25,6 +75,9 @@ ModelImporter:
     importAnimatedCustomProperties: 0
     importConstraints: 0
     animationCompression: 1
+    aCLCompressionLevel: 3
+    aCLCurvePrecision: 0.01
+    aCLFastSampleMode: 1
     animationRotationError: 0.5
     animationPositionError: 0.5
     animationScaleError: 0.5
@@ -33,10 +86,17 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations: []
     isReadable: 0
+    tuanjieGIEnable: 0
+    tuanjieGIGenSDFFactor: 1
+    tuanjieGIGenSDFBias: 0.25
+    tuanjieGIDoubleSidedMode: 0
+    tuanjieGIGenFacetNums: 12
   meshes:
     lODScreenPercentages: []
-    globalScale: 1
+    globalScale: 0.55
     meshCompression: 0
+    totalVerticesCount: 67529
+    totalTrianglesCount: 71496
     addColliders: 0
     useSRGBMaterialColor: 1
     sortHierarchyByName: 1
@@ -69,6 +129,191 @@ ModelImporter:
     secondaryUVPackMargin: 4
     useFileScale: 1
     strictVertexDataChecks: 0
+  virtualGeometry:
+    virtualGeometry: 0
+    useTransparent: 0
+    setVGForeachMesh: 0
+    isFirstUse: 1
+    virtualGeometrySettings:
+      generateGeometryBuffer: 0
+      surfaceCompensation: 0
+      allMeshUse: 1
+      ignoreSimpleMesh: 0
+      transformScaleState: 0
+      isPossibleOverflow: 0
+      hasBoneData: 0
+      isBoneCountOverflow: 0
+    virtualGeometryPlatformSettings:
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: DefaultVirtualGeometryPlatform
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: Standalone
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: iPhone
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    - serializedVersion: 0
+      overridden: 0
+      ignorePlatformSupport: 0
+      buildTarget: Android
+      positionPrecision: -2147483648
+      normalPrecision: -2147483648
+      tangentPrecision: -2147483648
+      boneWeightPrecision: -2147483648
+      detailedTriangleCount: 0
+      detailedVertexCount: 0
+      rootPageSize: 0
+      streamablePageSize: 0
+      reserveTrianglePercent: 100
+      reserveDetailLevel: 0
+    selectedVGMeshes:
+    - index: 0
+      meshName: ar15
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 1
+      meshName: Magazine
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 2
+      meshName: bolt carrier
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 3
+      meshName: acog
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 4
+      meshName: dust cover
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 5
+      meshName: glow stick
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 6
+      meshName: tape
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 7
+      meshName: laser
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 8
+      meshName: kill flash
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 9
+      meshName: suppressor
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 10
+      meshName: Front Grip
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 11
+      meshName: switch
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 12
+      meshName: rail
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 13
+      meshName: trigger
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    supportVGMeshes:
+    - index: 0
+      meshName: ar15
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 1
+      meshName: Magazine
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 2
+      meshName: bolt carrier
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 3
+      meshName: acog
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 4
+      meshName: dust cover
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 5
+      meshName: glow stick
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 6
+      meshName: tape
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 7
+      meshName: laser
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 8
+      meshName: kill flash
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 9
+      meshName: suppressor
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 10
+      meshName: Front Grip
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 11
+      meshName: switch
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 12
+      meshName: rail
+      lodLevel: 0
+      meshGeometryBuffer: 0
+    - index: 13
+      meshName: trigger
+      lodLevel: 0
+      meshGeometryBuffer: 0
   tangentSpace:
     normalSmoothAngle: 60
     normalImportMode: 0
@@ -79,10 +324,14 @@ ModelImporter:
     normalSmoothingSource: 0
   referencedClips: []
   importAnimation: 1
+  overrideDefaultPose: 0
   humanDescription:
     serializedVersion: 3
     human: []
     skeleton: []
+    namedPoseList:
+    - name: Default
+      skeleton: []
     armTwist: 0.5
     foreArmTwist: 0.5
     upperLegTwist: 0.5
@@ -90,8 +339,9 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
-    globalScale: 1
+    globalScale: 0.0055
     rootMotionBoneName: 
+    defaultPoseIndex: -1
     hasTranslationDoF: 0
     hasExtraRoot: 0
     skeletonHasParents: 1

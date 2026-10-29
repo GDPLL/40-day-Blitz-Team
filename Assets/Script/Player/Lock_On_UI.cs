@@ -12,8 +12,8 @@ public class Lock_On_UI : MonoBehaviour
             return;
         }
 
-        if (stage == 0) Debug.Log("解除锁定");
-        else if (stage == 1) Debug.Log("被锁定");
-        else Debug.Log("锁定完成");
+        if (Player_Main.player_Main == null || Player_Main.player_Main.uI_Player == null) return;
+
+        Player_Main.player_Main.uI_Player.UI_Player_Show_Lock(stage);
     }
 }

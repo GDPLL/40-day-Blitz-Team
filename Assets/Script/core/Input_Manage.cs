@@ -178,6 +178,8 @@ public class Input_Manage : NetworkBehaviour
     public bool RollDown;           //翻滚请求
     public Vector2 RollDir;         //翻滚方向
     public bool DebugKey;           // 调试输入
+    public bool MapDown;            // 地图开关
+    public bool FoldDown;           // 折叠开关
 
     // 读取输入状态
     void Input_get()
@@ -195,6 +197,8 @@ public class Input_Manage : NetworkBehaviour
         PeekLeftHeld = Input.GetKey(KeyCode.Q);             //左探头
         PeekRightHeld = Input.GetKey(KeyCode.E);            //右探头
         DebugKey = Input.GetKey(KeyCode.BackQuote);         //调试输入按钮
+        MapDown = Input.GetKeyDown(KeyCode.M);              //地图开关
+        FoldDown = Input.GetKeyDown(KeyCode.N);             //折叠开关
 
         GetAimPoint();      // 瞄准落点
         Roll_Double_Date(); // 翻滚双击

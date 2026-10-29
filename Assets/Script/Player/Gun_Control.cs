@@ -52,11 +52,11 @@ public class Gun_Control : NetworkBehaviour
 
     [Header("枪口特效对象池")]
     public int fireEffectPrewarm = 12;      // 预热数量
-    public float fireEffectLife = 2f;       // 存活时长
+    public float fireEffectLife = 0f;       // 存活时长，0用预制体
 
     [Header("命中特效对象池")]
     public int hitEffectPrewarm = 8;        // 预热数量
-    public float hitEffectLife = 2f;        // 存活时长
+    public float hitEffectLife = 0f;        // 存活时长，0用预制体
 
     [Header("命中爆浆")]
     public int bloodPrewarm = 8;            // 预热数量
@@ -80,6 +80,7 @@ public class Gun_Control : NetworkBehaviour
     bool isRaised;                 // 举枪中
 
     public bool IsReloading => reloadTimer > 0f;   // 换弹中
+    public bool IsRaised => isRaised;              // 举枪中
 
     // 一种姿态对应的一组参数
     // 外圈、内圈、增长速度与距离衰减

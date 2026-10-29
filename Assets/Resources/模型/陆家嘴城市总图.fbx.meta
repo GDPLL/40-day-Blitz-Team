@@ -43,7 +43,7 @@ ModelImporter:
     tuanjieGIGenFacetNums: 12
   meshes:
     lODScreenPercentages: []
-    globalScale: 1.59
+    globalScale: 1
     meshCompression: 0
     totalVerticesCount: 13305
     totalTrianglesCount: 6884
@@ -93,63 +93,7 @@ ModelImporter:
       isPossibleOverflow: 0
       hasBoneData: 0
       isBoneCountOverflow: 0
-    virtualGeometryPlatformSettings:
-    - serializedVersion: 0
-      overridden: 0
-      ignorePlatformSupport: 0
-      buildTarget: DefaultVirtualGeometryPlatform
-      positionPrecision: -2147483648
-      normalPrecision: -2147483648
-      tangentPrecision: -2147483648
-      boneWeightPrecision: -2147483648
-      detailedTriangleCount: 0
-      detailedVertexCount: 0
-      rootPageSize: 0
-      streamablePageSize: 0
-      reserveTrianglePercent: 100
-      reserveDetailLevel: 0
-    - serializedVersion: 0
-      overridden: 0
-      ignorePlatformSupport: 0
-      buildTarget: Standalone
-      positionPrecision: -2147483648
-      normalPrecision: -2147483648
-      tangentPrecision: -2147483648
-      boneWeightPrecision: -2147483648
-      detailedTriangleCount: 0
-      detailedVertexCount: 0
-      rootPageSize: 0
-      streamablePageSize: 0
-      reserveTrianglePercent: 100
-      reserveDetailLevel: 0
-    - serializedVersion: 0
-      overridden: 0
-      ignorePlatformSupport: 0
-      buildTarget: iPhone
-      positionPrecision: -2147483648
-      normalPrecision: -2147483648
-      tangentPrecision: -2147483648
-      boneWeightPrecision: -2147483648
-      detailedTriangleCount: 0
-      detailedVertexCount: 0
-      rootPageSize: 0
-      streamablePageSize: 0
-      reserveTrianglePercent: 100
-      reserveDetailLevel: 0
-    - serializedVersion: 0
-      overridden: 0
-      ignorePlatformSupport: 0
-      buildTarget: Android
-      positionPrecision: -2147483648
-      normalPrecision: -2147483648
-      tangentPrecision: -2147483648
-      boneWeightPrecision: -2147483648
-      detailedTriangleCount: 0
-      detailedVertexCount: 0
-      rootPageSize: 0
-      streamablePageSize: 0
-      reserveTrianglePercent: 100
-      reserveDetailLevel: 0
+    virtualGeometryPlatformSettings: []
     selectedVGMeshes:
     - index: 0
       meshName: "\u9646\u5BB6\u5634\u57CE\u5E02\u603B\u56FE"
@@ -185,7 +129,7 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
-    globalScale: 0.015899999
+    globalScale: 1
     rootMotionBoneName: 
     defaultPoseIndex: -1
     hasTranslationDoF: 0

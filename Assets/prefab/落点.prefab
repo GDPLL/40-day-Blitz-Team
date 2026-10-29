@@ -9821,7 +9821,7 @@ MonoBehaviour:
   ricochetSource: {fileID: 1964630110993329743}
   hitClip: {fileID: 8300000, guid: 774ad298ce838854199373df184ed3b9, type: 3}
   ricochetClip: {fileID: 8300000, guid: c8ca4b16514dada478ef5496bf263df0, type: 3}
-  time: 2
+  time: 0.3
   ricochetRate: 0.25
   volumeMin: 0.8
   volumeMax: 1.2

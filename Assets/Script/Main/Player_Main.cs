@@ -24,6 +24,7 @@ public class Player_Main : NetworkBehaviour
     public UI_Rank uI_Rank;                         //本机积分排行榜
     public UI_CallATime_Text uI_CallATime;           //通讯设备UI
     public UI_Body uI_Body;                         //本机人形状态图
+    public UI_Map uI_Map;                           //地图分层UI
 
     bool levelEntered;                  // 已进入关卡
     bool hasLocalPlayer;                // 是否找到本地玩家
@@ -94,6 +95,12 @@ public class Player_Main : NetworkBehaviour
             if (uI_Body != null)
                 uI_Body.UI_Body_Show(oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp,
                     oPlayer_Control.Con_net_State.Show_State);
+
+            // 地图分层，当前高度、复活楼层、毒气阶段
+            if (uI_Map != null && Player_level.Instance != null)
+                uI_Map.UI_Map_Show(oPlayer_Control.transform.position.y,
+                    oPlayer_Control.RespawnIndex / 10,
+                    Player_level.Instance.Gas_Level);
 
             // 死亡等待幕布，淘汰后常驻
             if (uI_Curtain != null && !gameOver)
@@ -672,6 +679,13 @@ public class Player_Main : NetworkBehaviour
             Debug.LogError("Player_Main|InitScenceClientRpc|UI_Body 为空");
         }
         else uI_Body.UI_Body_Init();
+
+        // 地图分层
+        if (uI_Map == null)
+        {
+            Debug.LogError("Player_Main|InitScenceClientRpc|UI_Map 为空");
+        }
+        else uI_Map.UI_Map_Init();
 
         isInit = true;
 

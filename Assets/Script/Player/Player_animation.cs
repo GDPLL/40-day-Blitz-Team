@@ -20,8 +20,10 @@ public class Player_animation : MonoBehaviour
         }
         modelBasePosition = animation.transform.localPosition;
         modelBaseRotation = animation.transform.localRotation;
-        leftToe = animation.GetBoneTransform(HumanBodyBones.LeftToes);
-        rightToe = animation.GetBoneTransform(HumanBodyBones.RightToes);
+        leftToe = Bone_Date(HumanBodyBones.LeftToes, "LeftToe", HumanBodyBones.LeftFoot);
+        rightToe = Bone_Date(HumanBodyBones.RightToes, "RightToe", HumanBodyBones.RightFoot);
+        if (leftToe == null || rightToe == null)
+            Debug.LogError("Player_animation|Owner_Init|脚底骨骼缺失");
         float rollClipLength = 0f;
         // 蹲走动画强制循环
         foreach (AnimationClip clip in animation.runtimeAnimatorController.animationClips)
@@ -328,11 +330,7 @@ public class Player_animation : MonoBehaviour
     // Animator更新后校正脚底
     public void Player_animation_Ground_Performance()
     {
-        if (leftToe == null || rightToe == null)
-        {
-            Debug.LogError("Player_animation|Player_animation_Ground_Performance|脚趾骨骼为空");
-            return;
-        }
+        if (leftToe == null || rightToe == null) return;    // 骨骼缺失不校正
 
         if (rollActive)
         {
@@ -413,5 +411,18 @@ public class Player_animation : MonoBehaviour
         if (duration <= 0f) return target;
         float step = Time.deltaTime / duration;
         return Mathf.MoveTowards(animation.GetLayerWeight(layer), target, step);
+    }
+
+    // 取骨骼，人形骨骼缺失时按名字找，再退回脚掌
+    Transform Bone_Date(HumanBodyBones bone, string keyword, HumanBodyBones fallback)
+    {
+        Transform t = animation.GetBoneTransform(bone);
+        if (t != null) return t;
+
+        // Generic骨命名，如 mixamorig:LeftToeBase
+        foreach (Transform child in animation.GetComponentsInChildren<Transform>(true))
+            if (child.name.Contains(keyword)) return child;
+
+        return animation.GetBoneTransform(fallback);
     }
 }

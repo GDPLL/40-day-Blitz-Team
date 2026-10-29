@@ -35,12 +35,14 @@ Shader "UI/Body"
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+                fixed4 color : COLOR;
             };
 
             struct v2f
             {
                 float4 pos : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                fixed4 color : COLOR;
             };
 
             sampler2D _MainTex;
@@ -48,12 +50,13 @@ Shader "UI/Body"
             fixed4 _FlashColor;
             float _Damage;
 
-            // 顶点，传出UV
+            // 顶点，传出UV与顶点色
             v2f vert(appdata v)
             {
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv = v.uv;
+                o.color = v.color;
                 return o;
             }
 
@@ -61,8 +64,9 @@ Shader "UI/Body"
             fixed4 frag(v2f i) : SV_Target
             {
                 fixed4 tex = tex2D(_MainTex, i.uv);
-                fixed3 rgb = lerp(_Color.rgb, _FlashColor.rgb, _Damage);
-                return fixed4(rgb, tex.a * _Color.a);
+                fixed4 tint = _Color * i.color;      // 顶点色参与，Image.color 生效
+                fixed3 rgb = lerp(tint.rgb, _FlashColor.rgb, _Damage);
+                return fixed4(rgb, tex.a * tint.a);
             }
             ENDCG
         }

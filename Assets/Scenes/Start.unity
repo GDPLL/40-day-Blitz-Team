@@ -175,6 +175,8 @@ MonoBehaviour:
   RollDown: 0
   RollDir: {x: 0, y: 0}
   DebugKey: 0
+  MapDown: 0
+  FoldDown: 0
 --- !u!4 &7224402
 Transform:
   m_ObjectHideFlags: 0

@@ -67,6 +67,12 @@ public class Player_level : MonoBehaviour
     //复活楼层，3m10s二楼 5m三楼 5m30s四楼，一层毒气不管
     public int Respawn_Floor => gameTime >= 330f ? 3 : gameTime >= 300f ? 2 : gameTime >= 190f ? 1 : 0;
 
+    // 毒气阶段，0为未释放
+    public int Gas_Level => gasHeight >= nodeGasY[gasNode[3]] ? 4
+        : gasHeight >= nodeGasY[gasNode[2]] ? 3
+        : gasHeight >= nodeGasY[gasNode[1]] ? 2
+        : gasHeight >= nodeGasY[gasNode[0]] ? 1 : 0;
+
     //9分钟关闭复活
     public bool Respawn_Off => gameTime >= 540f;
 

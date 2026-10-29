@@ -24,6 +24,7 @@ public class Level_elevator : MonoBehaviour
 
     // 行程
     public float doorSlide = 1.5f;  // 单扇门左右开合距离
+    public float waitTime = 5f;     // 一楼停顿秒数
     float floorUp = 48.2f;     // 地板升高
     float floorDown = 0.3f;  // 先行下沉托人
     float moveSpeed = 5f;    // 移动速度
@@ -39,6 +40,7 @@ public class Level_elevator : MonoBehaviour
     Vector3 floorNow;       // 地板当前位置
     int stage;              // 运行阶段
     bool startup;           // 开局下行中
+    float waitTimer;        // 一楼停顿计时
 
     // 初始化，重置所有位置
     public void Level_elevator_Init()
@@ -86,6 +88,7 @@ public class Level_elevator : MonoBehaviour
 
         startup = true;
         stage = 7;      // 关二楼门下行开一楼门
+        waitTimer = 0f;
     }
 
     // 启动，关一楼门上行开二楼门
@@ -168,9 +171,30 @@ public class Level_elevator : MonoBehaviour
             case 9:     // 开一楼门
                 if (!Door_Date(door1Left, door1LBase, door1Right, door1RBase, true, step)) break;
 
-                // 开局下行回到待机，其余回到结束
-                stage = startup ? 1 : 10;
-                startup = false;
+                // 开局下行回到待机
+                if (startup)
+                {
+                    startup = false;
+                    stage = 1;
+                    break;
+                }
+
+                // 毒气已释放则停顿后再次上行
+                if (Player_level.Instance != null && Player_level.Instance.Gas_Height > 0f)
+                {
+                    waitTimer = 0f;
+                    stage = 11;
+                    break;
+                }
+
+                stage = 10;
+                break;
+            case 11:    // 一楼停顿，毒气后再次上行
+                waitTimer += Time.fixedDeltaTime;
+                if (waitTimer < waitTime) break;
+
+                stage = 2;      // 重新关一楼门上楼
+                Play_Once(startClip);
                 break;
             default: return;    // 运行结束
         }
