@@ -276,7 +276,8 @@ public class Player_Move_Date : MonoBehaviour
         // 滑铲末段起跳
         if ((slideJumpBufferTimer > 0f || jumpRequest) && slideTimer > 0f
             && slideJumpWindow > 0f && slideTimer <= slideJumpWindow
-            && body.IsGrounded && !Is_Roll_Active && !slidePending)
+            && body.IsGrounded && !Is_Roll_Active && !slidePending
+            && staminaDate.Try_Spend(staminaDate.jumpStaminaCost))
         {
             jumpRequest = false;
             slideJumpBufferTimer = 0f;
@@ -295,7 +296,9 @@ public class Player_Move_Date : MonoBehaviour
         {
             jumpRequest = false;
             if (slideTimer <= 0f
-                && !Is_Roll_Active && !slidePending)
+                && !Is_Roll_Active && !slidePending
+                && body.IsGrounded
+                && staminaDate.Try_Spend(staminaDate.jumpStaminaCost))
             {
                 body.Body_Jump_Date();
                 if (c.IsOwner && c.Con_player_Audio != null) c.Con_player_Audio.Jump_Show();
