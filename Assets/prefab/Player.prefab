@@ -1477,6 +1477,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   idleStateName: "\u7AD9\u7ACB"
+  lobbyController: {fileID: 9100000, guid: 1cb2c477b1a013a429d8442549f34d21, type: 2}
 --- !u!136 &6542558866760458668
 CapsuleCollider:
   m_ObjectHideFlags: 0

@@ -1,14 +1,16 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 using Unity.Netcode;
 using TMPro;
-using Unity.VisualScripting;
+using System.Collections.Generic;
 
 //负责开始界面的场景初始化与配置方法
 public class Start_Main : MonoBehaviour
 {
     const int HardPlayerLimit = 4;
+    const int HostTestSlot = 0;   //房主测试使用玩家1
+
+    public static Start_Main Instance { get; private set; }
 
     public SessionManager session;
     public Button hostButton;
@@ -22,9 +24,16 @@ public class Start_Main : MonoBehaviour
     public GameObject ObjectPrefab;
     public TextMeshProUGUI textMeshPro;
 
+    readonly Dictionary<ulong, int> clientSlots = new Dictionary<ulong, int>();
+    readonly Dictionary<ulong, NetworkObject> lobbyPlayers =
+        new Dictionary<ulong, NetworkObject>();
+    StartViewStage viewStage;
+
     // 绑定按钮与连接事件
     void Awake()
     {
+        Instance = this;
+
         if (session == null) session = GetComponent<SessionManager>();
         if (session == null) Debug.LogError("Start_Main|Start|未找到 SessionManager");
 
@@ -34,14 +43,20 @@ public class Start_Main : MonoBehaviour
 
         GameManager.gameManager.networkManager.OnConnectionEvent += OnPlayerJoin;
         GameManager.gameManager.StartAction += Room_Enter;      //回到房间
+        EnsureViewStage();
 
         Debug.Log("Start_Main|Awake|完成初始化");
     }
 
     void OnDestroy()
     {
-        GameManager.gameManager.networkManager.OnConnectionEvent -= OnPlayerJoin;
-        GameManager.gameManager.StartAction -= Room_Enter;
+        if (GameManager.gameManager != null
+            && GameManager.gameManager.networkManager != null)
+        {
+            GameManager.gameManager.networkManager.OnConnectionEvent -= OnPlayerJoin;
+            GameManager.gameManager.StartAction -= Room_Enter;
+        }
+        if (Instance == this) Instance = null;
     }
 
     // 开主机，创建中继房间
@@ -65,10 +80,17 @@ public class Start_Main : MonoBehaviour
     // 有玩家连接时生成对象
     void OnPlayerJoin(NetworkManager manager, ConnectionEventData data)
     {
-        if (data.EventType != ConnectionEvent.ClientConnected || !manager.IsServer) return;
+        if (!manager.IsServer) return;
 
-        int index = manager.ConnectedClients.Count - 1;
-        if (index < LobbyPlayerLimit) SpawnPlayer(index);    //新玩家编号
+        if (data.EventType == ConnectionEvent.ClientConnected)
+        {
+            int index = AssignClientSlot(data.ClientId);
+            if (index >= 0) SpawnPlayer(data.ClientId, index);
+        }
+        else if (data.EventType == ConnectionEvent.ClientDisconnected)
+        {
+            RemoveLobbyPlayer(data.ClientId);
+        }
     }
 
     // 回到房间，放开鼠标并重建成员
@@ -79,45 +101,118 @@ public class Start_Main : MonoBehaviour
 
         if (!GameManager.gameManager.networkManager.IsServer) return;   //只有主机生成
 
-        // 按当前人数重新生成
-        int count = Mathf.Min(
-            GameManager.gameManager.networkManager.ConnectedClients.Count,
-            LobbyPlayerLimit);
-        for (int i = 0; i < count; i++) SpawnPlayer(i);
+        // 按当前客户端补齐缺失的展示玩家
+        List<ulong> clientIds =
+            new List<ulong>(GameManager.gameManager.networkManager.ConnectedClientsIds);
+        clientIds.Sort();
+
+        for (int i = 0; i < clientIds.Count; i++)
+        {
+            int slot = AssignClientSlot(clientIds[i]);
+            if (slot >= 0) SpawnPlayer(clientIds[i], slot);
+        }
     }
 
     int LobbyPlayerLimit => Mathf.Clamp(MaxLobbyPlayers, 1, HardPlayerLimit);
 
-    // 生成玩家对象，index为编号
-    void SpawnPlayer(int index)
+    // 生成玩家并绑定对应客户端视角
+    void SpawnPlayer(ulong clientId, int index)
     {
         if (index < 0 || index >= LobbyPlayerLimit) return;
+        if (lobbyPlayers.TryGetValue(clientId, out NetworkObject existing)
+            && existing != null) return;
 
-        // 固定四个展示位，Camera.right 对应屏幕从左到右。
-        float centerIndex = (LobbyPlayerLimit - 1) * 0.5f;
-        Camera mainCamera = Camera.main;
-        Vector3 right = mainCamera != null ? mainCamera.transform.right : Vector3.back;
-
-        float slotOffset = (index - centerIndex) * PlayerSpacing;
-        if (index == 0) slotOffset -= FirstPlayerExtraLeft;
-
-        // 首位额外左移后，按最左和最右槽位的包围中心整体回正。
-        float leftmost = -centerIndex * PlayerSpacing - FirstPlayerExtraLeft;
-        float rightmost = centerIndex * PlayerSpacing;
-        float rowCenter = (leftmost + rightmost) * 0.5f;
-        Vector3 spawnPosition = StartVector3 + right * (slotOffset - rowCenter);
-
-        Vector3 faceCamera = mainCamera != null
-            ? mainCamera.transform.position - spawnPosition
-            : Vector3.zero;
-        faceCamera.y = 0f;
-        Quaternion rotation = faceCamera.sqrMagnitude > 0.001f
-            ? Quaternion.LookRotation(faceCamera)
-            : Quaternion.Euler(StartRotation);
+        EnsureViewStage();
+        Vector3 spawnPosition = viewStage.GetPlayerPosition(index);
+        Quaternion rotation = viewStage.GetPlayerRotation(index);
 
         GameObject go = Instantiate(ObjectPrefab, spawnPosition, rotation);
+        StartPlayerDisplay display = go.GetComponent<StartPlayerDisplay>();
+        if (display == null)
+        {
+            Debug.LogError("Start_Main|SpawnPlayer|展示组件缺失");
+            Destroy(go);
+            return;
+        }
+
+        display.ConfigureLobbyDisplay(index, clientId);
 
         // destroyWithScene 为 true，切场景时销毁
-        go.GetComponent<NetworkObject>().Spawn(true);
+        NetworkObject networkObject = go.GetComponent<NetworkObject>();
+        if (networkObject == null)
+        {
+            Debug.LogError("Start_Main|SpawnPlayer|NetworkObject缺失");
+            Destroy(go);
+            return;
+        }
+
+        networkObject.Spawn(true);
+        lobbyPlayers[clientId] = networkObject;
+        Debug.Log($"Start_Main|SpawnPlayer|客户端{clientId}对应玩家{index + 1}");
+    }
+
+    // 为客户端分配最小空闲席位
+    int AssignClientSlot(ulong clientId)
+    {
+        if (clientSlots.TryGetValue(clientId, out int assigned)) return assigned;
+
+        if (NetworkManager.Singleton != null
+            && clientId == NetworkManager.ServerClientId
+            && !clientSlots.ContainsValue(HostTestSlot))
+        {
+            clientSlots[clientId] = HostTestSlot;
+            return HostTestSlot;
+        }
+
+        for (int slot = 0; slot < LobbyPlayerLimit; slot++)
+        {
+            if (slot == HostTestSlot) continue;   //留给房主
+            if (clientSlots.ContainsValue(slot)) continue;
+            clientSlots[clientId] = slot;
+            return slot;
+        }
+
+        Debug.LogWarning($"Start_Main|AssignClientSlot|玩家已满，忽略客户端{clientId}");
+        return -1;
+    }
+
+    // 客户端离开时释放对应展示对象
+    void RemoveLobbyPlayer(ulong clientId)
+    {
+        if (lobbyPlayers.TryGetValue(clientId, out NetworkObject player)
+            && player != null)
+            player.Despawn(true);
+
+        lobbyPlayers.Remove(clientId);
+        clientSlots.Remove(clientId);
+    }
+
+    // 本机玩家收到席位后切换镜头
+    public void ShowViewForSlot(int slot)
+    {
+        EnsureViewStage();
+        viewStage.ShowSlot(slot);
+    }
+
+    public float GetViewSurfaceHeight(int slot)
+    {
+        EnsureViewStage();
+        return viewStage.GetPlayerSurfaceHeight(slot);
+    }
+
+    public Vector3 GetViewAimDirection(int slot)
+    {
+        EnsureViewStage();
+        return viewStage.GetAimDirection(slot);
+    }
+
+    // 场景视图组件只在本场景创建
+    void EnsureViewStage()
+    {
+        if (viewStage != null) return;
+
+        viewStage = GetComponent<StartViewStage>();
+        if (viewStage == null) viewStage = gameObject.AddComponent<StartViewStage>();
+        viewStage.BuildStage(StartVector3);
     }
 }
