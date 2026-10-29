@@ -12,7 +12,7 @@ public class Player_Stamina_Date
     public float rollStaminaCost = 30f;         //翻滚消耗
     public float recoverRate = 30f;             //每秒恢复
     public float runRecoverRate = 10f;          //跑步每秒恢复
-    public float recoverDelay = 0.35f;          //恢复延迟秒
+    public float recoverDelay = 0.3f;          //恢复延迟秒
 
     float recoverTimer;                         //恢复延迟剩余
 
