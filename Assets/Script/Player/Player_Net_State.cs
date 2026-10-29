@@ -21,6 +21,7 @@ public class Player_Net_State : NetworkBehaviour
     NetworkVariable<int> netScore = new NetworkVariable<int>();             //玩家积分
     NetworkVariable<float> netRespawnWait = new NetworkVariable<float>();   //等待剩余
     NetworkVariable<bool> netOut = new NetworkVariable<bool>();             //已淘汰，不再复活
+    NetworkVariable<float> netStamina = new NetworkVariable<float>(100f);   //当前体力
 
     //对外读取
     public uint Show_State => netShowState.Value;           //表现状态位
@@ -36,6 +37,7 @@ public class Player_Net_State : NetworkBehaviour
     public int Score => netScore.Value;                     //玩家积分
     public float RespawnWait => netRespawnWait.Value;       //等待剩余
     public bool Is_Out => netOut.Value;                     //已淘汰
+    public float Stamina => netStamina.Value;               //当前体力
 
     //本机表现状态位，按键本地预测
     public uint Show_State_Local()
@@ -124,6 +126,10 @@ public class Player_Net_State : NetworkBehaviour
         netHealth.Value = c.Con_ObjectSystem.HP;
         netAmmo.Value = c.Con_gun_Control.ammo;
         netMagazine.Value = c.Con_gun_Control.magazineCount;
+        if (c.Con_move != null
+            && !Mathf.Approximately(netStamina.Value,
+                c.Con_move.staminaDate.stamina))
+            netStamina.Value = c.Con_move.staminaDate.stamina;
 
         // 垂直速度
         netVerticalSpeed.Value = c.rigidbody != null ? c.rigidbody.velocity.y : 0f;
@@ -142,7 +148,8 @@ public class Player_Net_State : NetworkBehaviour
     }
 
     //初始化同步
-    public void Init_Push(int hp, int ammo, int magazine, int respawnIdx)
+    public void Init_Push(int hp, int ammo, int magazine,
+        int respawnIdx, float stamina)
     {
         if (!IsServer) return;
 
@@ -150,6 +157,7 @@ public class Player_Net_State : NetworkBehaviour
         netAmmo.Value = ammo;
         netMagazine.Value = magazine;
         netRespawnIndex.Value = respawnIdx;
+        netStamina.Value = stamina;
     }
 
     // 复活重置弹药与弹夹，主机写入

@@ -179,7 +179,8 @@ public class Player_Control : Character_Move
         // 初始化同步
         if (IsServer && Con_net_State != null && Con_ObjectSystem != null && Con_gun_Control != null && Con_move != null)
             Con_net_State.Init_Push(Con_ObjectSystem.HP, Con_gun_Control.ammo,
-                Con_gun_Control.magazineCount, Con_ObjectSystem.respawnIndex);
+                Con_gun_Control.magazineCount, Con_ObjectSystem.respawnIndex,
+                Con_move.staminaDate.stamina);
 
         if (Con_body != null) Con_body.Body_Init(rigidbody);
         if (Con_gun_Control != null)
@@ -455,6 +456,11 @@ public class Player_Control : Character_Move
     public void Player_Control_Show_ClientUpdate_Own()
     {
         if (!IsLocalPlayer) return;
+
+        // 客机校正体力预测
+        if (!IsServer && Con_move != null && Con_net_State != null)
+            Con_move.staminaDate.Sync_Date(Con_net_State.Stamina,
+                Con_move.Is_Stamina_Action);
 
         // 本机信号花屏
         if (Con_player_camera != null && Con_ObjectSystem != null)

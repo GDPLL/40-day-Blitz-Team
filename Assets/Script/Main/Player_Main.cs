@@ -88,7 +88,9 @@ public class Player_Main : NetworkBehaviour
             if (uI_Player != null)
                 uI_Player.UI_Player_Show(oPlayer_Control.Con_gun_Control.ammo, oPlayer_Control.Con_gun_Control.maxAmmo,
                     oPlayer_Control.Con_ObjectSystem.HP, oPlayer_Control.Con_ObjectSystem.MaxHp,
-                    oPlayer_Control.MagazineCount, oPlayer_Control.Con_gun_Control.IsReloading);
+                    oPlayer_Control.MagazineCount, oPlayer_Control.Con_gun_Control.IsReloading,
+                    oPlayer_Control.Con_move.staminaDate.stamina,
+                    oPlayer_Control.Con_move.staminaDate.maxStamina);
 
             // 本机人形状态图
             if (uI_Body != null)

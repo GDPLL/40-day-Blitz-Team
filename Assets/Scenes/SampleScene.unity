@@ -24080,6 +24080,7 @@ GameObject:
   - component: {fileID: 802451440}
   - component: {fileID: 802451441}
   - component: {fileID: 802451442}
+  - component: {fileID: 802451443}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Canvas
@@ -24196,6 +24197,7 @@ MonoBehaviour:
   ammoImage: {fileID: 1275695788}
   healthImage: {fileID: 2117460052}
   magazineUI: {fileID: 0}
+  staminaUI: {fileID: 0}
 --- !u!114 &802451441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24226,6 +24228,47 @@ MonoBehaviour:
   timeText: {fileID: 2058504135}
   eventText: {fileID: 649146077}
   showTime: 5
+--- !u!114 &802451443
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802451435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4de5d8b952895e841a17f8ed3a21491f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  magazineHeight: 190
+  reserveHeight: 100
+  magazineGap: 5
+  panelOffset: {x: 50, y: 120}
+  activeAlpha: 0.45
+  idleAlpha: 0.28
+  moveSmooth: 14
+  fadeTime: 0.18
+  activeColor: {r: 0.93, g: 0.97, b: 0.9, a: 1}
+  outlineColor: {r: 0.1, g: 0.11, b: 0.08, a: 0.55}
+  bulletOutline: 1
+  stackTilt: 0
+  stackOffsetX: 0
+  stackKickDistance: 5
+  stackKickTime: 0.09
+  discardLife: 0.45
+  discardSpin: -260
+  discardVelocity: {x: -90, y: 20}
+  discardGravity: -900
+  bulletLife: 1.6
+  bulletUpSpeed: 240
+  bulletSideSpeed: 90
+  bulletGravity: -700
+  bulletSpin: 360
+  bulletPressTime: 0.08
+  bulletPressDistance: 24
+  bulletWidth: 40
+  bulletOffscreenMargin: 24
+  bulletColor: {r: 0.98, g: 0.82, b: 0.25, a: 1}
 --- !u!1001 &803484644
 PrefabInstance:
   m_ObjectHideFlags: 0

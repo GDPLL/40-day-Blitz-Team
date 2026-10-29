@@ -11,6 +11,8 @@ public class Player_Move_Date : MonoBehaviour
     public float respawnSquatTime = 0.23f;      //复活倒地碰撞体保持秒
     [Header("位置纠偏")]
     public float reconcileSpeed = 5f;           //纠偏拉回速度,米每秒
+    [Header("体力")]
+    public Player_Stamina_Date staminaDate = new Player_Stamina_Date(); //体力数据
 
     public bool isOnGround;     //在地面
     public bool isWeightLess;   //失重中
@@ -63,6 +65,8 @@ public class Player_Move_Date : MonoBehaviour
     public bool Is_Roll_Active => rollTimer > 0f || rollPending; //是否翻滚占用
     public bool Is_Roll_Push => rollTimer > 0f && rollDelay <= 0f; //是否二段翻滚
     public bool Is_Roll_Half => rollTimer > 0f && rollHalf; //是否后半段
+    public bool Is_Stamina_Action =>
+        Is_Roll_Active || slideTimer > 0f || slideExitTimer > 0f || slidePending; //是否动作消耗
 
     // 瞬移申请，高优先级覆盖低优先级
     public void Teleport_Request(Vector3 position, Quaternion rotation, int priority)
@@ -147,6 +151,7 @@ public class Player_Move_Date : MonoBehaviour
         slidePending = false;
         slideBefore = false;
         slideJumpBufferTimer = 0f;
+        staminaDate.Reset_Date();
         isPeekLeft = false;
         isPeekRight = false;
         respawnSquatTimer = respawnSquatTime;
@@ -302,7 +307,8 @@ public class Player_Move_Date : MonoBehaviour
         {
             rollRequest = false;
 
-            if (!Is_Roll_Active && slideTimer <= 0f)
+            if (!Is_Roll_Active && slideTimer <= 0f && !slidePending
+                && staminaDate.Try_Spend(staminaDate.rollStaminaCost))
             {
                 bool requestAir = rollRequestAir || !body.IsGrounded;
                 rollRequestAir = false;
@@ -323,6 +329,7 @@ public class Player_Move_Date : MonoBehaviour
                 }
                 else rollPending = true;
             }
+            else rollRequestAir = false;
         }
 
         // 空中翻滚落地启动
@@ -343,16 +350,20 @@ public class Player_Move_Date : MonoBehaviour
             slideRequest = false;
             bool requestAir = slideRequestAir || !body.IsGrounded;
             slideRequestAir = false;
+            bool canStart = slideTimer <= 0f && !Is_Roll_Active
+                && (requestAir || body.IsGrounded);
 
-            if (requestAir && slideTimer <= 0f && !Is_Roll_Active)
-                slidePending = true;
-            else if (!requestAir && slideTimer <= 0f && !Is_Roll_Active && body.IsGrounded)
+            if (canStart && staminaDate.Try_Spend(staminaDate.slideStaminaCost))
             {
-                slidePending = false;
-                slideTimer = slideTime;
-                slideExitTimer = 0f;
-                slideJumpBufferTimer = 0f;
-                body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
+                if (requestAir) slidePending = true;
+                else
+                {
+                    slidePending = false;
+                    slideTimer = slideTime;
+                    slideExitTimer = 0f;
+                    slideJumpBufferTimer = 0f;
+                    body.Body_Slide_Date(packet.move, packet.viewDir, body.GroundNormal);
+                }
             }
         }
 
@@ -414,6 +425,9 @@ public class Player_Move_Date : MonoBehaviour
         // 输入施推力
         if (isWASDDowm && rollPhysicsTimer <= 0f && slideTimer <= 0f)
             body.Body_Move();
+
+        staminaDate.Recover_Date(Time.fixedDeltaTime, Is_Stamina_Action,
+            body.IsGrounded, isRuning);
     }
 
     // 计算滑铲起身惯性
