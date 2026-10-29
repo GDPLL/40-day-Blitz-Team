@@ -8,11 +8,17 @@ using Unity.VisualScripting;
 //负责开始界面的场景初始化与配置方法
 public class Start_Main : MonoBehaviour
 {
+    const int HardPlayerLimit = 4;
+
     public SessionManager session;
     public Button hostButton;
     public Button clientButton;
     public Button startButton;
     public Vector3 StartVector3;
+    public Vector3 StartRotation;
+    public float PlayerSpacing = 1.5f;
+    public float FirstPlayerExtraLeft = 2f;
+    public int MaxLobbyPlayers = HardPlayerLimit;
     public GameObject ObjectPrefab;
     public TextMeshProUGUI textMeshPro;
 
@@ -61,7 +67,8 @@ public class Start_Main : MonoBehaviour
     {
         if (data.EventType != ConnectionEvent.ClientConnected || !manager.IsServer) return;
 
-        SpawnPlayer(manager.ConnectedClients.Count - 1);    //新玩家编号
+        int index = manager.ConnectedClients.Count - 1;
+        if (index < LobbyPlayerLimit) SpawnPlayer(index);    //新玩家编号
     }
 
     // 回到房间，放开鼠标并重建成员
@@ -73,15 +80,43 @@ public class Start_Main : MonoBehaviour
         if (!GameManager.gameManager.networkManager.IsServer) return;   //只有主机生成
 
         // 按当前人数重新生成
-        int count = GameManager.gameManager.networkManager.ConnectedClients.Count;
+        int count = Mathf.Min(
+            GameManager.gameManager.networkManager.ConnectedClients.Count,
+            LobbyPlayerLimit);
         for (int i = 0; i < count; i++) SpawnPlayer(i);
     }
+
+    int LobbyPlayerLimit => Mathf.Clamp(MaxLobbyPlayers, 1, HardPlayerLimit);
 
     // 生成玩家对象，index为编号
     void SpawnPlayer(int index)
     {
-        GameObject go = Instantiate(ObjectPrefab,
-            StartVector3 + Vector3.right * 2f * index, Quaternion.identity);
+        if (index < 0 || index >= LobbyPlayerLimit) return;
+
+        // 固定四个展示位，Camera.right 对应屏幕从左到右。
+        float centerIndex = (LobbyPlayerLimit - 1) * 0.5f;
+        Camera mainCamera = Camera.main;
+        Vector3 right = mainCamera != null ? mainCamera.transform.right : Vector3.back;
+
+        float slotOffset = (index - centerIndex) * PlayerSpacing;
+        if (index == 0) slotOffset -= FirstPlayerExtraLeft;
+
+        // 首位额外左移后，按最左和最右槽位的包围中心整体回正。
+        float leftmost = -centerIndex * PlayerSpacing - FirstPlayerExtraLeft;
+        float rightmost = centerIndex * PlayerSpacing;
+        float rowCenter = (leftmost + rightmost) * 0.5f;
+        Vector3 spawnPosition = StartVector3 + right * (slotOffset - rowCenter);
+
+        Vector3 faceCamera = mainCamera != null
+            ? mainCamera.transform.position - spawnPosition
+            : Vector3.zero;
+        faceCamera.y = 0f;
+        Quaternion rotation = faceCamera.sqrMagnitude > 0.001f
+            ? Quaternion.LookRotation(faceCamera)
+            : Quaternion.Euler(StartRotation);
+
+        GameObject go = Instantiate(ObjectPrefab, spawnPosition, rotation);
+
         // destroyWithScene 为 true，切场景时销毁
         go.GetComponent<NetworkObject>().Spawn(true);
     }

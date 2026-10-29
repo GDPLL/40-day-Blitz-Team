@@ -1438,6 +1438,7 @@ GameObject:
   - component: {fileID: 1326813372226240841}
   - component: {fileID: 622760688168328977}
   - component: {fileID: 7075731802248219611}
+  - component: {fileID: 724563210}
   m_Layer: 8
   m_HasEditorInfo: 1
   m_Name: Player
@@ -1463,6 +1464,19 @@ Transform:
   - {fileID: 5684947569124474701}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &724563210
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7709504677304415273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abb4ee50a6b24aaab3bc1f05b1ee0cc9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  idleStateName: "\u7AD9\u7ACB"
 --- !u!136 &6542558866760458668
 CapsuleCollider:
   m_ObjectHideFlags: 0
